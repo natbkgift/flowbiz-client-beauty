@@ -1,0 +1,125 @@
+#!/bin/bash
+set -e
+
+# Configuration
+APP_DIR="/opt/flowbiz/clients/flowbiz-client-beauty"
+REPO_DIR="$APP_DIR/repo"
+RELEASES_DIR="$APP_DIR/releases"
+SHARED_DIR="$APP_DIR/shared"
+CURRENT_DIR="$APP_DIR/current"
+
+echo "==============================================="
+echo "=== FlowBiz Beauty CRM Zero-Downtime Deploy ==="
+echo "==============================================="
+
+# 1. Ensure directory structure exists
+mkdir -p "$RELEASES_DIR"
+mkdir -p "$SHARED_DIR"
+
+# 2. Make sure shared .env exists
+if [ ! -f "$SHARED_DIR/.env" ]; then
+  if [ -f "$REPO_DIR/.env" ]; then
+    echo "[Config] Copying .env from repo to shared..."
+    cp "$REPO_DIR/.env" "$SHARED_DIR/.env"
+  else
+    echo "[Config] Creating default .env in shared from example..."
+    cp "$REPO_DIR/.env.example" "$SHARED_DIR/.env"
+    
+    # Update default production values
+    sed -i 's/APP_ENV=development/APP_ENV=production/g' "$SHARED_DIR/.env"
+    sed -i 's/API_PORT=3001/API_PORT=8103/g' "$SHARED_DIR/.env"
+    sed -i 's/WEB_PORT=4173/WEB_PORT=8104/g' "$SHARED_DIR/.env"
+    
+    # Use production DB configs
+    sed -i 's/POSTGRES_DB=flowbiz_local/POSTGRES_DB=flowbiz_beauty/g' "$SHARED_DIR/.env"
+    sed -i 's/POSTGRES_USER=flowbiz/POSTGRES_USER=flowbiz_beauty/g' "$SHARED_DIR/.env"
+    sed -i 's/POSTGRES_PASSWORD=flowbiz_local_dev_only/POSTGRES_PASSWORD=DexzRQ3c6PS2P8Fc1Tly9pfQ/g' "$SHARED_DIR/.env"
+    sed -i 's|DATABASE_URL=postgresql://flowbiz:flowbiz_local_dev_only@localhost:5432/flowbiz_local|DATABASE_URL=postgresql://flowbiz_beauty:DexzRQ3c6PS2P8Fc1Tly9pfQ@localhost:5432/flowbiz_beauty|g' "$SHARED_DIR/.env"
+  fi
+fi
+
+# 3. Pull latest changes inside repo
+echo "[Git] Updating git repository..."
+cd "$REPO_DIR"
+git fetch origin
+git reset --hard origin/main
+
+# 4. Generate unique release directory name
+RELEASE_NAME=$(date +%Y%m%d%H%M%S)
+NEW_RELEASE_DIR="$RELEASES_DIR/$RELEASE_NAME"
+echo "[Deploy] Creating new release directory: $RELEASE_NAME"
+mkdir -p "$NEW_RELEASE_DIR"
+
+# 5. Extract files from git to new release directory
+git archive HEAD | tar -x -C "$NEW_RELEASE_DIR"
+
+# 6. Symlink shared files (.env)
+ln -sf "$SHARED_DIR/.env" "$NEW_RELEASE_DIR/.env"
+
+# 7. Start the database container if not running
+echo "[Docker] Starting postgres database container..."
+cd "$NEW_RELEASE_DIR"
+docker compose -f "$NEW_RELEASE_DIR/infra/docker/docker-compose.yml" --env-file "$SHARED_DIR/.env" up -d --wait || \
+docker compose -f "$NEW_RELEASE_DIR/infra/docker/docker-compose.yml" --env-file "$SHARED_DIR/.env" up -d
+
+# 8. Install dependencies and build
+echo "[Node] Installing dependencies..."
+npm install
+
+echo "[Node] Building React app..."
+npm run build:web
+
+echo "[Database] Running migrations..."
+npm run migrate
+
+# 9. Switch symlink atomically
+echo "[Deploy] Updating symlink current -> $RELEASE_NAME..."
+ln -sfn "$NEW_RELEASE_DIR" "$CURRENT_DIR"
+
+# 10. Copy and configure systemd services
+echo "[Systemd] Configuring systemd services..."
+SERVICE_UPDATED=0
+
+if [ -f "$NEW_RELEASE_DIR/infra/systemd/flowbiz-client-beauty-api.service" ]; then
+  if [ ! -f "/etc/systemd/system/flowbiz-client-beauty-api.service" ] || \
+     ! cmp -s "$NEW_RELEASE_DIR/infra/systemd/flowbiz-client-beauty-api.service" "/etc/systemd/system/flowbiz-client-beauty-api.service"; then
+    echo "[Systemd] Installing flowbiz-client-beauty-api.service..."
+    cp "$NEW_RELEASE_DIR/infra/systemd/flowbiz-client-beauty-api.service" "/etc/systemd/system/flowbiz-client-beauty-api.service"
+    systemctl enable flowbiz-client-beauty-api
+    SERVICE_UPDATED=1
+  fi
+fi
+
+if [ -f "$NEW_RELEASE_DIR/infra/systemd/flowbiz-client-beauty-web.service" ]; then
+  if [ ! -f "/etc/systemd/system/flowbiz-client-beauty-web.service" ] || \
+     ! cmp -s "$NEW_RELEASE_DIR/infra/systemd/flowbiz-client-beauty-web.service" "/etc/systemd/system/flowbiz-client-beauty-web.service"; then
+    echo "[Systemd] Installing flowbiz-client-beauty-web.service..."
+    cp "$NEW_RELEASE_DIR/infra/systemd/flowbiz-client-beauty-web.service" "/etc/systemd/system/flowbiz-client-beauty-web.service"
+    systemctl enable flowbiz-client-beauty-web
+    SERVICE_UPDATED=1
+  fi
+fi
+
+if [ "$SERVICE_UPDATED" -eq 1 ]; then
+  echo "[Systemd] Reloading systemd daemon..."
+  systemctl daemon-reload
+fi
+
+# 11. Restart services
+echo "[Systemd] Restarting services..."
+if [ -f "/etc/systemd/system/flowbiz-client-beauty-api.service" ]; then
+  systemctl restart flowbiz-client-beauty-api
+  echo "[Systemd] API service restarted."
+fi
+
+if [ -f "/etc/systemd/system/flowbiz-client-beauty-web.service" ]; then
+  systemctl restart flowbiz-client-beauty-web
+  echo "[Systemd] Web service restarted."
+fi
+
+# 12. Clean up old releases, keep last 5
+echo "[Deploy] Cleaning up old releases..."
+cd "$RELEASES_DIR"
+ls -1t | tail -n +6 | xargs -I {} rm -rf "{}" 2>/dev/null || true
+
+echo "=== Deployment Completed Successfully! ==="

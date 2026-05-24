@@ -1,0 +1,14 @@
+[Unit]
+Description=FlowBiz Beauty Web Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/flowbiz/clients/flowbiz-client-beauty/current
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node apps/web/src/server.js
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
