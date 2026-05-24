@@ -275,3 +275,157 @@ test('Facebook Page Comment Webhook scans intent, triggers auto-reply and create
   assert.ok(noteRows.rows.length >= 1);
   assert.ok(noteRows.rows[0].content.includes('FB Comment Intent'));
 });
+
+const { handleUnifiedChatRoutes } = require('../apps/api/src/modules/unified-chat/routes');
+
+test('Unified Chat API handles listing threads, thread messages, and sending manual messages with rich payload standardizations', async (t) => {
+  const fixture = await createFixture(t);
+
+  // 1. Create a lead and active chat thread/messages in the database
+  const leadResult = await fixture.pool.query(
+    `insert into leads (clinic_id, organization_id, workspace_id, source, full_name, status, stage)
+     values ($1, $2, $3, 'line', 'Chat Client', 'new', 'inquiry') returning id`,
+    [fixture.session.currentClinic.id, fixture.session.currentOrganization.id, fixture.session.currentWorkspace.id]
+  );
+  const leadId = Number(leadResult.rows[0].id);
+
+  // Add contact identity to ensure outbound resolves a recipient
+  await fixture.pool.query(
+    `insert into contact_identities (clinic_id, entity_type, entity_id, channel_type, external_id, is_primary)
+     values ($1, 'lead', $2, 'line', 'U-line-user-123', true)`,
+    [fixture.session.currentClinic.id, leadId]
+  );
+
+  const threadResult = await fixture.pool.query(
+    `insert into ai_chat_threads (clinic_id, lead_id, status, context_summary)
+     values ($1, $2, 'active', 'Interested in Botox') returning id`,
+    [fixture.session.currentClinic.id, leadId]
+  );
+  const threadId = Number(threadResult.rows[0].id);
+
+  // Insert standard text and raw Flex JSON messages into the thread
+  const lineFlexJson = JSON.stringify({
+    type: "flex",
+    contents: {
+      body: {
+        contents: [
+          { type: "text", text: "Special Botox Promo 2,900 THB" },
+          { type: "button", label: "Book Now" }
+        ]
+      }
+    }
+  });
+
+  await fixture.pool.query(
+    `insert into ai_chat_messages (thread_id, sender_type, message_text, confidence_score, status)
+     values ($1, 'lead', 'How much is Botox?', 1.00, 'sent'),
+            ($1, 'ai_agent', $2, 0.90, 'sent')`,
+    [threadId, lineFlexJson]
+  );
+
+  // 2. Test GET /chats (listing threads)
+  const reqList = {
+    method: 'GET',
+    url: { pathname: '/chats' },
+    headers: { authorization: `Bearer ${fixture.session.token}` }
+  };
+
+  let responseStatus = 200;
+  let responseData = null;
+
+  const res = {
+    status(code) {
+      responseStatus = code;
+      return this;
+    },
+    json(data) {
+      responseData = data;
+      return this;
+    }
+  };
+
+  const tools = {
+    authenticateRequest: async () => fixture.ownerContext,
+    parseJsonBody: async () => ({}),
+    json: (_response, status, data) => {
+      responseStatus = status;
+      responseData = data;
+    }
+  };
+
+  await handleUnifiedChatRoutes(reqList, {}, { pathname: '/chats' }, tools);
+
+  assert.equal(responseStatus, 200);
+  assert.ok(responseData.items);
+  assert.ok(responseData.items.some(item => item.id === threadId));
+  const mappedThread = responseData.items.find(item => item.id === threadId);
+  assert.equal(mappedThread.lead.fullName, 'Chat Client');
+  assert.equal(mappedThread.contextSummary, 'Interested in Botox');
+
+  // 3. Test GET /chats/:threadId/messages (thread messages and payload standardization)
+  const pathnameMessages = `/chats/${threadId}/messages`;
+  const reqMessages = {
+    method: 'GET',
+    url: { pathname: pathnameMessages },
+    headers: { authorization: `Bearer ${fixture.session.token}` }
+  };
+
+  await handleUnifiedChatRoutes(reqMessages, {}, { pathname: pathnameMessages }, tools);
+
+  assert.equal(responseStatus, 200);
+  assert.equal(responseData.threadId, threadId);
+  assert.equal(responseData.channelType, 'line');
+  assert.equal(responseData.messages.length, 2);
+
+  // Check text message normalization
+  const textMsg = responseData.messages[0];
+  assert.equal(textMsg.senderType, 'lead');
+  assert.equal(textMsg.messageText, 'How much is Botox?');
+  assert.equal(textMsg.richContent.type, 'text');
+  assert.equal(textMsg.richContent.text, 'How much is Botox?');
+
+  // Check Flex JSON message normalization
+  const flexMsg = responseData.messages[1];
+  assert.equal(flexMsg.senderType, 'ai_agent');
+  assert.equal(flexMsg.richContent.type, 'flex');
+  assert.equal(flexMsg.richContent.text, 'Special Botox Promo 2,900 THB');
+  assert.equal(flexMsg.richContent.elements[0].type, 'text');
+  assert.equal(flexMsg.richContent.elements[0].text, 'Special Botox Promo 2,900 THB');
+  assert.equal(flexMsg.richContent.elements[1].type, 'button');
+  assert.equal(flexMsg.richContent.elements[1].text, 'Book Now');
+
+  // 4. Test POST /chats/:threadId/send (sending manual staff reply)
+  const pathnameSend = `/chats/${threadId}/send`;
+  const reqSend = {
+    method: 'POST',
+    url: { pathname: pathnameSend },
+    headers: { authorization: `Bearer ${fixture.session.token}` }
+  };
+
+  const overrideMessageText = 'We have slots open today. Would you like to book?';
+  const toolsSend = {
+    authenticateRequest: async () => fixture.ownerContext,
+    parseJsonBody: async () => ({ messageText: overrideMessageText }),
+    json: (_response, status, data) => {
+      responseStatus = status;
+      responseData = data;
+    }
+  };
+
+  await handleUnifiedChatRoutes(reqSend, {}, { pathname: pathnameSend }, toolsSend);
+
+  assert.equal(responseStatus, 201);
+  assert.ok(responseData.success);
+  assert.ok(responseData.outboundMessageId);
+  assert.equal(responseData.message.senderType, 'staff_override');
+  assert.equal(responseData.message.messageText, overrideMessageText);
+
+  // Check Database for added message
+  const msgRows = await fixture.pool.query(
+    `select * from ai_chat_messages where thread_id = $1 and sender_type = 'staff_override' order by id desc limit 1`,
+    [threadId]
+  );
+  assert.equal(msgRows.rows.length, 1);
+  assert.equal(msgRows.rows[0].message_text, overrideMessageText);
+  assert.equal(msgRows.rows[0].status, 'sent');
+});

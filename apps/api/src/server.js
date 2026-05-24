@@ -43,6 +43,7 @@ const { handleCustomerRoutes } = require('./modules/customers/routes');
 const { handleMembershipRoutes } = require('./modules/memberships/routes');
 const { handleSettingsRoutes } = require('./modules/settings/routes');
 const { handleOpsRoutes } = require('./modules/ops/routes');
+const { handleUnifiedChatRoutes } = require('./modules/unified-chat/routes');
 
 const config = loadConfig();
 
@@ -317,6 +318,10 @@ async function routeRequest(request, response) {
   }
 
   if (await handleAuditRoutes(request, response, url, { authenticateRequest, json })) {
+    return;
+  }
+
+  if (await handleUnifiedChatRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
     return;
   }
 
