@@ -18,6 +18,7 @@ function validateCampaignPayload(payload) {
     channelType: payload.channelType,
     channelId: Number(payload.channelId),
     templateId: payload.templateId ? Number(payload.templateId) : null,
+    customMessageText: payload.customMessageText || null,
     segmentQueryJson: payload.segmentQueryJson || {},
     scheduledAt: payload.scheduledAt || null
   };
@@ -33,6 +34,7 @@ function mapCampaign(row) {
     channelType: row.channel_type,
     channelId: Number(row.channel_id),
     templateId: row.template_id ? Number(row.template_id) : null,
+    customMessageText: row.custom_message_text || null,
     segmentQueryJson: row.segment_query_json,
     status: row.status,
     scheduledAt: row.scheduled_at,
@@ -92,12 +94,13 @@ async function createCampaign(clinicContext, payload) {
         channel_type,
         channel_id,
         template_id,
+        custom_message_text,
         segment_query_json,
         status,
         scheduled_at,
         created_by
       )
-      values ($1, $2, $3, $4, $5, $6, $7::jsonb, 'draft', $8, $9)
+      values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, 'draft', $9, $10)
       returning *
     `,
     [
@@ -107,6 +110,7 @@ async function createCampaign(clinicContext, payload) {
       normalized.channelType,
       normalized.channelId,
       normalized.templateId,
+      normalized.customMessageText,
       JSON.stringify(normalized.segmentQueryJson),
       normalized.scheduledAt,
       userId
@@ -311,7 +315,7 @@ async function dispatchCampaignDelivery(clinicContext, deliveryId) {
 
   const deliveryResult = await pool.query(
     `
-      select cd.*, c.clinic_id, c.channel_id, c.template_id, c.segment_query_json, c.status as campaign_status
+      select cd.*, c.clinic_id, c.channel_id, c.template_id, c.custom_message_text, c.segment_query_json, c.status as campaign_status
       from campaign_deliveries cd
       inner join campaigns c on c.id = cd.campaign_id
       where cd.id = $1
@@ -340,7 +344,7 @@ async function dispatchCampaignDelivery(clinicContext, deliveryId) {
       {
         channelId: Number(delivery.channel_id),
         templateId: delivery.template_id ? Number(delivery.template_id) : null,
-        content: 'Broadcast Campaign Outbound'
+        content: delivery.custom_message_text || 'Broadcast Campaign Outbound'
       },
       {
         messageType: 'campaign'
