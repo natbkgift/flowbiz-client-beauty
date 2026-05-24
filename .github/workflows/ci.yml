@@ -1,0 +1,52 @@
+name: FlowBiz Beauty CI/CD validation Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: flowbiz_beauty_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run esbuild validate compile check
+        run: npm run validate
+
+      - name: Run SQL Schema migrations verification
+        env:
+          DATABASE_URL: postgres://postgres:password@localhost:5432/flowbiz_beauty_test
+        run: npm run migrate
+
+      - name: Run Phase 5 and Phase 6 Automated Test Suites
+        env:
+          DATABASE_URL: postgres://postgres:password@localhost:5432/flowbiz_beauty_test
+        run: node --test tests/phase5_social_inbound.test.js tests/phase6_loyalty_roas.test.js
