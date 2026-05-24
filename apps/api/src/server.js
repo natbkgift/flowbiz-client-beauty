@@ -44,6 +44,7 @@ const { handleMembershipRoutes } = require('./modules/memberships/routes');
 const { handleSettingsRoutes } = require('./modules/settings/routes');
 const { handleOpsRoutes } = require('./modules/ops/routes');
 const { handleUnifiedChatRoutes } = require('./modules/unified-chat/routes');
+const { handleLoyaltyRoutes } = require('./modules/loyalty-mgm/routes');
 
 const config = loadConfig();
 
@@ -148,6 +149,10 @@ async function routeRequest(request, response) {
   }
 
   if (await handleAiAgentRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
+    return;
+  }
+
+  if (await handleLoyaltyRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
     return;
   }
 
