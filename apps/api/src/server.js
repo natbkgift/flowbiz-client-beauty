@@ -36,6 +36,7 @@ const {
 const { handleAutomationBuilderRoutes } = require('./modules/automation-builder/routes');
 const { createBuilderFlow, getExecutionSteps } = require('./modules/automation-builder/service');
 const { handleAiRoutes } = require('./modules/ai/routes');
+const { handleAiAgentRoutes } = require('./modules/ai-agent/routes');
 const { handleAnalyticsRoutes } = require('./modules/analytics/routes');
 const { handleAuditRoutes } = require('./modules/audit/routes');
 const { handleCustomerRoutes } = require('./modules/customers/routes');
@@ -142,6 +143,10 @@ async function routeRequest(request, response) {
   }
 
   if (await handleIntegrationGatewayRoutes(request, response, url, { authenticateRequest, authenticateAndAuthorize, parseJsonBody, json })) {
+    return;
+  }
+
+  if (await handleAiAgentRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
     return;
   }
 

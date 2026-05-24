@@ -198,12 +198,14 @@ async function executeJob(job) {
   switch (job.job_type) {
     case 'campaign.dispatch': {
       const { dispatchCampaignDelivery } = require('../campaigns/service');
+      const { recordMeteredUsage } = require('../billing/service');
       const context = await resolveWorkerContext(
         job.clinic_id,
         job.payload_json?.actorUserId || null,
         job.payload_json?.workspaceId || null
       );
       await dispatchCampaignDelivery(context, job.payload_json.deliveryId);
+      await recordMeteredUsage(job.clinic_id, 'broadcast_sent', 1);
       return { type: 'campaign.dispatch', deliveryId: job.payload_json.deliveryId };
     }
     case 'automation.execute': {

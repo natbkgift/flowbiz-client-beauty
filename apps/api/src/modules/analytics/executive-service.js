@@ -76,6 +76,57 @@ async function getExecutiveAnalyticsSummary(organizationId) {
     };
   });
 
+  // 5. Weekly Lead Influx Trends (Phase 4 Extension)
+  const trendsResult = await pool.query(
+    `
+      select 
+        date_trunc('week', created_at)::date as week_start,
+        count(id)::int as lead_count
+      from leads
+      where organization_id = $1
+      group by week_start
+      order by week_start asc
+      limit 8
+    `,
+    [organizationId]
+  );
+
+  const weeklyLeadsTrends = trendsResult.rows.map((row) => ({
+    weekStart: row.week_start,
+    leadCount: row.lead_count
+  }));
+
+  // 6. Channel ROI Breakdown (LINE vs Facebook - Phase 4 Extension)
+  const channelStatsResult = await pool.query(
+    `
+      select 
+        channel_type,
+        count(id)::int as campaign_count,
+        coalesce(sum((stats_json->>'deliveredCount')::int)::int, 0) as total_delivered,
+        coalesce(sum((stats_json->>'failedCount')::int)::int, 0) as total_failed
+      from campaigns
+      where workspace_id in (
+        select id from workspaces where organization_id = $1
+      )
+      group by channel_type
+    `,
+    [organizationId]
+  );
+
+  const channelBreakdown = {
+    line: { campaignCount: 0, deliveredCount: 0, failedCount: 0 },
+    facebook: { campaignCount: 0, deliveredCount: 0, failedCount: 0 }
+  };
+
+  channelStatsResult.rows.forEach((row) => {
+    const ch = row.channel_type === 'facebook' ? 'facebook' : 'line';
+    channelBreakdown[ch] = {
+      campaignCount: row.campaign_count,
+      deliveredCount: row.total_delivered,
+      failedCount: row.total_failed
+    };
+  });
+
   return {
     organizationId: Number(organizationId),
     organizationName: orgCheck.rows[0].name,
@@ -89,7 +140,9 @@ async function getExecutiveAnalyticsSummary(organizationId) {
         failedCount: campaignStats.rows[0].total_failed
       }
     },
-    topPerformingClinics: topClinics
+    topPerformingClinics: topClinics,
+    weeklyLeadsTrends,
+    channelBreakdown
   };
 }
 
