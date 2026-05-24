@@ -1,8 +1,30 @@
 const { matchPath } = require('../../common/routing');
-const { handleInboundMessage, getApprovalQueue, approveOrOverrideMessage } = require('./conversation-service');
+const {
+  handleInboundMessage,
+  getApprovalQueue,
+  approveOrOverrideMessage,
+  getAiCopilotSuggestion
+} = require('./conversation-service');
 
 async function handleAiAgentRoutes(request, response, url, tools) {
   const { authenticateRequest, parseJsonBody, json } = tools;
+
+  if (url.pathname === '/ai-agent/copilot/suggest' && request.method === 'GET') {
+    const context = await authenticateRequest(request);
+    const messageText = url.searchParams.get('messageText');
+    const leadId = Number.parseInt(url.searchParams.get('leadId'), 10);
+
+    if (!messageText || !leadId) {
+      return json(response, 400, { error: 'Bad Request', message: 'messageText and leadId are required' });
+    }
+
+    const suggestion = await getAiCopilotSuggestion(
+      context.currentClinic.id,
+      leadId,
+      messageText
+    );
+    return json(response, 200, suggestion);
+  }
 
   if (url.pathname === '/ai-agent/approval-queue' && request.method === 'GET') {
     const context = await authenticateRequest(request);

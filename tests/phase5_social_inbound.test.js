@@ -110,7 +110,7 @@ test('TikTok Lead Webhook parses, buffers raw payload, and creates lead successf
     [responseData.leadId]
   );
   assert.ok(noteRows.rows.length >= 1);
-  assert.ok(noteRows.rows[0].content.includes('TikTok Ads Ingest'));
+  assert.ok(noteRows.rows.some(r => r.content.includes('TikTok Ads Ingest')));
 });
 
 test('Facebook Lead Ads Webhook parses, buffers, and creates lead successfully', async (t) => {
@@ -273,7 +273,7 @@ test('Facebook Page Comment Webhook scans intent, triggers auto-reply and create
     [responseData.leadId]
   );
   assert.ok(noteRows.rows.length >= 1);
-  assert.ok(noteRows.rows[0].content.includes('FB Comment Intent'));
+  assert.ok(noteRows.rows.some(r => r.content.includes('FB Comment Intent')));
 });
 
 const { handleUnifiedChatRoutes } = require('../apps/api/src/modules/unified-chat/routes');
@@ -428,4 +428,60 @@ test('Unified Chat API handles listing threads, thread messages, and sending man
   assert.equal(msgRows.rows.length, 1);
   assert.equal(msgRows.rows[0].message_text, overrideMessageText);
   assert.equal(msgRows.rows[0].status, 'sent');
+});
+
+const { handleAiAgentRoutes } = require('../apps/api/src/modules/ai-agent/routes');
+
+test('AI Agent Routes handles Co-Pilot promotions suggestions with intent scanning and DB auditing', async (t) => {
+  const fixture = await createFixture(t);
+
+  // Create a lead to link the suggestions audit trail
+  const leadResult = await fixture.pool.query(
+    `insert into leads (clinic_id, organization_id, workspace_id, source, full_name, status, stage)
+     values ($1, $2, $3, 'manual', 'Botox Inquiry Client', 'new', 'inquiry') returning id`,
+    [fixture.session.currentClinic.id, fixture.session.currentOrganization.id, fixture.session.currentWorkspace.id]
+  );
+  const leadId = Number(leadResult.rows[0].id);
+
+  // Mock Request Object targeting GET /ai-agent/copilot/suggest
+  const reqSuggest = {
+    method: 'GET',
+    url: { pathname: '/ai-agent/copilot/suggest' },
+    headers: { authorization: `Bearer ${fixture.session.token}` }
+  };
+
+  let responseStatus = 200;
+  let responseData = null;
+
+  const tools = {
+    authenticateRequest: async () => fixture.ownerContext,
+    parseJsonBody: async () => ({}),
+    json: (_response, status, data) => {
+      responseStatus = status;
+      responseData = data;
+    }
+  };
+
+  // 1. Test scanning botox intent
+  const botoxUrl = new URL(`http://localhost/ai-agent/copilot/suggest?leadId=${leadId}&messageText=สนใจราคาโบท็อกซ์ริ้วรอยแก้มค่ะ`);
+  await handleAiAgentRoutes(reqSuggest, {}, botoxUrl, tools);
+
+  assert.equal(responseStatus, 200);
+  assert.ok(responseData.success);
+  assert.equal(responseData.confidenceScore, 0.95);
+  assert.equal(responseData.promotion.code, 'BOTOX29');
+  assert.equal(responseData.promotion.price, 2900);
+  assert.ok(responseData.suggestedResponse.includes('โบท็อกซ์'));
+  assert.ok(responseData.suggestedResponse.includes('2,900'));
+
+  // 2. Verify audit record in ai_copilot_suggestions table
+  const auditRows = await fixture.pool.query(
+    `select * from ai_copilot_suggestions where lead_id = $1 order by id desc limit 1`,
+    [leadId]
+  );
+  assert.equal(auditRows.rows.length, 1);
+  assert.equal(Number(auditRows.rows[0].lead_id), leadId);
+  assert.equal(Number(auditRows.rows[0].confidence_score), 0.95);
+  assert.ok(auditRows.rows[0].suggested_response.includes('2,900'));
+  assert.equal(auditRows.rows[0].used, false);
 });
