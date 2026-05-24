@@ -138,7 +138,7 @@ test('campaign broadcast system - creation, segmentation, enqueuing, worker proc
   assert.ok(workerJobs.rowCount >= 1);
 
   // 8. Run worker to process the jobs
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  await pool.query("update worker_jobs set run_at = now() - interval '10 seconds' where clinic_id = $1 and job_type = 'campaign.dispatch'", [context.currentClinic.id]);
   const runResult = await runDueJobs(10);
   console.log('runResult:', JSON.stringify(runResult, null, 2));
 

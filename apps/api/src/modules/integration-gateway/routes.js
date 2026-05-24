@@ -1,6 +1,7 @@
 const { matchPath } = require('../../common/routing');
 const { handleWixWebhook } = require('./wix-handler');
 const { handleZonepangWebhook } = require('./zonepang-handler');
+const { checkRateLimit } = require('../../common/rate-limiter');
 
 async function handleIntegrationGatewayRoutes(request, response, url, tools) {
   const { parseJsonBody, json } = tools;
@@ -12,6 +13,13 @@ async function handleIntegrationGatewayRoutes(request, response, url, tools) {
       workspaceId: wixParams.workspaceId
     };
     request.query = Object.fromEntries(url.searchParams);
+    
+    // API Security Rate Limiter (60 Req / 1 Min window)
+    const limitCheck = checkRateLimit(request, 60, 60000);
+    if (!limitCheck.allowed) {
+      return json(response, 429, { error: 'Too Many Requests', message: limitCheck.message });
+    }
+
     request.body = await parseJsonBody(request);
     
     await new Promise((resolve, reject) => {
@@ -38,6 +46,13 @@ async function handleIntegrationGatewayRoutes(request, response, url, tools) {
       clinicId: zonepangParams.clinicId
     };
     request.query = Object.fromEntries(url.searchParams);
+
+    // API Security Rate Limiter (60 Req / 1 Min window)
+    const limitCheck = checkRateLimit(request, 60, 60000);
+    if (!limitCheck.allowed) {
+      return json(response, 429, { error: 'Too Many Requests', message: limitCheck.message });
+    }
+
     request.body = await parseJsonBody(request);
 
     await new Promise((resolve, reject) => {

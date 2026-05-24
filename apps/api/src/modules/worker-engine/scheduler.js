@@ -119,17 +119,20 @@ async function failOrRetryJob(job, error) {
     );
   }
 
+  // Archiving to DLQ (Dead Letter Queue) and clearing from active queue
   await getPool().query(
     `
-      update worker_jobs
-      set status = 'failed',
-          attempts = $2,
-          last_error = $3,
-          updated_at = now()
-      where id = $1
+      insert into dead_letter_jobs (job_id, clinic_id, job_type, payload_json, last_error)
+      values ($1, $2, $3, $4::jsonb, $5)
     `,
-    [job.id, nextAttempts, error.message]
+    [job.id, job.clinicId, job.jobType, JSON.stringify(job.payloadJson || {}), error.message]
   );
+
+  await getPool().query(
+    `delete from worker_jobs where id = $1`,
+    [job.id]
+  );
+  
   return 'failed';
 }
 
