@@ -16,9 +16,14 @@ echo "==============================================="
 mkdir -p "$RELEASES_DIR"
 mkdir -p "$SHARED_DIR"
 
-# 2. Make sure shared .env exists
+# 2. Make sure shared .env exists and is valid for Linux
+if [ -f "$SHARED_DIR/.env" ] && grep -q "D:/FlowBiz" "$SHARED_DIR/.env"; then
+  echo "[Config] Existing shared .env contains Windows paths. Regenerating..."
+  rm -f "$SHARED_DIR/.env"
+fi
+
 if [ ! -f "$SHARED_DIR/.env" ]; then
-  if [ -f "$REPO_DIR/.env" ]; then
+  if [ -f "$REPO_DIR/.env" ] && ! grep -q "D:/FlowBiz" "$REPO_DIR/.env"; then
     echo "[Config] Copying .env from repo to shared..."
     cp "$REPO_DIR/.env" "$SHARED_DIR/.env"
   else
@@ -29,6 +34,12 @@ if [ ! -f "$SHARED_DIR/.env" ]; then
     sed -i 's/APP_ENV=development/APP_ENV=production/g' "$SHARED_DIR/.env"
     sed -i 's/API_PORT=3001/API_PORT=8103/g' "$SHARED_DIR/.env"
     sed -i 's/WEB_PORT=4173/WEB_PORT=8104/g' "$SHARED_DIR/.env"
+    
+    # Update paths to Linux format
+    sed -i 's|PROJECT_ROOT=D:/FlowBiz/flowbiz-client-beauty|PROJECT_ROOT=/opt/flowbiz/clients/flowbiz-client-beauty|g' "$SHARED_DIR/.env"
+    sed -i 's|DATA_ROOT=D:/FlowBiz/data/flowbiz-client-beauty|DATA_ROOT=/opt/flowbiz/data/flowbiz-client-beauty|g' "$SHARED_DIR/.env"
+    sed -i 's|BACKUP_ROOT=D:/FlowBiz/backups/flowbiz-client-beauty|BACKUP_ROOT=/opt/flowbiz/backups/flowbiz-client-beauty|g' "$SHARED_DIR/.env"
+    sed -i 's|LOG_ROOT=D:/FlowBiz/data/flowbiz-client-beauty/logs|LOG_ROOT=/opt/flowbiz/data/flowbiz-client-beauty/logs|g' "$SHARED_DIR/.env"
     
     # Use production DB configs
     sed -i 's/POSTGRES_DB=flowbiz_local/POSTGRES_DB=flowbiz_beauty/g' "$SHARED_DIR/.env"
