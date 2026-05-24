@@ -155,8 +155,86 @@ async function approveOrOverrideMessage(clinicId, messageId, staffOverrideText =
   return updatedResult.rows[0];
 }
 
+const CLINIC_PROMOTIONS = [
+  {
+    code: 'BOTOX29',
+    name: 'โปรแกรมโบท็อกซ์ลดริ้วรอยทั่วใบหน้า',
+    keywords: ['โบท็อกซ์', 'ริ้วรอย', 'ย่น', 'ตีนกา', 'หน้าผาก', 'botox', 'wrinkle'],
+    price: 2900,
+    discountText: 'ลดเหลือ 2,900.- บาท (ปกติ 5,900.-)',
+    replyTemplate: 'สวัสดีค่ะคุณลูกค้า 💖 สำหรับปัญหาเรื่องริ้วรอยและตีนกา แอดมินแนะนำโปรแกรมโบท็อกซ์ลดริ้วรอยทั่วใบหน้า (Korea Premium) ช่วยคลายกล้ามเนื้อเรียบเนียนทันใจ ตอนนี้มีโปรโมชั่นพิเศษเพียง 2,900.- บาทเท่านั้นค่ะ (ปกติ 5,900.-) สนใจรับสิทธิ์โปรโมชั่นนี้เพื่อจองคิวคุณหมอเลยไหมคะ?'
+  },
+  {
+    code: 'MESO19',
+    name: 'โปรแกรมเมโสออร่าสกินหน้าใสฉ่ำวาว',
+    keywords: ['เมโส', 'หน้าใส', 'ฉ่ำวาว', 'รูขุมขน', 'ผิวกระจ่างใส', 'meso', 'aura'],
+    price: 1990,
+    discountText: 'ลดเหลือ 1,990.- บาท (ปกติ 3,500.-)',
+    replyTemplate: 'สวัสดีค่ะคุณลูกค้า ✨ แอดมินขอแนะนำคอร์สยอดนิยมเพื่อฟื้นฟูผิวหน้า โปรแกรมเมโสออร่าสกินหน้าใสฉ่ำวาว (Meso Aura) ช่วยบำรุงผิวล้ำลึก กระชับรูขุมขน ปรับผิวขาวสว่างกระจ่างใส ราคาพิเศษลดเหลือเพียง 1,990.- บาทต่อครั้งค่ะ (ปกติ 3,500.-) สนใจให้แอดมินจองสิทธิ์ลัดคิวให้วันนี้เลยไหมคะ?'
+  },
+  {
+    code: 'HIFU39',
+    name: 'โปรแกรมไฮฟูยกกระชับแก้มเหนียง Hifu Ultra Lift',
+    keywords: ['ไฮฟู', 'ยกกระชับ', 'แก้ม', 'เหนียง', 'หย่อนคล้อย', 'วีเชฟ', 'hifu', 'lift'],
+    price: 3900,
+    discountText: 'ลดเหลือ 3,900.- บาท (ปกติ 8,900.-)',
+    replyTemplate: 'สวัสดีค่ะคุณลูกค้า 🥰 สำหรับแก้มเหนียงและปัญหาความหย่อนคล้อย แอดมินแนะนำโปรแกรมไฮฟูยกกระชับแก้มเหนียง Hifu Ultra Lift ดึงหน้ายกกระชับลงลึกถึงชั้น SMAS ไม่จำกัดช็อต ไม่เจ็บไม่บวม ดีลเด็ดลดเหลือเพียง 3,900.- บาทเท่านั้นค่ะ (ปกติ 8,900.-) สะดวกนัดวันเข้าพบคงหมอเพื่อประเมินใบหน้าฟรีเลยไหมคะ?'
+  },
+  {
+    code: 'ACNE99',
+    name: 'โปรแกรมรักษาสิวเคลียร์ผิวใส Acne Care 5 ขั้นตอน',
+    keywords: ['สิว', 'อักเสบ', 'กดสิว', 'รักษาสิว', 'acne', 'clear'],
+    price: 990,
+    discountText: 'ลดเหลือ 990.- บาท (ปกติ 1,800.-)',
+    replyTemplate: 'สวัสดีค่ะคุณลูกค้า 🌿 หากกังวลเรื่องปัญหาสิวอุดตันหรือสิวอักเสบ แอดมินแนะนำโปรแกรมเคลียร์ผิวใส Acne Care 5 ขั้นตอนครบวงจร (กดสิว + ฉีดสิว + มาร์คสิวลดการอักเสบ + เลเซอร์ฉายแสงฆ่าเชื้อ) ราคาเบาๆ เพียง 990.- บาทต่อครั้งค่ะ (ปกติ 1,800.-) สะดวกเข้ามาให้คุณหมอช่วยกดและประเมินผิวก่อนช่วงบ่ายนี้ไหมคะ?'
+  }
+];
+
+async function getAiCopilotSuggestion(clinicId, leadId, messageText) {
+  const pool = getPool();
+  const lowerText = (messageText || '').toLowerCase();
+  
+  // 1. Scan for matching beauty promotions based on customer intent keywords
+  let matchedPromo = CLINIC_PROMOTIONS.find(promo => 
+    promo.keywords.some(kw => lowerText.includes(kw))
+  );
+
+  let confidenceScore = 0.80;
+  let suggestedResponse = 'สวัสดีค่ะคุณลูกค้า ยินดีต้อนรับสู่คลินิกความงามค่ะ สามารถปรึกษารายละเอียดสิว ริ้วรอย หรือยกกระชับใบหน้าได้เลยนะคะ วันนี้มีคอร์สราคาพิเศษมากมายค่ะ';
+  let promotion = null;
+
+  if (matchedPromo) {
+    confidenceScore = 0.95;
+    suggestedResponse = matchedPromo.replyTemplate;
+    promotion = {
+      code: matchedPromo.code,
+      name: matchedPromo.name,
+      price: matchedPromo.price,
+      discountText: matchedPromo.discountText
+    };
+  }
+
+  // 2. Log suggestion to database ai_copilot_suggestions table for audit analytics
+  const result = await pool.query(
+    `insert into ai_copilot_suggestions (clinic_id, lead_id, message_text, suggested_response, confidence_score, used)
+     values ($1, $2, $3, $4, $5, false)
+     returning id`,
+    [Number(clinicId), Number(leadId), messageText, suggestedResponse, confidenceScore]
+  );
+
+  return {
+    success: true,
+    suggestionId: Number(result.rows[0].id),
+    messageText,
+    suggestedResponse,
+    confidenceScore,
+    promotion
+  };
+}
+
 module.exports = {
   handleInboundMessage,
   getApprovalQueue,
-  approveOrOverrideMessage
+  approveOrOverrideMessage,
+  getAiCopilotSuggestion
 };

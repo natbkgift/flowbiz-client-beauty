@@ -1,4 +1,4 @@
-import React, { createContext, startTransition, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, startTransition, useContext, useEffect, useMemo, useState, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 
 const STORAGE_KEY = 'flowbiz.admin.token';
@@ -13,6 +13,7 @@ const ExecutionDebuggerContext = createContext(null);
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', caption: 'Tenant activity overview' },
+  { key: 'unified-inbox', label: 'Omnichannel Inbox', caption: 'Social chat and AI co-pilot' },
   { key: 'users', label: 'Users', caption: 'Memberships and roles' },
   { key: 'workspaces', label: 'Workspaces', caption: 'Workspace configuration' },
   { key: 'settings', label: 'Settings', caption: 'Tenant and org settings' },
@@ -271,6 +272,18 @@ function createApiClient(apiBaseUrl) {
 
       const suffix = search.toString() ? `?${search.toString()}` : '';
       return request(`/automation/tasks${suffix}`, session);
+    },
+    listChats(session) {
+      return request('/chats', session);
+    },
+    getChatMessages(session, threadId) {
+      return request(`/chats/${threadId}/messages`, session);
+    },
+    sendChatMessage(session, threadId, body) {
+      return request(`/chats/${threadId}/send`, { ...session, method: 'POST', body });
+    },
+    getAiCopilotSuggestion(session, leadId, messageText) {
+      return request(`/ai-agent/copilot/suggest?leadId=${leadId}&messageText=${encodeURIComponent(messageText)}`, session);
     },
     getSystemHealth(session) {
       return request('/ops/health', session);
@@ -1928,8 +1941,369 @@ function SystemHealthPage() {
   );
 }
 
+function UnifiedInboxPage() {
+  const api = useApi();
+  const sessionOptions = useSessionRequestOptions();
+  const [threads, setThreads] = useState([]);
+  const [activeThreadId, setActiveThreadId] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [channelType, setChannelType] = useState('line');
+  const [inputText, setInputText] = useState('');
+  const [suggestion, setSuggestion] = useState(null);
+  const [loadingSuggestion, setLoadingSuggestion] = useState(false);
+  const [loadingThreads, setLoadingThreads] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [flash, setFlash] = useState(null);
+  const messageEndRef = useRef(null);
+
+  // Poll threads and active messages
+  useEffect(() => {
+    let active = true;
+    async function fetchThreads() {
+      if (!active) return;
+      try {
+        const payload = await api.listChats(sessionOptions);
+        setThreads(payload.items || []);
+      } catch (err) {
+        console.error("Error fetching threads:", err);
+      }
+    }
+    
+    setLoadingThreads(true);
+    fetchThreads().finally(() => setLoadingThreads(false));
+
+    const interval = setInterval(fetchThreads, 5000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [api, sessionOptions]);
+
+  // Fetch messages when activeThreadId changes
+  useEffect(() => {
+    if (!activeThreadId) {
+      setMessages([]);
+      return;
+    }
+
+    let active = true;
+    async function fetchMessages() {
+      try {
+        const payload = await api.getChatMessages(sessionOptions, activeThreadId);
+        if (active) {
+          setMessages(payload.messages || []);
+          setChannelType(payload.channelType || 'line');
+        }
+      } catch (err) {
+        console.error("Error fetching messages:", err);
+      }
+    }
+
+    setLoadingMessages(true);
+    fetchMessages().finally(() => setLoadingMessages(false));
+
+    const interval = setInterval(fetchMessages, 4000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [activeThreadId, api, sessionOptions]);
+
+  // Fetch AI suggestion when last lead message changes or when new lead is selected
+  useEffect(() => {
+    if (!activeThreadId || messages.length === 0) {
+      setSuggestion(null);
+      return;
+    }
+
+    // Find last message from lead
+    const leadMessages = messages.filter(m => m.senderType === 'lead');
+    if (leadMessages.length === 0) {
+      setSuggestion(null);
+      return;
+    }
+    const lastLeadMsg = leadMessages[leadMessages.length - 1];
+    
+    // Find the thread details to get leadId
+    const thread = threads.find(t => t.id === activeThreadId);
+    if (!thread || !thread.leadId) return;
+
+    let active = true;
+    async function getSuggestion() {
+      setLoadingSuggestion(true);
+      try {
+        const payload = await api.getAiCopilotSuggestion(sessionOptions, thread.leadId, lastLeadMsg.messageText);
+        if (active) {
+          setSuggestion(payload);
+        }
+      } catch (err) {
+        console.error("Error fetching AI suggestion:", err);
+        if (active) setSuggestion(null);
+      } finally {
+        if (active) setLoadingSuggestion(false);
+      }
+    }
+
+    getSuggestion();
+    return () => {
+      active = false;
+    };
+  }, [activeThreadId, messages, threads, api, sessionOptions]);
+
+  // Scroll to bottom of messages
+  useEffect(() => {
+    messageEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const handleSendOverride = async (textToSend) => {
+    const text = textToSend || inputText;
+    if (!text.trim() || !activeThreadId) return;
+
+    try {
+      await api.sendChatMessage(sessionOptions, activeThreadId, { messageText: text });
+      setInputText('');
+      
+      // Instantly refresh messages
+      const payload = await api.getChatMessages(sessionOptions, activeThreadId);
+      setMessages(payload.messages || []);
+    } catch (err) {
+      setFlash({ kind: 'error', message: err.message || 'Failed to send message' });
+    }
+  };
+
+  const activeThread = threads.find(t => t.id === activeThreadId);
+
+  // Render elements in rich content standard formatting
+  const renderRichContent = (richContent) => {
+    if (!richContent) return null;
+    if (richContent.type === 'text') {
+      return <p className="msg-text">{richContent.text}</p>;
+    }
+    if (richContent.type === 'flex' || richContent.type === 'generic_template') {
+      return (
+        <div className="rich-card">
+          {richContent.imageUrl && (
+            <img src={richContent.imageUrl} alt="Promo" className="rich-card-img" />
+          )}
+          <h4 className="rich-card-title">{richContent.text || 'Special Offer'}</h4>
+          {richContent.elements && richContent.elements.map((el, i) => (
+            <div key={i} className="rich-card-element">
+              {el.type === 'text' ? (
+                <p className="rich-card-el-text">{el.text}</p>
+              ) : el.type === 'button' ? (
+                <button type="button" className="rich-card-el-btn" disabled>
+                  {el.text || el.label}
+                </button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      );
+    }
+    return <p className="msg-text">{JSON.stringify(richContent)}</p>;
+  };
+
+  return (
+    <PageShell 
+      title="Omnichannel Inbox & AI Co-Pilot" 
+      intro="แชทรวมศูนย์ความงามจากช่องทาง LINE, Facebook, และ Instagram พร้อมผู้ช่วย AI แนะนำโปรโมชั่นปิดการขายแบบเรียลไทม์"
+    >
+      <StatusBanner state={flash} />
+      <div className="inbox-layout">
+        
+        {/* Left column - Threads list */}
+        <div className="inbox-threads-pane">
+          <div className="pane-header">
+            <h3>บทสนทนาทั้งหมด</h3>
+            <span className="pill compact-pill">{threads.length} Threads</span>
+          </div>
+          {loadingThreads && threads.length === 0 ? (
+            <div className="loading-inside">กำลังโหลดรายการแชท...</div>
+          ) : threads.length === 0 ? (
+            <div className="empty-inside">ไม่มีบทสนทนาที่รอการตอบกลับ</div>
+          ) : (
+            <div className="threads-scrollable">
+              {threads.map(thread => {
+                const isActive = thread.id === activeThreadId;
+                const sourceUpper = (thread.lead?.source || 'line').toUpperCase();
+                return (
+                  <button
+                    key={thread.id}
+                    type="button"
+                    className={`thread-item-btn ${isActive ? 'active' : ''}`}
+                    onClick={() => setActiveThreadId(thread.id)}
+                  >
+                    <div className="thread-item-meta">
+                      <span className={`channel-badge ${thread.lead?.source || 'line'}`}>
+                        {sourceUpper}
+                      </span>
+                      <span className="thread-time">{formatDateTime(thread.updated_at).split(' ')[1] || ''}</span>
+                    </div>
+                    <h4 className="thread-lead-name">{thread.lead?.fullName || 'คนไข้ใหม่'}</h4>
+                    <p className="thread-preview">{thread.contextSummary || 'สอบถามรายละเอียดบริการ...'}</p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Middle column - Chat thread */}
+        <div className="inbox-chat-pane">
+          {activeThread ? (
+            <>
+              <div className="pane-header chat-header">
+                <div>
+                  <h3>{activeThread.lead?.fullName || 'คนไข้ใหม่'}</h3>
+                  <div className="chat-subtitle">
+                    <span className={`channel-badge compact-badge ${activeThread.lead?.source || 'line'}`}>
+                      {(activeThread.lead?.source || 'line').toUpperCase()}
+                    </span>
+                    <span className="subtitle-meta">
+                      {activeThread.lead?.phone ? `📞 ${activeThread.lead.phone}` : ''}
+                      {activeThread.lead?.email ? ` | ✉️ ${activeThread.lead.email}` : ''}
+                      {activeThread.lead?.stage ? ` | Stage: ${activeThread.lead.stage}` : ''}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="chat-messages-container">
+                {loadingMessages && messages.length === 0 ? (
+                  <div className="loading-inside">กำลังโหลดข้อความ...</div>
+                ) : (
+                  <div className="messages-flow">
+                    {messages.map(msg => {
+                      const isLead = msg.senderType === 'lead';
+                      const isAi = msg.senderType === 'ai_agent';
+                      const senderLabel = isLead ? 'คนไข้' : isAi ? 'AI Co-Pilot ✨' : 'พนักงาน 👤';
+                      return (
+                        <div key={msg.id} className={`message-wrapper ${msg.senderType}`}>
+                          <span className="msg-sender-label">{senderLabel}</span>
+                          <div className={`message-bubble ${msg.senderType}`}>
+                            {msg.richContent ? renderRichContent(msg.richContent) : <p className="msg-text">{msg.messageText}</p>}
+                            {isAi && msg.confidenceScore && (
+                              <span className="ai-confidence-badge">
+                                Confidence: {Math.round(msg.confidenceScore * 100)}%
+                              </span>
+                            )}
+                            <span className="msg-time">{formatDateTime(msg.createdAt).split(' ')[1] || ''}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={messageEndRef} />
+                  </div>
+                )}
+              </div>
+
+              <div className="chat-input-area">
+                <textarea
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="พิมพ์ข้อความตอบกลับเพื่อส่งในนามพนักงาน (Staff Override)..."
+                  rows={2}
+                />
+                <button
+                  type="button"
+                  className="primary-button send-btn"
+                  onClick={() => handleSendOverride()}
+                  disabled={!inputText.trim()}
+                >
+                  ส่งข้อความ
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="chat-empty-state">
+              <div className="empty-bubble">💬</div>
+              <h3>ยินดีต้อนรับสู่ Omnichannel Inbox</h3>
+              <p>เลือกบทสนทนาจากคอลัมน์ซ้ายมือเพื่อเริ่มการตอบกลับและใช้ตัวช่วย AI อัจฉริยะ</p>
+            </div>
+          )}
+        </div>
+
+        {/* Right column - AI Co-Pilot */}
+        <div className="inbox-copilot-pane">
+          <div className="pane-header gold-header">
+            <h3>AI Sales Co-Pilot ✨</h3>
+            <span className="pill gold-pill">Smart Agent</span>
+          </div>
+
+          {!activeThreadId ? (
+            <div className="copilot-empty">
+              <p className="muted">กรุณาเลือกห้องแชทเพื่อรับข้อเสนอแนะโปรโมชั่นอัจฉริยะ</p>
+            </div>
+          ) : loadingSuggestion ? (
+            <div className="copilot-loading">
+              <div className="spinner" />
+              <p className="muted">AI กำลังวิเคราะห์ข้อมูลความต้องการของคนไข้...</p>
+            </div>
+          ) : suggestion && suggestion.success ? (
+            <div className="copilot-suggestion-card">
+              <div className="gold-glowing-card">
+                <div className="copilot-card-header">
+                  <span className="copilot-intent-badge">ตรวจพบความต้องการจองโปรแกรมความงาม</span>
+                  <span className="copilot-confidence-score">
+                    Confidence: {Math.round(suggestion.confidenceScore * 100)}%
+                  </span>
+                </div>
+                
+                {suggestion.promotion && (
+                  <div className="copilot-promo-box">
+                    <div className="promo-main-details">
+                      <h4 className="promo-name">{suggestion.promotion.name}</h4>
+                      <span className="promo-price">{formatNumber(suggestion.promotion.price)} บาท</span>
+                    </div>
+                    <p className="promo-description">{suggestion.promotion.description}</p>
+                    <span className="promo-code">Code: {suggestion.promotion.code}</span>
+                  </div>
+                )}
+
+                <div className="copilot-response-box">
+                  <h5>สคริปต์แนะนำสำหรับส่งตอบลูกค้า:</h5>
+                  <p className="suggested-response-text">{suggestion.suggestedResponse}</p>
+                </div>
+
+                <div className="copilot-actions">
+                  <button
+                    type="button"
+                    className="ghost-button copilot-btn"
+                    onClick={() => setInputText(suggestion.suggestedResponse)}
+                  >
+                    วางลงช่องพิมพ์คำตอบ
+                  </button>
+                  <button
+                    type="button"
+                    className="primary-button gold-btn copilot-btn"
+                    onClick={() => handleSendOverride(suggestion.suggestedResponse)}
+                  >
+                    ส่งโปรโมชั่นทันที
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="copilot-no-intent">
+              <div className="info-icon">💡</div>
+              <h4>ยังไม่ตรวจพบโปรโมชั่นหัตถการ</h4>
+              <p className="muted">
+                เมื่อคนไข้พิมพ์สอบถามหัตถการพิเศษ เช่น โบท็อกซ์ (Botox), เมโซออร่า (Meso Aura), ไฮฟู (Hifu) หรือรักษาสิว (Acne Clear) 
+                ระบบ AI Co-Pilot จะนำเสนอคูปองราคาพิเศษและชุดคำตอบปิดดีลขึ้นแนะนำพนักงานทันที
+              </p>
+            </div>
+          )}
+        </div>
+
+      </div>
+    </PageShell>
+  );
+}
+
 function renderPage(route) {
   switch (route?.key) {
+    case 'unified-inbox':
+      return <UnifiedInboxPage />;
     case 'users':
       return <UsersPage />;
     case 'workspaces':
