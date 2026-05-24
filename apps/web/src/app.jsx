@@ -14,6 +14,7 @@ const ExecutionDebuggerContext = createContext(null);
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', caption: 'Tenant activity overview' },
   { key: 'unified-inbox', label: 'Omnichannel Inbox', caption: 'Social chat and AI co-pilot' },
+  { key: 'roas-analytics', label: 'ROAS & Loyalty', caption: 'Ad spend, CAC & member referrals' },
   { key: 'users', label: 'Users', caption: 'Memberships and roles' },
   { key: 'workspaces', label: 'Workspaces', caption: 'Workspace configuration' },
   { key: 'settings', label: 'Settings', caption: 'Tenant and org settings' },
@@ -284,6 +285,21 @@ function createApiClient(apiBaseUrl) {
     },
     getAiCopilotSuggestion(session, leadId, messageText) {
       return request(`/ai-agent/copilot/suggest?leadId=${leadId}&messageText=${encodeURIComponent(messageText)}`, session);
+    },
+    getLoyaltyBalance(session, leadId) {
+      return request(`/loyalty/balance?leadId=${leadId}`, session);
+    },
+    getReferralsList(session, leadId) {
+      return request(`/loyalty/referrals?leadId=${leadId}`, session);
+    },
+    recordPurchase(session, body) {
+      return request('/loyalty/record-purchase', { ...session, method: 'POST', body });
+    },
+    syncAdSpend(session) {
+      return request('/loyalty/ad-spend/sync', { ...session, method: 'POST' });
+    },
+    getRoasReport(session) {
+      return request('/loyalty/roas-report', session);
     },
     getSystemHealth(session) {
       return request('/ops/health', session);
@@ -2300,10 +2316,335 @@ function UnifiedInboxPage() {
   );
 }
 
+function RoasAnalyticsPage() {
+  const api = useApi();
+  const sessionOptions = useSessionRequestOptions();
+  const [flash, setFlash] = useState(null);
+  
+  // Lead info queries
+  const [leadIdInput, setLeadIdInput] = useState('');
+  const [queriedLeadId, setQueriedLeadId] = useState(null);
+  const [loyaltyBalance, setLoyaltyBalance] = useState(null);
+  const [referrals, setReferrals] = useState([]);
+  const [queryingLead, setQueryingLead] = useState(false);
+
+  // Manual purchase entry
+  const [purchaseForm, setPurchaseForm] = useState({ leadId: '', amount: '', description: '' });
+  const [submittingPurchase, setSubmittingPurchase] = useState(false);
+
+  // Load ROAS report
+  const [state, setState] = usePageData(
+    () => api.getRoasReport(sessionOptions),
+    [api, sessionOptions]
+  );
+
+  async function handleSyncAdSpend() {
+    setFlash({ kind: 'info', message: 'กำลังซิงค์ข้อมูลโฆษณาจำลอง...' });
+    try {
+      await api.syncAdSpend(sessionOptions);
+      setFlash({ kind: 'success', message: 'ซิงค์ข้อมูลโฆษณา Facebook และ Google 7 วันย้อนหลังเสร็จสิ้น!' });
+      // Reload report
+      const updated = await api.getRoasReport(sessionOptions);
+      setState({ status: 'ready', data: updated, error: null });
+    } catch (err) {
+      setFlash({ kind: 'error', message: err.message || 'ซิงค์ล้มเหลว' });
+    }
+  }
+
+  async function handleQueryLead(event) {
+    if (event) event.preventDefault();
+    if (!leadIdInput.trim()) return;
+
+    setQueryingLead(true);
+    try {
+      const lId = Number(leadIdInput);
+      const balanceData = await api.getLoyaltyBalance(sessionOptions, lId);
+      const referralsData = await api.getReferralsList(sessionOptions, lId);
+      setLoyaltyBalance(balanceData.balance);
+      setReferrals(referralsData.items || []);
+      setQueriedLeadId(lId);
+    } catch (err) {
+      setFlash({ kind: 'error', message: `ไม่พบข้อมูลคนไข้รหัส #${leadIdInput}` });
+      setLoyaltyBalance(null);
+      setReferrals([]);
+      setQueriedLeadId(null);
+    } finally {
+      setQueryingLead(false);
+    }
+  }
+
+  async function handleRecordPurchase(event) {
+    event.preventDefault();
+    const lId = Number(purchaseForm.leadId);
+    const amt = Number(purchaseForm.amount);
+    if (!lId || !amt) {
+      setFlash({ kind: 'error', message: 'กรุณากรอกรหัสคนไข้และยอดเงินที่ชำระให้ครบถ้วน' });
+      return;
+    }
+
+    setSubmittingPurchase(true);
+    try {
+      const res = await api.recordPurchase(sessionOptions, {
+        leadId: lId,
+        amount: amt,
+        description: purchaseForm.description || undefined
+      });
+      let successMsg = `บันทึกรายการสำเร็จ! คนไข้ได้รับแต้ม ${res.pointsEarned} Points`;
+      if (res.referralProcessed) {
+        successMsg += ` (และประมวลผลแนะนำเพื่อนรับแต้มโบนัส Referrer +${res.referrerBonus} / Referee +${res.refereeBonus} เรียบร้อย)`;
+      }
+      setFlash({ kind: 'success', message: successMsg });
+      setPurchaseForm({ leadId: '', amount: '', description: '' });
+      
+      // Reload report since revenue changed
+      const updated = await api.getRoasReport(sessionOptions);
+      setState({ status: 'ready', data: updated, error: null });
+
+      // Refresh queried lead balance if they were the buyer
+      if (queriedLeadId === lId) {
+        setLeadIdInput(String(lId));
+        const balanceData = await api.getLoyaltyBalance(sessionOptions, lId);
+        const referralsData = await api.getReferralsList(sessionOptions, lId);
+        setLoyaltyBalance(balanceData.balance);
+        setReferrals(referralsData.items || []);
+      }
+    } catch (err) {
+      setFlash({ kind: 'error', message: err.message || 'บันทึกยอดชำระล้มเหลว' });
+    } finally {
+      setSubmittingPurchase(false);
+    }
+  }
+
+  if (state.status === 'loading' || state.status === 'idle') {
+    return <LoadingCard label="กำลังดึงข้อมูลรายงาน ROAS..." />;
+  }
+
+  if (state.status === 'error') {
+    return <ErrorCard error={state.error} />;
+  }
+
+  const report = state.data;
+  const total = report.total || { totalSpend: 0, totalRevenue: 0, totalLeads: 0, totalConverted: 0, costPerLead: 0, customerAcquisitionCost: 0, roas: 0 };
+  const fb = report.facebook || { totalSpend: 0, totalRevenue: 0, totalLeads: 0, totalConverted: 0, costPerLead: 0, customerAcquisitionCost: 0, roas: 0 };
+  const gg = report.google || { totalSpend: 0, totalRevenue: 0, totalLeads: 0, totalConverted: 0, costPerLead: 0, customerAcquisitionCost: 0, roas: 0 };
+
+  return (
+    <PageShell
+      title="ROAS Analytics & Loyalty CRM"
+      intro="วิเคราะห์ความคุ้มทุนในการซื้อแอดโฆษณา (ROAS, CAC, CPL) และบริการจัดการระบบแนะนำเพื่อน Member-Get-Member สะสมแต้มแบบ Omnichannel"
+      actions={(
+        <button type="button" className="primary-button" onClick={handleSyncAdSpend}>
+          ซิงค์ข้อมูลโฆษณา (Mock Sync)
+        </button>
+      )}
+    >
+      <StatusBanner state={flash} />
+
+      {/* Top metrics summary cards */}
+      <div className="metric-grid">
+        <MetricCard
+          label="Total Ad Spend"
+          value={`${formatNumber(total.totalSpend)} บาท`}
+          hint="งบโฆษณาที่ใช้จริงสะสม"
+        />
+        <MetricCard
+          label="Total Revenue"
+          value={`${formatNumber(total.totalRevenue)} บาท`}
+          hint="รายได้จากการซื้อคอร์สที่หน้าร้าน"
+        />
+        <MetricCard
+          label="Overall ROAS"
+          value={`${total.roas}x`}
+          hint="ประสิทธิภาพผลตอบแทนยอดเงินโฆษณา"
+        />
+      </div>
+
+      <div className="two-column-grid">
+        {/* Marketing Channel Breakdown Card */}
+        <section className="section-card">
+          <h3 className="section-heading">เปรียบเทียบช่องทางโฆษณา (Facebook vs Google)</h3>
+          <p className="muted">สรุปความคุ้มค่าโฆษณาและอัตราการแปลงของลีด</p>
+
+          <div className="table-shell" style={{ marginTop: '16px' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>ตัวชี้วัด (KPIs)</th>
+                  <th>Facebook Ads</th>
+                  <th>Google Ads</th>
+                  <th>รวมทั้งหมด</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>ค่าโฆษณา (Spend)</strong></td>
+                  <td>{formatNumber(fb.totalSpend)} บาท</td>
+                  <td>{formatNumber(gg.totalSpend)} บาท</td>
+                  <td>{formatNumber(total.totalSpend)} บาท</td>
+                </tr>
+                <tr>
+                  <td><strong>รายได้ที่ได้ (Revenue)</strong></td>
+                  <td>{formatNumber(fb.totalRevenue)} บาท</td>
+                  <td>{formatNumber(gg.totalRevenue)} บาท</td>
+                  <td>{formatNumber(total.totalRevenue)} บาท</td>
+                </tr>
+                <tr>
+                  <td><strong>จำนวนลีด (Leads)</strong></td>
+                  <td>{fb.totalLeads} คน</td>
+                  <td>{gg.totalLeads} คน</td>
+                  <td>{total.totalLeads} คน</td>
+                </tr>
+                <tr>
+                  <td><strong>ปิดการขายได้ (Converted)</strong></td>
+                  <td>{fb.totalConverted} คน</td>
+                  <td>{gg.totalConverted} คน</td>
+                  <td>{total.totalConverted} คน</td>
+                </tr>
+                <tr>
+                  <td><strong>ราคาต่อลีด (CPL)</strong></td>
+                  <td><span className="pill compact-pill">{fb.costPerLead} บาท</span></td>
+                  <td><span className="pill compact-pill">{gg.costPerLead} บาท</span></td>
+                  <td><span className="pill compact-pill">{total.costPerLead} บาท</span></td>
+                </tr>
+                <tr>
+                  <td><strong>ราคาต่อหัวปิดดีล (CAC)</strong></td>
+                  <td><span className="pill compact-pill status-healthy">{fb.customerAcquisitionCost} บาท</span></td>
+                  <td><span className="pill compact-pill status-healthy">{gg.customerAcquisitionCost} บาท</span></td>
+                  <td><span className="pill compact-pill status-healthy">{total.customerAcquisitionCost} บาท</span></td>
+                </tr>
+                <tr>
+                  <td><strong>อัตรา ROAS</strong></td>
+                  <td><strong style={{ color: '#0f766e' }}>{fb.roas}x</strong></td>
+                  <td><strong style={{ color: '#0f766e' }}>{gg.roas}x</strong></td>
+                  <td><strong style={{ color: '#0f766e' }}>{total.roas}x</strong></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* Record Treatment Purchase Form */}
+        <section className="section-card">
+          <h3 className="section-heading">บันทึกคนไข้ชำระเงินที่หน้าร้าน</h3>
+          <p className="muted">กรอกยอดชำระจริงของคนไข้เพื่อสะสมแต้มพอยต์และจ่ายค่าคอมมิชชั่นบอกต่อเพื่อน (MGM)</p>
+          
+          <form className="form-grid" onSubmit={handleRecordPurchase} style={{ marginTop: '16px' }}>
+            <label className="field">
+              <span>รหัสคนไข้ (Lead ID)</span>
+              <input
+                type="number"
+                value={purchaseForm.leadId}
+                onChange={e => setPurchaseForm(curr => ({ ...curr, leadId: e.target.value }))}
+                placeholder="เช่น 12"
+                required
+              />
+            </label>
+            <label className="field">
+              <span>ยอดเงินที่จ่ายจริง (บาท)</span>
+              <input
+                type="number"
+                value={purchaseForm.amount}
+                onChange={e => setPurchaseForm(curr => ({ ...curr, amount: e.target.value }))}
+                placeholder="เช่น 15000"
+                required
+              />
+            </label>
+            <label className="field field-span-2">
+              <span>รายละเอียดหัตถการ / บริการ</span>
+              <input
+                type="text"
+                value={purchaseForm.description}
+                onChange={e => setPurchaseForm(curr => ({ ...curr, description: e.target.value }))}
+                placeholder="เช่น โบท็อกซ์ริ้วรอย 100u / ดริปวิตามินผิวใส"
+              />
+            </label>
+            <div className="inline-actions field-span-2" style={{ marginTop: '8px' }}>
+              <button type="submit" className="primary-button" disabled={submittingPurchase}>
+                {submittingPurchase ? 'กำลังประมวลผลแต้ม...' : 'ยืนยันยอดสะสมแต้ม'}
+              </button>
+            </div>
+          </form>
+        </section>
+      </div>
+
+      {/* Query Member Loyalty Points & MGM Referral Connections */}
+      <section className="section-card">
+        <h3 className="section-heading">ตรวจสอบสถานะแต้มและรายชื่อการบอกต่อเพื่อน (MGM)</h3>
+        <p className="muted">ค้นหารหัสคนไข้เพื่อตรวจสอบยอดแต้มคงเหลือและเพื่อนที่ถูกแนะนำเข้ามาลงทะเบียน</p>
+
+        <form onSubmit={handleQueryLead} className="inline-form" style={{ marginTop: '16px', marginBottom: '20px' }}>
+          <input
+            type="number"
+            value={leadIdInput}
+            onChange={e => setLeadIdInput(e.target.value)}
+            placeholder="ใส่รหัสคนไข้ (Lead ID) เช่น 1"
+            style={{ padding: '10px 14px', borderRadius: '12px', border: '1px solid var(--border-strong)', width: '240px' }}
+            required
+          />
+          <button type="submit" className="secondary-button" disabled={queryingLead}>
+            {queryingLead ? 'กำลังค้นหา...' : 'ดึงข้อมูลพอยต์ & MGM'}
+          </button>
+        </form>
+
+        {queriedLeadId !== null && (
+          <div className="two-column-grid" style={{ background: 'rgba(255,255,255,0.4)', borderRadius: '18px', padding: '16px', border: '1px solid var(--border)' }}>
+            <div>
+              <h4 style={{ margin: '0 0 10px' }}>รหัสสมาชิกคนไข้ #{queriedLeadId}</h4>
+              <div className="metric-row" style={{ background: '#fff' }}>
+                <span>แต้มสะสมปัจจุบัน (Loyalty Points)</span>
+                <strong style={{ fontSize: '1.4rem', color: '#b45309' }}>{formatNumber(loyaltyBalance)} Points</strong>
+              </div>
+              <div style={{ marginTop: '14px' }}>
+                <span className="pill">รหัสแนะนำส่งต่อเพื่อน: FB-{queriedLeadId}-GOLD</span>
+              </div>
+            </div>
+
+            <div>
+              <h4 style={{ margin: '0 0 10px' }}>เพื่อนที่แนะนำเข้ารับบริการ (MGM List)</h4>
+              {referrals.length === 0 ? (
+                <p className="muted" style={{ fontSize: '0.9rem' }}>คนไข้รายนี้ยังไม่มีการแนะนำเพื่อนเข้ามา</p>
+              ) : (
+                <div className="table-shell">
+                  <table className="data-table" style={{ fontSize: '0.85rem' }}>
+                    <thead>
+                      <tr>
+                        <th>ชื่อเพื่อน</th>
+                        <th>สถานะดีล</th>
+                        <th>แจกโบนัสแล้ว</th>
+                        <th>วันที่ลงทะเบียน</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {referrals.map(ref => (
+                        <tr key={ref.id}>
+                          <td>{ref.referred_lead_name}</td>
+                          <td>
+                            <span className={`pill compact-pill status-${ref.status}`}>
+                              {ref.status}
+                            </span>
+                          </td>
+                          <td>{ref.reward_issued ? '✅ ได้รับแล้ว' : '❌ ยังไม่ได้รับ'}</td>
+                          <td>{formatDateTime(ref.created_at).split(' ')[0]}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+    </PageShell>
+  );
+}
+
 function renderPage(route) {
   switch (route?.key) {
     case 'unified-inbox':
       return <UnifiedInboxPage />;
+    case 'roas-analytics':
+      return <RoasAnalyticsPage />;
     case 'users':
       return <UsersPage />;
     case 'workspaces':
