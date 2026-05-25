@@ -3,7 +3,9 @@ const {
   handleInboundMessage,
   getApprovalQueue,
   approveOrOverrideMessage,
-  getAiCopilotSuggestion
+  getAiCopilotSuggestion,
+  getAgentRules,
+  updateAgentRule
 } = require('./conversation-service');
 
 async function handleAiAgentRoutes(request, response, url, tools) {
@@ -53,6 +55,29 @@ async function handleAiAgentRoutes(request, response, url, tools) {
       body.text
     );
     return json(response, 201, message);
+  }
+
+  if (url.pathname === '/ai-agent/rules' && request.method === 'GET') {
+    const context = await authenticateRequest(request);
+    const rules = await getAgentRules(context.currentClinic.id);
+    return json(response, 200, rules);
+  }
+
+  if (url.pathname === '/ai-agent/rules' && request.method === 'POST') {
+    const context = await authenticateRequest(request);
+    const body = await parseJsonBody(request);
+    const { agentType, systemPrompt, temperature, rulesConfig } = body;
+    if (!agentType || !systemPrompt || temperature === undefined) {
+      return json(response, 400, { error: 'Bad Request', message: 'agentType, systemPrompt, and temperature are required' });
+    }
+    const rule = await updateAgentRule(
+      context.currentClinic.id,
+      agentType,
+      systemPrompt,
+      Number(temperature),
+      rulesConfig || {}
+    );
+    return json(response, 200, rule);
   }
 
   return false;
