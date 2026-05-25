@@ -49,4 +49,4 @@ jobs:
       - name: Run Phase 5 and Phase 6 Automated Test Suites
         env:
           DATABASE_URL: postgres://postgres:password@localhost:5432/flowbiz_beauty_test
-        run: node --test tests/phase5_social_inbound.test.js tests/phase6_loyalty_roas.test.js
+        run: node -r ./teardown-hook.js --test tests/phase5_social_inbound.test.js tests/phase6_loyalty_roas.test.js
