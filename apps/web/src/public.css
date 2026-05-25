@@ -1,0 +1,759 @@
+/* FlowBiz Beauty - Public Premium Styling */
+:root {
+  --bg-primary: #0a0b0d;
+  --bg-secondary: #13151a;
+  --bg-tertiary: #1b1e25;
+  --text-primary: #f3f4f6;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  
+  /* Gold/Metallic Accent Palette */
+  --gold-primary: #d4af37;
+  --gold-hover: #f3e5ab;
+  --gold-dark: #aa7c11;
+  --gold-glow: rgba(212, 175, 55, 0.15);
+  
+  --glass-bg: rgba(19, 21, 26, 0.65);
+  --glass-border: rgba(212, 175, 55, 0.15);
+  --glass-border-hover: rgba(212, 175, 55, 0.35);
+  
+  --font-heading: 'Outfit', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-body);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+  transition: var(--transition-smooth);
+}
+
+/* Header & Nav */
+.header-glass {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--glass-border);
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: var(--transition-smooth);
+}
+
+.logo {
+  font-family: var(--font-heading);
+  font-size: 1.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #ffffff 0%, var(--gold-primary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.logo-icon {
+  color: var(--gold-primary);
+}
+
+.nav-links {
+  display: flex;
+  gap: 2rem;
+  list-style: none;
+}
+
+.nav-links a {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.nav-links a:hover, .nav-links a.active {
+  color: var(--gold-primary);
+  text-shadow: 0 0 8px var(--gold-glow);
+}
+
+.cta-btn {
+  background: linear-gradient(135deg, var(--gold-dark) 0%, var(--gold-primary) 100%);
+  color: var(--bg-primary);
+  padding: 0.6rem 1.5rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 15px var(--gold-glow);
+  transition: var(--transition-smooth);
+}
+
+.cta-btn:hover {
+  background: linear-gradient(135deg, var(--gold-primary) 0%, var(--gold-hover) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.3);
+}
+
+.cta-btn.secondary {
+  background: transparent;
+  color: var(--gold-primary);
+  border: 1px solid var(--gold-primary);
+  box-shadow: none;
+}
+
+.cta-btn.secondary:hover {
+  background: var(--gold-glow);
+  color: var(--text-primary);
+}
+
+/* Hero Section */
+.hero {
+  position: relative;
+  min-height: 80vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  background: radial-gradient(circle at 50% 30%, rgba(212, 175, 55, 0.08) 0%, transparent 60%);
+}
+
+.hero-content {
+  max-width: 800px;
+  text-align: center;
+}
+
+.hero-subtitle {
+  color: var(--gold-primary);
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.2em;
+  margin-bottom: 1rem;
+}
+
+.hero-title {
+  font-size: 3.5rem;
+  font-weight: 800;
+  line-height: 1.15;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(to right, #ffffff, #ffffff 40%, var(--gold-primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@media (max-width: 768px) {
+  .hero-title {
+    font-size: 2.5rem;
+  }
+}
+
+.hero-desc {
+  font-size: 1.15rem;
+  color: var(--text-secondary);
+  margin-bottom: 2.5rem;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+/* Glass Cards Grid */
+.section {
+  padding: 6rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.section-header {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.section-subtitle {
+  color: var(--gold-primary);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.section-title {
+  font-size: 2.25rem;
+  font-weight: 700;
+}
+
+.grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.glass-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  transition: var(--transition-smooth);
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-card:hover {
+  transform: translateY(-8px);
+  border-color: var(--glass-border-hover);
+  box-shadow: 0 10px 30px var(--gold-glow);
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, var(--gold-primary), transparent);
+  transform: translateX(-100%);
+  transition: var(--transition-smooth);
+}
+
+.glass-card:hover::before {
+  transform: translateX(100%);
+  transition: all 1.2s ease;
+}
+
+.card-icon {
+  font-size: 2.5rem;
+  color: var(--gold-primary);
+  margin-bottom: 1.5rem;
+}
+
+.card-title {
+  font-size: 1.35rem;
+  margin-bottom: 1rem;
+}
+
+.card-desc {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+/* Promotions Grid */
+.promo-badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: var(--gold-dark);
+  color: var(--bg-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+}
+
+.promo-price-box {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 1.5rem 0;
+}
+
+.promo-price {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--gold-primary);
+  font-family: var(--font-heading);
+}
+
+.promo-currency {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.promo-original {
+  font-size: 1rem;
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+/* Blog & Forum Page Styles */
+.public-container {
+  min-height: 70vh;
+  padding: 3rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.forum-header, .blog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3rem;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.blog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 2.5rem;
+}
+
+.blog-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: var(--transition-smooth);
+  display: flex;
+  flex-direction: column;
+}
+
+.blog-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--glass-border-hover);
+  box-shadow: 0 10px 25px var(--gold-glow);
+}
+
+.blog-cover {
+  width: 100%;
+  height: 200px;
+  background: linear-gradient(135deg, var(--bg-tertiary) 0%, rgba(212, 175, 55, 0.15) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.blog-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.blog-cover-placeholder {
+  color: var(--gold-primary);
+  font-size: 3rem;
+}
+
+.blog-card-content {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.blog-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 0.75rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.blog-card-title {
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.3;
+}
+
+.blog-card-excerpt {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.blog-card-link {
+  color: var(--gold-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.blog-card-link:hover {
+  color: var(--gold-hover);
+}
+
+/* Blog Detail Page */
+.blog-post-detail {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.blog-post-header {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.blog-post-title {
+  font-size: 2.75rem;
+  margin-bottom: 1rem;
+  line-height: 1.2;
+}
+
+.blog-post-meta {
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  font-size: 0.9rem;
+  margin-bottom: 2rem;
+}
+
+.blog-post-cover {
+  width: 100%;
+  height: 400px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  margin-bottom: 3rem;
+}
+
+.blog-post-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.blog-post-content {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  line-height: 1.8;
+}
+
+.blog-post-content p {
+  margin-bottom: 1.5rem;
+}
+
+.blog-post-content h2 {
+  font-size: 1.75rem;
+  margin: 2.5rem 0 1rem;
+}
+
+.blog-post-content h3 {
+  font-size: 1.4rem;
+  margin: 2rem 0 1rem;
+}
+
+.blog-post-content ul, .blog-post-content ol {
+  margin-bottom: 1.5rem;
+  padding-left: 1.5rem;
+}
+
+.blog-post-content li {
+  margin-bottom: 0.5rem;
+}
+
+.blog-post-footer {
+  margin-top: 4rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--glass-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Forum Boards & Topics */
+.forum-categories {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.forum-cat-btn {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  padding: 0.5rem 1.25rem;
+  border-radius: 9999px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: var(--transition-smooth);
+}
+
+.forum-cat-btn:hover, .forum-cat-btn.active {
+  background: var(--gold-glow);
+  color: var(--gold-primary);
+  border-color: var(--gold-primary);
+}
+
+.forum-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.forum-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: var(--transition-smooth);
+}
+
+.forum-card:hover {
+  border-color: var(--glass-border-hover);
+  box-shadow: 0 5px 15px var(--gold-glow);
+}
+
+.forum-card-main {
+  flex-grow: 1;
+}
+
+.forum-tag {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin-right: 0.75rem;
+  font-weight: 600;
+}
+
+.forum-card-title {
+  font-size: 1.15rem;
+  margin: 0.5rem 0;
+}
+
+.forum-card-meta {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.forum-card-stat {
+  text-align: right;
+  min-width: 100px;
+  color: var(--text-secondary);
+}
+
+.forum-stat-num {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--gold-primary);
+}
+
+.forum-stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Doctor Verified Badge */
+.verified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px solid var(--gold-primary);
+  color: var(--gold-primary);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
+/* Forum Detail & Thread */
+.forum-topic-view {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.forum-post {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+}
+
+.forum-post-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 1rem;
+}
+
+.forum-post-author {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.forum-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold-dark), var(--gold-primary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bg-primary);
+  font-weight: 700;
+}
+
+.forum-avatar.anonymous {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.forum-author-name {
+  font-weight: 600;
+}
+
+.forum-post-date {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.forum-post-body {
+  font-size: 1.05rem;
+  color: var(--text-primary);
+  white-space: pre-line;
+}
+
+/* Reply Editor */
+.reply-editor {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-top: 3rem;
+}
+
+.reply-editor-title {
+  font-size: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.reply-textarea {
+  width: 100%;
+  min-height: 150px;
+  background: var(--bg-primary);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  padding: 1rem;
+  font-family: inherit;
+  font-size: 0.95rem;
+  resize: vertical;
+  margin-bottom: 1rem;
+  outline: none;
+}
+
+.reply-textarea:focus {
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 5px rgba(212, 175, 55, 0.2);
+}
+
+.reply-editor-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.anon-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+/* Footer */
+.footer {
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--glass-border);
+  padding: 4rem 2rem 2rem;
+  margin-top: 8rem;
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 3rem;
+  margin-bottom: 3rem;
+}
+
+.footer-section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 1.25rem;
+  color: var(--text-primary);
+}
+
+.footer-links {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.footer-links a {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.footer-links a:hover {
+  color: var(--gold-primary);
+}
+
+.footer-bottom {
+  max-width: 1200px;
+  margin: 0 auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}

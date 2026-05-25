@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Allow: /blog
+Allow: /forum
+Disallow: /admin
+Disallow: /api
+
+Sitemap: https://beauty.flowbiz.cloud/sitemap.xml

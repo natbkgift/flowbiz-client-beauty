@@ -61,6 +61,11 @@ const requiredPaths = [
   'apps/web/src/styles.css',
   'apps/web/src/main.js',
   'apps/web/src/app.jsx',
+  'apps/web/src/public-main.js',
+  'apps/web/src/public-index.html',
+  'apps/web/src/public-app.jsx',
+  'apps/web/src/public.css',
+  'apps/web/src/robots.txt',
   'database/migrations/001_init.sql',
   'database/migrations/002_multi_tenant_base.sql',
   'database/migrations/003_auth_sessions.sql',
@@ -106,7 +111,8 @@ const requiredPaths = [
   'tests/event_bus.test.js',
   'tests/ai_engine.test.js',
   'tests/admin_ui.test.js',
-  'tests/crm_lead_pipeline.test.js'
+  'tests/crm_lead_pipeline.test.js',
+  'tests/phase9_seo_web.test.js'
 ];
 
 function checkFiles() {
@@ -173,6 +179,7 @@ function checkSyntax() {
     'apps/api/src/modules/customers/routes.js',
     'apps/web/src/server.js',
     'apps/web/src/main.js',
+    'apps/web/src/public-main.js',
     'scripts/build-web.js',
     'scripts/migrate.js',
     'scripts/seed.js',
@@ -187,7 +194,8 @@ function checkSyntax() {
     'tests/event_bus.test.js',
     'tests/ai_engine.test.js',
     'tests/admin_ui.test.js',
-    'tests/crm_lead_pipeline.test.js'
+    'tests/crm_lead_pipeline.test.js',
+    'tests/phase9_seo_web.test.js'
   ];
 
   for (const file of jsFiles) {
