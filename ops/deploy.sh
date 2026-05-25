@@ -53,7 +53,9 @@ fi
 echo "[Git] Updating git repository..."
 cd "$REPO_DIR"
 git fetch origin
-git reset --hard origin/main
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+echo "[Git] Resetting to origin/$BRANCH..."
+git reset --hard "origin/$BRANCH"
 
 # 4. Generate unique release directory name
 RELEASE_NAME=$(date +%Y%m%d%H%M%S)
