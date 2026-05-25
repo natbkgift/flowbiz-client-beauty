@@ -41,7 +41,38 @@ async function enqueueJob(input, client = getPool()) {
   return mapWorkerJob(result.rows[0]);
 }
 
-async function claimDueJobs(limit = 10) {
+async function claimDueJobs(limit = 10, options = {}) {
+  const values = [limit];
+  const filters = [
+    "status = 'pending'",
+    'run_at <= now()'
+  ];
+
+  function addFilterValue(value) {
+    values.push(value);
+    return `$${values.length}`;
+  }
+
+  if (options.clinicId) {
+    filters.push(`clinic_id = ${addFilterValue(Number(options.clinicId))}`);
+  }
+
+  if (options.jobType) {
+    filters.push(`job_type = ${addFilterValue(String(options.jobType))}`);
+  }
+
+  if (options.payloadJsonContains && typeof options.payloadJsonContains === 'object') {
+    filters.push(`payload_json @> ${addFilterValue(JSON.stringify(options.payloadJsonContains))}::jsonb`);
+  }
+
+  if (Array.isArray(options.jobIds) && options.jobIds.length > 0) {
+    filters.push(`id = any(${addFilterValue(options.jobIds.map(Number))}::bigint[])`);
+  }
+
+  if (options.createdAfter) {
+    filters.push(`created_at >= ${addFilterValue(new Date(options.createdAfter).toISOString())}::timestamptz`);
+  }
+
   const result = await getPool().query(
     `
       update worker_jobs
@@ -50,15 +81,14 @@ async function claimDueJobs(limit = 10) {
       where id in (
         select id
         from worker_jobs
-        where status = 'pending'
-          and run_at <= now()
+        where ${filters.join(' and ')}
         order by case when job_type = 'event.dispatch.retry' then 0 else 1 end asc, run_at asc, id asc
         limit $1
         for update skip locked
       )
       returning *
     `,
-    [limit]
+    values
   );
 
   return result.rows.map(mapWorkerJob);
@@ -136,8 +166,8 @@ async function failOrRetryJob(job, error) {
   return 'failed';
 }
 
-async function runDueJobs(limit = 10) {
-  const jobs = await claimDueJobs(limit);
+async function runDueJobs(limit = 10, options = {}) {
+  const jobs = await claimDueJobs(limit, options);
   const results = [];
 
   for (const job of jobs) {
@@ -164,7 +194,7 @@ async function runDueJobs(limit = 10) {
   };
 }
 
-async function tickWorkerLoop(limit) {
+async function tickWorkerLoop(limit, options = {}) {
   if (workerLoopInFlight) {
     return {
       claimedJobs: 0,
@@ -176,7 +206,7 @@ async function tickWorkerLoop(limit) {
   workerLoopInFlight = true;
 
   try {
-    return await runDueJobs(limit);
+    return await runDueJobs(limit, options);
   } finally {
     workerLoopInFlight = false;
   }
@@ -195,9 +225,15 @@ function startWorkerLoop(options = {}) {
   const intervalMs = options.intervalMs || config.workerLoopIntervalMs;
   const batchSize = options.batchSize || config.workerLoopBatchSize;
   const runOnStart = options.runOnStart !== false;
+  const runOptions = {};
+  for (const key of ['clinicId', 'jobType', 'payloadJsonContains', 'jobIds', 'createdAfter']) {
+    if (options[key] !== undefined) {
+      runOptions[key] = options[key];
+    }
+  }
 
   const runTick = () => {
-    void tickWorkerLoop(batchSize).catch((error) => {
+    void tickWorkerLoop(batchSize, runOptions).catch((error) => {
       console.error('Worker loop tick failed:', error.message);
     });
   };

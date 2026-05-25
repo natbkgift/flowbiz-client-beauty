@@ -461,7 +461,11 @@ test('automation engine schedules delay step and resumes execution via worker', 
     [context.currentClinic.id, String(executionId)]
   );
 
-  const workerResult = await scheduler.runDueJobs(20);
+  const workerResult = await scheduler.runDueJobs(20, {
+    clinicId: context.currentClinic.id,
+    jobType: 'automation.execute',
+    payloadJsonContains: { executionId }
+  });
   detail = await getExecutionDetail(context, executionId);
   const taskResult = await pool.query(
     `select count(*)::int as task_count from automation_tasks where execution_id = $1 and title = 'Delayed task'`,
@@ -542,7 +546,11 @@ test('automation engine schedules retry when task action fails and worker comple
     [context.currentClinic.id, String(executionId)]
   );
 
-  const workerResult = await scheduler.runDueJobs(20);
+  const workerResult = await scheduler.runDueJobs(20, {
+    clinicId: context.currentClinic.id,
+    jobType: 'automation.execute',
+    payloadJsonContains: { executionId }
+  });
   detail = await getExecutionDetail(context, executionId);
   const taskResult = await pool.query(
     `select count(*)::int as task_count from automation_tasks where execution_id = $1 and title = 'Retry task' and assigned_user_id = $2`,

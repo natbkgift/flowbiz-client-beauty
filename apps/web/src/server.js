@@ -21,7 +21,9 @@ function renderIndex(templateName, requestHostname = 'localhost') {
   const template = fs.readFileSync(path.join(root, templateName), 'utf8');
   const devApiHost = ['localhost', '127.0.0.1'].includes(requestHostname) ? requestHostname : 'localhost';
   const apiBaseUrl = config.appEnv === 'production' ? '/api' : `http://${devApiHost}:${config.apiPort}`;
-  return template.replace('__API_BASE_URL__', apiBaseUrl);
+  return template
+    .replace('__API_BASE_URL__', apiBaseUrl)
+    .replace('__PUBLIC_CLINIC_ID__', JSON.stringify(config.publicClinicId || null));
 }
 
 function generateSitemap() {

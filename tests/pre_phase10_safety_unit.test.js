@@ -1,11 +1,18 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 
 const { classifyMedicalSafety } = require('../apps/api/src/modules/ai-agent/medical-safety');
-const { verifyWebhookSecret, getIntegrationStatus } = require('../apps/api/src/modules/integration-gateway/security');
+const {
+  verifyWebhookSecret,
+  getIntegrationStatus,
+  resetWebhookReplayCacheForTests
+} = require('../apps/api/src/modules/integration-gateway/security');
 const { getThaiErrorMessage } = require('../apps/api/src/common/user-messages');
 const { json, noContent } = require('../apps/api/src/common/http');
 const { loadConfig } = require('../apps/api/src/config');
+const { resolvePublicClinicId } = require('../apps/api/src/modules/public-content/tenant');
+const { handleAiAgentRoutes } = require('../apps/api/src/modules/ai-agent/routes');
 
 function createMockResponse() {
   return {
@@ -40,23 +47,141 @@ test('pre phase 10 medical safety classifier allows normal commercial inquiry', 
 });
 
 test('pre phase 10 webhook verifier rejects missing or invalid secrets and labels sandbox secrets', () => {
-  const missing = verifyWebhookSecret({ headers: {}, query: {} }, ['x-webhook-secret']);
-  assert.equal(missing.ok, false);
-  assert.equal(missing.reason, 'missing_secret');
+  const previousAppEnv = process.env.APP_ENV;
 
-  const invalid = verifyWebhookSecret({ headers: { 'x-webhook-secret': 'invalid-secret' }, query: {} }, ['x-webhook-secret']);
-  assert.equal(invalid.ok, false);
-  assert.equal(invalid.reason, 'invalid_secret');
+  try {
+    process.env.APP_ENV = 'development';
 
-  const sandbox = verifyWebhookSecret({ headers: { 'x-webhook-secret': 'mock-valid-signature' }, query: {} }, ['x-webhook-secret']);
-  assert.equal(sandbox.ok, true);
-  assert.equal(sandbox.integrationStatus, 'sandbox_secret');
-  assert.equal(getIntegrationStatus('sha256=abc123'), 'live_signature_unverified');
+    const missing = verifyWebhookSecret({ headers: {}, query: {} }, ['x-webhook-secret']);
+    assert.equal(missing.ok, false);
+    assert.equal(missing.reason, 'missing_secret');
+
+    const invalid = verifyWebhookSecret({ headers: { 'x-webhook-secret': 'invalid-secret' }, query: {} }, ['x-webhook-secret']);
+    assert.equal(invalid.ok, false);
+    assert.equal(invalid.reason, 'invalid_secret');
+
+    const sandbox = verifyWebhookSecret({ headers: { 'x-webhook-secret': 'mock-valid-signature' }, query: {} }, ['x-webhook-secret']);
+    assert.equal(sandbox.ok, true);
+    assert.equal(sandbox.integrationStatus, 'sandbox_secret');
+    assert.equal(getIntegrationStatus('sha256=abc123'), 'live_signature_unverified');
+  } finally {
+    if (previousAppEnv === undefined) delete process.env.APP_ENV;
+    else process.env.APP_ENV = previousAppEnv;
+  }
+});
+
+test('pre phase 10 webhook verifier validates HMAC signatures and blocks replay', () => {
+  const previous = {
+    appEnv: process.env.APP_ENV,
+    signingSecret: process.env.FLOWBIZ_WEBHOOK_SIGNING_SECRET
+  };
+
+  try {
+    resetWebhookReplayCacheForTests();
+    process.env.APP_ENV = 'production';
+    process.env.FLOWBIZ_WEBHOOK_SIGNING_SECRET = 'test-webhook-signing-secret';
+
+    const rawBody = JSON.stringify({ event: 'lead.created', id: 123 });
+    const timestamp = String(Math.floor(Date.now() / 1000));
+    const signature = crypto
+      .createHmac('sha256', process.env.FLOWBIZ_WEBHOOK_SIGNING_SECRET)
+      .update(`${timestamp}.${rawBody}`)
+      .digest('hex');
+    const req = {
+      rawBody,
+      query: {},
+      headers: {
+        'x-webhook-signature': `sha256=${signature}`,
+        'x-webhook-timestamp': timestamp
+      }
+    };
+
+    const accepted = verifyWebhookSecret(req, ['x-webhook-signature']);
+    assert.equal(accepted.ok, true);
+    assert.equal(accepted.integrationStatus, 'live_signature_verified');
+
+    const replayed = verifyWebhookSecret(req, ['x-webhook-signature']);
+    assert.equal(replayed.ok, false);
+    assert.equal(replayed.reason, 'replayed_signature');
+  } finally {
+    resetWebhookReplayCacheForTests();
+    if (previous.appEnv === undefined) delete process.env.APP_ENV;
+    else process.env.APP_ENV = previous.appEnv;
+
+    if (previous.signingSecret === undefined) delete process.env.FLOWBIZ_WEBHOOK_SIGNING_SECRET;
+    else process.env.FLOWBIZ_WEBHOOK_SIGNING_SECRET = previous.signingSecret;
+  }
+});
+
+test('pre phase 10 webhook verifier fails closed for arbitrary production shared secrets', () => {
+  const previous = {
+    appEnv: process.env.APP_ENV,
+    sharedSecret: process.env.FLOWBIZ_WEBHOOK_SHARED_SECRET
+  };
+
+  try {
+    process.env.APP_ENV = 'production';
+    delete process.env.FLOWBIZ_WEBHOOK_SHARED_SECRET;
+
+    const arbitrary = verifyWebhookSecret({ headers: { 'x-webhook-secret': 'anything-non-empty' }, query: {} }, ['x-webhook-secret']);
+    assert.equal(arbitrary.ok, false);
+    assert.equal(arbitrary.reason, 'missing_shared_secret');
+
+    process.env.FLOWBIZ_WEBHOOK_SHARED_SECRET = 'configured-prod-secret';
+    const wrong = verifyWebhookSecret({ headers: { 'x-webhook-secret': 'wrong-secret' }, query: {} }, ['x-webhook-secret']);
+    assert.equal(wrong.ok, false);
+    assert.equal(wrong.reason, 'invalid_secret');
+
+    const accepted = verifyWebhookSecret({ headers: { 'x-webhook-secret': 'configured-prod-secret' }, query: {} }, ['x-webhook-secret']);
+    assert.equal(accepted.ok, true);
+    assert.equal(accepted.integrationStatus, 'live_shared_secret_verified');
+  } finally {
+    if (previous.appEnv === undefined) delete process.env.APP_ENV;
+    else process.env.APP_ENV = previous.appEnv;
+
+    if (previous.sharedSecret === undefined) delete process.env.FLOWBIZ_WEBHOOK_SHARED_SECRET;
+    else process.env.FLOWBIZ_WEBHOOK_SHARED_SECRET = previous.sharedSecret;
+  }
 });
 
 test('pre phase 10 user-facing API error messages are Thai while codes remain stable', () => {
   assert.equal(getThaiErrorMessage('FORBIDDEN'), 'คุณไม่มีสิทธิ์ดำเนินการนี้');
+  assert.equal(getThaiErrorMessage('PUBLIC_CLINIC_REQUIRED'), 'กรุณาระบุคลินิกสำหรับหน้าเว็บสาธารณะ');
   assert.equal(getThaiErrorMessage('MEDICAL_SAFETY_REVIEW_REQUIRED'), 'เนื้อหานี้เกี่ยวข้องกับความปลอดภัยทางการแพทย์ ต้องให้เจ้าหน้าที่ตรวจสอบก่อนส่ง');
+});
+
+test('public content routes require explicit clinic context instead of defaulting tenants', () => {
+  assert.equal(resolvePublicClinicId(new URL('http://localhost/blog/posts?clinicId=1001')), 1001);
+  assert.throws(
+    () => resolvePublicClinicId(new URL('http://localhost/blog/posts')),
+    (error) => error.code === 'PUBLIC_CLINIC_REQUIRED'
+  );
+});
+
+test('AI inbound test route is disabled in production runtime', async () => {
+  const previousAppEnv = process.env.APP_ENV;
+
+  try {
+    process.env.APP_ENV = 'production';
+    await assert.rejects(
+      () => handleAiAgentRoutes(
+        { method: 'POST' },
+        {},
+        new URL('http://localhost/ai-agent/inbound'),
+        {
+          authenticateRequest: async () => {
+            throw new Error('authenticateRequest should not be called');
+          },
+          parseJsonBody: async () => ({}),
+          json: () => true
+        }
+      ),
+      (error) => error.code === 'NOT_FOUND'
+    );
+  } finally {
+    if (previousAppEnv === undefined) delete process.env.APP_ENV;
+    else process.env.APP_ENV = previousAppEnv;
+  }
 });
 
 test('http response helpers return handled marker for modular route dispatch', () => {

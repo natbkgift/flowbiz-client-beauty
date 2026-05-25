@@ -16,6 +16,7 @@ function noContent(response) {
 function parseJsonBody(request) {
   return new Promise((resolve, reject) => {
     if (request.method === 'GET' || request.method === 'HEAD') {
+      request.rawBody = '';
       resolve({});
       return;
     }
@@ -32,6 +33,8 @@ function parseJsonBody(request) {
     });
 
     request.on('end', () => {
+      request.rawBody = body;
+
       if (!body) {
         resolve({});
         return;

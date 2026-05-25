@@ -4,10 +4,27 @@ import { createRoot } from 'react-dom/client';
 // Config & API Helpers
 const CONFIG = window.__FLOWBIZ_WEB_CONFIG__ || { apiBaseUrl: 'http://localhost:3001' };
 const API_BASE = CONFIG.apiBaseUrl || '/api';
+const PUBLIC_CLINIC_ID = Number.isInteger(Number(CONFIG.publicClinicId)) && Number(CONFIG.publicClinicId) > 0
+  ? Number(CONFIG.publicClinicId)
+  : null;
+
+function withPublicClinicContext(path) {
+  if (!PUBLIC_CLINIC_ID) {
+    return path;
+  }
+
+  const parsed = new URL(path, window.location.origin);
+  if ((parsed.pathname.startsWith('/blog/') || parsed.pathname.startsWith('/forum/')) && !parsed.searchParams.has('clinicId')) {
+    parsed.searchParams.set('clinicId', String(PUBLIC_CLINIC_ID));
+  }
+
+  return `${parsed.pathname}${parsed.search}`;
+}
 
 async function apiFetch(path, options = {}) {
+  const pathWithContext = withPublicClinicContext(path);
   try {
-    const response = await fetch(`${API_BASE}${path}`, {
+    const response = await fetch(`${API_BASE}${pathWithContext}`, {
       headers: {
         'Content-Type': 'application/json',
         ...options.headers
@@ -17,7 +34,7 @@ async function apiFetch(path, options = {}) {
     if (!response.ok) throw new Error('เรียก API ไม่สำเร็จ');
     return await response.json();
   } catch (err) {
-    console.warn(`API call to ${path} failed, using local fallback state:`, err.message);
+    console.warn(`API call to ${pathWithContext} failed, using local fallback state:`, err.message);
     return null;
   }
 }

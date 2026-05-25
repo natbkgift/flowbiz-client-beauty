@@ -602,7 +602,7 @@ async function sendLeadOutboundMessage(clinicContext, leadId, payload, options =
 
     try {
       const { publishDomainEvent } = require('../event-bus/publisher');
-      publishDomainEvent({
+      await publishDomainEvent({
         clinicId: clinicContext.currentClinic.id,
         eventType: 'message.sent',
         entityType: 'lead',
@@ -615,8 +615,6 @@ async function sendLeadOutboundMessage(clinicContext, leadId, payload, options =
           workspaceId: lead.workspace_id,
           actorUserId: clinicContext.currentUser.id
         }
-      }).catch((error) => {
-        console.error('Event bus message.sent publish failed for lead:', error.message);
       });
     } catch (error) {
       console.error('Event bus message.sent publish failed for lead:', error.message);
@@ -782,7 +780,7 @@ async function sendCustomerOutboundMessage(clinicContext, customerId, payload, o
 
     try {
       const { publishDomainEvent } = require('../event-bus/publisher');
-      publishDomainEvent({
+      await publishDomainEvent({
         clinicId: clinicContext.currentClinic.id,
         eventType: 'message.sent',
         entityType: 'customer',
@@ -794,8 +792,6 @@ async function sendCustomerOutboundMessage(clinicContext, customerId, payload, o
           status: outbound.status,
           actorUserId: clinicContext.currentUser.id
         }
-      }).catch((error) => {
-        console.error('Event bus message.sent publish failed for customer:', error.message);
       });
     } catch (error) {
       console.error('Event bus message.sent publish failed for customer:', error.message);

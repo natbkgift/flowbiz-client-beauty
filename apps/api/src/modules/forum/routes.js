@@ -5,6 +5,7 @@ const {
   hasAnyPermission,
   hasPermission
 } = require('../rbac/service');
+const { resolvePublicClinicId, resolvePublicClinicContext } = require('../public-content/tenant');
 const {
   createTopic,
   listTopics,
@@ -27,7 +28,7 @@ async function handleForumRoutes(request, response, url, tools) {
       clinicId = context.currentClinic.id;
       canModerate = hasAnyPermission(context, [['forum', 'moderate'], ['forum', 'medical_answer']]);
     } catch (_) {
-      clinicId = Number(url.searchParams.get('clinicId')) || 1001;
+      clinicId = resolvePublicClinicId(url);
     }
 
     const topics = await listTopics(clinicId, {
@@ -47,7 +48,7 @@ async function handleForumRoutes(request, response, url, tools) {
       const context = await authenticateRequest(request);
       clinicId = context.currentClinic.id;
     } catch (_) {
-      clinicId = Number(url.searchParams.get('clinicId')) || 1001;
+      clinicId = resolvePublicClinicId(url);
     }
 
     try {
@@ -68,10 +69,7 @@ async function handleForumRoutes(request, response, url, tools) {
     try {
       clinicContext = await authenticateRequest(request);
     } catch (_) {
-      // Public / Guest user
-      clinicContext = {
-        currentClinic: { id: Number(url.searchParams.get('clinicId')) || 1001 }
-      };
+      clinicContext = resolvePublicClinicContext(url);
     }
 
     const body = await parseJsonBody(request);
@@ -91,9 +89,7 @@ async function handleForumRoutes(request, response, url, tools) {
         isDoctorReply = true; // Auto-detect as doctor/clinic reply if posted by owner/admin
       }
     } catch (_) {
-      clinicContext = {
-        currentClinic: { id: Number(url.searchParams.get('clinicId')) || 1001 }
-      };
+      clinicContext = resolvePublicClinicContext(url);
     }
 
     const body = await parseJsonBody(request);

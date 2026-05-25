@@ -145,7 +145,11 @@ test('campaign broadcast system - creation, segmentation, enqueuing, worker proc
     "update worker_jobs set run_at = now() - interval '10 seconds' where clinic_id = $1 and job_type = 'campaign.dispatch' and payload_json->>'campaignId' = $2",
     [context.currentClinic.id, String(campaign.id)]
   );
-  const runResult = await runDueJobs(Math.max(10, enqueuedCampaign.statsJson.targetCount + 2));
+  const runResult = await runDueJobs(Math.max(10, enqueuedCampaign.statsJson.targetCount + 2), {
+    clinicId: context.currentClinic.id,
+    jobType: 'campaign.dispatch',
+    payloadJsonContains: { campaignId: campaign.id }
+  });
   assert.ok(runResult.claimedJobs >= 1);
 
   // 9. Reload campaign and verify stats and status

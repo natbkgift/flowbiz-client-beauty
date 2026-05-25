@@ -71,6 +71,7 @@ function loadConfig() {
     workerLoopIntervalMs: toPositiveInt(process.env.WORKER_LOOP_INTERVAL_MS, 5000),
     workerLoopBatchSize: toPositiveInt(process.env.WORKER_LOOP_BATCH_SIZE, 20),
     eventRetryMaxAttempts: toPositiveInt(process.env.EVENT_RETRY_MAX_ATTEMPTS, 3),
+    publicClinicId: toPositiveInt(process.env.PUBLIC_CLINIC_ID, appEnv === 'production' ? null : 1001),
     databaseUrl
   };
 }

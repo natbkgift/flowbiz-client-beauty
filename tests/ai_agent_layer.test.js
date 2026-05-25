@@ -238,7 +238,7 @@ test('flow insights generated from execution data', async () => {
   });
 
   await waitForAssertion(async () => {
-    await runDueJobs(10);
+    await runDueJobs(10, { clinicId: context.currentClinic.id });
     const executionResult = await pool.query(
       `select id from automation_executions where clinic_id = $1 and flow_id = $2 and entity_id = $3 order by id desc limit 1`,
       [context.currentClinic.id, flow.id, lead.id]

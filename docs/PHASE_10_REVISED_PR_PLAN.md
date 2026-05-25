@@ -1,7 +1,7 @@
 # Phase 10 Revised PR Plan
 
-วันที่จัดทำ: 2026-05-25  
-สถานะล่าสุด: แผนนี้ถูกใช้เป็นแนวทางสำหรับ branch `stabilization/pre-phase-10-thai-hardening` แล้วบางส่วน เพื่อทำ Pre-Phase 10 stabilization เฉพาะจุด. ยังไม่ merge, ยังไม่ deploy และยังต้องผ่าน full regression พร้อม PostgreSQL ก่อนเปิด merge gate.
+วันที่จัดทำ: 2026-05-26
+สถานะล่าสุด: แผนนี้ถูกใช้เป็นแนวทางสำหรับ branch `stabilization/pre-phase-10-thai-hardening` แล้ว เพื่อทำ Pre-Phase 10 stabilization เฉพาะจุด. Local regression gate ผ่านแล้ว แต่ยังไม่ merge, ยังไม่ deploy และ CI ต้องยืนยันซ้ำบน fresh database ก่อนเปิด merge gate.
 
 ## Pre-Phase 10 Implementation Snapshot
 
@@ -13,6 +13,10 @@
 - Medical safety classifier บังคับ HITL สำหรับข้อความเสี่ยงก่อน AI auto-reply และ campaign broadcast enqueue
 - Thai API/user-facing UX และ XSS-safe rendering สำหรับ blog/forum rich content
 - Post-review fix เพิ่มเติม: route-dispatch helper return handled marker, dev-only CORS allowlist, dev API host ตาม request host, public empty states, production config fail-closed เมื่อ secret/database ยังเป็น local default และ deploy script รับ DB secrets จาก environment เท่านั้น
+- Production webhook guard เพิ่ม HMAC/shared-secret fail-closed, raw-body verification, timestamp/replay check และ test ว่า arbitrary signature ถูกปฏิเสธใน production
+- Public blog/forum API ตัด default `clinicId=1001`; frontend inject `PUBLIC_CLINIC_ID` สำหรับ public routes และ API return Thai error เมื่อไม่มี explicit clinic context
+- `POST /ai-agent/inbound` ถูกปิดใน production runtime จนกว่าจะมี service-account ingress ที่ auditable
+- Worker queue ไม่ถูก drain จาก request/event subscriber path แล้ว; tests ใช้ scoped worker filters เพื่อลด race และลด latency risk
 
 ยังเป็น stop condition ก่อน merge/deploy:
 
@@ -23,11 +27,11 @@
 Validation ล่าสุดใน local stabilization gate:
 
 - Docker PostgreSQL local พร้อมใช้งานและ apply migration 036 แล้ว
-- `npm test` ผ่าน 97/97
+- `npm test` ผ่าน 93/93
 - `npm run validate` ผ่าน
 - `npm run build:web` ผ่าน
 - `npm audit --audit-level=moderate` ผ่าน 0 vulnerabilities
-- Browser smoke public/admin/mobile ผ่านโดยไม่มี console error
+- Browser smoke public landing/blog/forum และ admin ผ่านทั้ง desktop/mobile โดยไม่มี console warning/error
 
 ## Phase Split
 
@@ -143,8 +147,8 @@ Required work:
 
 - Add integration status registry: `mock`, `sandbox`, `live`, `disabled`, with `verified_at`, `provider`, `capabilities_json`.
 - Disable production sends for mock providers unless `ALLOW_MOCK_PROVIDER_IN_PROD=false` is explicitly enforced.
-- Add webhook signature validation with timestamp/replay protection.
-- Add raw buffer for Wix and Zonepang or a generic `inbound_webhook_events` table.
+- Finalize provider-specific webhook signature contracts on top of the production fail-closed HMAC/shared-secret guard.
+- Persist replay protection durably and add raw event storage for Wix/Zonepang or a generic `inbound_webhook_events` table.
 - Make API/UI label Stripe/Omise/ad-spend/messaging as simulated until real adapters exist.
 
 Tests required:
@@ -157,7 +161,7 @@ Tests required:
 
 Stop conditions:
 
-- Any webhook accepts arbitrary non-`invalid-secret` signature.
+- Any production webhook accepts missing, random, stale or replayed signature input.
 - Any mock integration is shown as live/fully active.
 
 ### PR 10A.4 - PDPA Consent And Retention Foundation

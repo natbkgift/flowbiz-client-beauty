@@ -11,6 +11,10 @@ const {
   updateAgentRule
 } = require('./conversation-service');
 
+function isProductionRuntime() {
+  return (process.env.APP_ENV || 'development') === 'production';
+}
+
 async function handleAiAgentRoutes(request, response, url, tools) {
   const { authenticateRequest, parseJsonBody, json } = tools;
 
@@ -62,6 +66,10 @@ async function handleAiAgentRoutes(request, response, url, tools) {
   }
 
   if (url.pathname === '/ai-agent/inbound' && request.method === 'POST') {
+    if (isProductionRuntime()) {
+      throw new AppError(404, 'NOT_FOUND', 'Route not found.');
+    }
+
     const context = await authenticateAndAuthorize(request, authenticateRequest, 'ai', 'manage');
     const body = await parseJsonBody(request);
     const message = await handleInboundMessage(

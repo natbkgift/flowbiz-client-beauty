@@ -95,7 +95,7 @@ test('production hardening - worker DLQ archives failed jobs', async () => {
   assert.equal(job.attempts, 0);
 
   // 2. Run the worker loop to process the failing job
-  const runResult = await runDueJobs(10);
+  const runResult = await runDueJobs(10, { clinicId: context.currentClinic.id, jobIds: [job.id] });
 
   // 3. Verify job is removed from active worker_jobs queue
   const reloadedJob = await pool.query('select * from worker_jobs where id = $1', [job.id]);

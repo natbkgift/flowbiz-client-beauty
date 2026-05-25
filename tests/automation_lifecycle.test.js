@@ -5,6 +5,7 @@ const { loadConfig } = require('../apps/api/src/config');
 const { getLifecycleFlowPresets } = require('../apps/api/src/modules/automation/flow-presets');
 const { handleDomainEvent } = require('../apps/api/src/modules/automation/service');
 const { createLead, updateLeadStageStatus } = require('../apps/api/src/modules/leads/service');
+const { runDueJobs } = require('../apps/api/src/modules/worker-engine/scheduler');
 
 async function buildContext(pool) {
   const clinicResult = await pool.query(`select id, name, slug, plan, status, timezone, created_at, updated_at from clinics where slug = 'demo-clinic' limit 1`);
@@ -96,6 +97,7 @@ test('lifecycle flow pack is seeded for demo clinic', async () => {
 test('new lead welcome creates execution, task, and outbound log', async () => {
   const pool = new Pool({ connectionString: loadConfig().databaseUrl });
   const context = await buildContext(pool);
+  const startedAt = new Date().toISOString();
   const lead = await createLead(context, {
     fullName: `Lifecycle Test Lead ${Date.now()}`,
     source: 'manual',
@@ -108,6 +110,12 @@ test('new lead welcome creates execution, task, and outbound log', async () => {
   });
 
   await waitForAssertion(async () => {
+    await runDueJobs(20, {
+      clinicId: context.currentClinic.id,
+      jobType: 'automation.execute',
+      createdAfter: startedAt
+    });
+
     const executionResult = await pool.query(
       `
         select count(*)::int as execution_count

@@ -1,5 +1,6 @@
 const { matchPath } = require('../../common/routing');
 const { authenticateAndAuthorize, hasPermission } = require('../rbac/service');
+const { resolvePublicClinicId } = require('../public-content/tenant');
 const {
   createPost,
   updatePost,
@@ -25,8 +26,7 @@ async function handleBlogRoutes(request, response, url, tools) {
       clinicId = context.currentClinic.id;
       canManageBlog = hasPermission(context, 'blog', 'manage');
     } catch (_) {
-      // Fallback for public requests
-      clinicId = Number(url.searchParams.get('clinicId')) || 1001; // default to first seeded clinic if not provided
+      clinicId = resolvePublicClinicId(url);
     }
 
     const reqStatus = url.searchParams.get('status');
@@ -46,7 +46,7 @@ async function handleBlogRoutes(request, response, url, tools) {
       const context = await authenticateRequest(request);
       clinicId = context.currentClinic.id;
     } catch (_) {
-      clinicId = Number(url.searchParams.get('clinicId')) || 1001;
+      clinicId = resolvePublicClinicId(url);
     }
 
     // Wait! If slug is a number, is it possible they are calling PUT /blog/posts/:id?

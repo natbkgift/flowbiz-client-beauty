@@ -15,7 +15,6 @@ function ensureDefaultSubscribers() {
     async handle(event) {
       const { resolveWorkerContext } = require('../worker-engine/worker');
       const { handleDomainEvent } = require('../automation/service');
-      const { runDueJobs } = require('../worker-engine/scheduler');
       const context = await resolveWorkerContext(
         event.clinicId,
         event.payloadJson.actorUserId || null,
@@ -52,8 +51,6 @@ function ensureDefaultSubscribers() {
           deferExecution: true
         });
       }
-
-      await runDueJobs(50);
     }
   });
 
