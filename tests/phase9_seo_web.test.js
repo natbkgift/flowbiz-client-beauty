@@ -35,14 +35,14 @@ test('SEO Landing Page, Robots.txt, and Sitemap.xml Routing', async (t) => {
   // 1. Verify Public Landing Page (/)
   const resHome = await get(`${baseUrl}/`);
   assert.equal(resHome.statusCode, 200);
-  assert.match(resHome.body, /<html lang="en">/);
+  assert.match(resHome.body, /<html lang="th">/);
   assert.match(resHome.body, /FlowBiz Beauty Clinic/);
   assert.match(resHome.body, /public.bundle.js/);
 
   // 2. Verify Admin Routing (/admin)
   const resAdmin = await get(`${baseUrl}/admin`);
   assert.equal(resAdmin.statusCode, 200);
-  assert.match(resAdmin.body, /FlowBiz Admin Control Center/);
+  assert.match(resAdmin.body, /FlowBiz Beauty CRM \| ศูนย์ควบคุมคลินิก/);
   assert.match(resAdmin.body, /admin.bundle.js/);
 
   // 3. Verify Sitemap.xml

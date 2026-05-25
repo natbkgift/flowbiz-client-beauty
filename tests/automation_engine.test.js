@@ -143,15 +143,8 @@ async function createTenantFixture(t) {
     password: 'StrongPass123!'
   });
   const pool = new Pool({ connectionString: loadConfig().databaseUrl });
-  const cleanupUserIds = new Set([session.user.id]);
 
   t.after(async () => {
-    await pool.query('delete from clinics where id = $1', [session.currentClinic.id]);
-
-    if (cleanupUserIds.size > 0) {
-      await pool.query('delete from users where id = any($1::bigint[])', [[...cleanupUserIds].map((id) => Number(id))]);
-    }
-
     await pool.end();
   });
 
@@ -161,23 +154,20 @@ async function createTenantFixture(t) {
     pool,
     session,
     context,
-    registerUser(userId) {
-      cleanupUserIds.add(userId);
-    }
+    registerUser() {}
   };
 }
 
-test('automation engine executes canonical flow steps and records step executions', async () => {
-  const pool = new Pool({ connectionString: loadConfig().databaseUrl });
-  const context = await buildContext(pool);
+test('automation engine executes canonical flow steps and records step executions', async (t) => {
+  const { pool, context } = await createTenantFixture(t);
   await pool.query('delete from automation_flows where clinic_id = $1', [context.currentClinic.id]);
   const flow = await createFlow(context, {
     name: `Automation Engine ${Date.now()}`,
     flowType: 'lifecycle',
     status: 'active',
-    triggerEvent: 'lead.created',
+    triggerEvent: 'lead.note_added',
     definitionJson: {
-      trigger: 'lead.created',
+      trigger: 'lead.note_added',
       entityType: 'lead',
       conditions: {},
       steps: [
@@ -202,6 +192,16 @@ test('automation engine executes canonical flow steps and records step execution
     ownerUserId: context.currentUser.id,
     phone: `087${String(Date.now()).slice(-7)}`,
     email: `automation-engine-${Date.now()}@example.com`
+  });
+
+  await handleDomainEvent(context, {
+    eventName: 'lead.note_added',
+    entityType: 'lead',
+    entityId: lead.id,
+    eventId: `automation-engine-${lead.id}`,
+    occurredAt: '2026-03-16T09:00:00Z',
+    contextJson: { workspaceId: context.currentWorkspace.id },
+    deferExecution: false
   });
 
   let executionId = null;
@@ -244,7 +244,6 @@ test('automation engine executes canonical flow steps and records step execution
   );
 
   assert.equal(taskResult.rows[0].task_count, 1);
-  await pool.end();
 });
 
 test('automation engine rejects self-looping tag automations', async () => {
@@ -343,9 +342,8 @@ test('automation flow activation updates status and writes activation audit', as
   await pool.end();
 });
 
-test('automation engine stops after failed condition and skips action execution', async () => {
-  const pool = new Pool({ connectionString: loadConfig().databaseUrl });
-  const context = await buildContext(pool);
+test('automation engine stops after failed condition and skips action execution', async (t) => {
+  const { pool, context } = await createTenantFixture(t);
   await pool.query('delete from automation_flows where clinic_id = $1', [context.currentClinic.id]);
   const flow = await createFlow(context, {
     name: `Condition Skip ${Date.now()}`,
@@ -405,12 +403,10 @@ test('automation engine stops after failed condition and skips action execution'
   );
   assert.equal(taskResult.rows[0].task_count, 0);
   assert.equal(flow.id > 0, true);
-  await pool.end();
 });
 
-test('automation engine schedules delay step and resumes execution via worker', async () => {
-  const pool = new Pool({ connectionString: loadConfig().databaseUrl });
-  const context = await buildContext(pool);
+test('automation engine schedules delay step and resumes execution via worker', async (t) => {
+  const { pool, context } = await createTenantFixture(t);
   await pool.query('delete from automation_flows where clinic_id = $1', [context.currentClinic.id]);
   const flow = await createFlow(context, {
     name: `Delay Resume ${Date.now()}`,
@@ -477,12 +473,10 @@ test('automation engine schedules delay step and resumes execution via worker', 
   assert.ok(detail.stepExecutions.some((step) => step.stepOrder === 2 && step.status === 'completed'));
   assert.equal(taskResult.rows[0].task_count, 1);
   assert.equal(flow.id > 0, true);
-  await pool.end();
 });
 
-test('automation engine schedules retry when task action fails and worker completes retry', async () => {
-  const pool = new Pool({ connectionString: loadConfig().databaseUrl });
-  const context = await buildContext(pool);
+test('automation engine schedules retry when task action fails and worker completes retry', async (t) => {
+  const { pool, context } = await createTenantFixture(t);
   await pool.query('delete from automation_flows where clinic_id = $1', [context.currentClinic.id]);
   const flow = await createFlow(context, {
     name: `Retry Flow ${Date.now()}`,
@@ -559,7 +553,6 @@ test('automation engine schedules retry when task action fails and worker comple
   assert.equal(detail.status, 'completed');
   assert.equal(taskResult.rows[0].task_count, 1);
   assert.equal(flow.id > 0, true);
-  await pool.end();
 });
 
 test('automation RBAC allows read and blocks manage for operator role', async (t) => {

@@ -1,6 +1,8 @@
 const { getPool } = require('../../db');
 const { AppError } = require('../../common/errors');
 const { recordMeteredUsage } = require('../billing/service');
+const { recordAuditLog } = require('../audit/service');
+const { classifyMedicalSafety } = require('./medical-safety');
 
 const CLINIC_PROMOTIONS = [
   {
@@ -85,7 +87,7 @@ async function getAgentRules(clinicId) {
   return res.rows;
 }
 
-async function updateAgentRule(clinicId, agentType, systemPrompt, temperature, rulesConfig = {}) {
+async function updateAgentRule(clinicId, agentType, systemPrompt, temperature, rulesConfig = {}, options = {}) {
   const pool = getPool();
   
   const res = await pool.query(
@@ -100,10 +102,23 @@ async function updateAgentRule(clinicId, agentType, systemPrompt, temperature, r
     [clinicId, agentType, systemPrompt, temperature, JSON.stringify(rulesConfig)]
   );
   
-  return res.rows[0];
+  const rule = res.rows[0];
+  await recordAuditLog({
+    clinicId,
+    entityType: 'ai_agent_rule',
+    entityId: rule.id,
+    actionType: 'ai.rule_updated',
+    actorUserId: options.actorUserId || null,
+    contextJson: {
+      agentType,
+      temperature: Number(temperature)
+    }
+  });
+
+  return rule;
 }
 
-async function handleInboundMessage(clinicId, leadId, text) {
+async function handleInboundMessage(clinicId, leadId, text, options = {}) {
   const pool = getPool();
 
   // 1. Get or create the AI Chat Thread
@@ -173,9 +188,7 @@ async function handleInboundMessage(clinicId, leadId, text) {
   let replyText = '';
   let nextAgent = currentAgent;
 
-  // Scan text for medical/complaint keywords to drop confidence score below 85%
-  const lowConfidenceKeywords = ['ตั้งครรภ์', 'ท้อง', 'แพ้', 'โรคประจำตัว', 'อันตราย', 'ผลข้างเคียง', 'คืนเงิน', 'ห่วย', 'ไม่เห็นผล', 'ร้องเรียน', 'ฟ้อง', 'มีบุตร', 'หัวใจ', 'ความดัน'];
-  const hasLowConfidenceKeyword = lowConfidenceKeywords.some(kw => lowerText.includes(kw));
+  const safetyClassification = classifyMedicalSafety(text);
 
   if (currentAgent === 'qualification') {
     const phoneRegex = /(0[2689]\d{8}|0[3457]\d{7})/g;
@@ -223,8 +236,9 @@ async function handleInboundMessage(clinicId, leadId, text) {
     }
   }
 
-  if (hasLowConfidenceKeyword) {
+  if (safetyClassification.requiresHitl) {
     confidenceScore = Math.min(confidenceScore, 0.72);
+    replyText = 'ขอบคุณที่แจ้งข้อมูลค่ะ กรณีนี้เกี่ยวข้องกับความปลอดภัยทางการแพทย์ แอดมินจะส่งให้เจ้าหน้าที่หรือแพทย์ผู้ดูแลตรวจสอบก่อนตอบกลับ เพื่อความปลอดภัยของคนไข้นะคะ';
   }
 
   let messageStatus = 'sent';
@@ -263,6 +277,23 @@ async function handleInboundMessage(clinicId, leadId, text) {
     );
   }
 
+  await recordAuditLog({
+    clinicId,
+    entityType: 'ai_message',
+    entityId: messageId,
+    actionType: messageStatus === 'sent' ? 'ai.auto_reply_sent' : 'ai.auto_reply_requires_hitl',
+    actorUserId: options.actorUserId || null,
+    contextJson: {
+      leadId,
+      threadId,
+      agentType: currentAgent,
+      nextAgent,
+      confidenceScore,
+      status: messageStatus,
+      medicalSafety: safetyClassification
+    }
+  });
+
   // 9. If auto-sent, record metered SaaS billing usage
   if (messageStatus === 'sent') {
     await recordMeteredUsage(clinicId, 'ai_message_generated', 1);
@@ -299,7 +330,7 @@ async function getApprovalQueue(clinicId) {
   }));
 }
 
-async function approveOrOverrideMessage(clinicId, messageId, staffOverrideText = null) {
+async function approveOrOverrideMessage(clinicId, messageId, staffOverrideText = null, options = {}) {
   const pool = getPool();
 
   // 1. Fetch message and verify clinic ownership
@@ -366,12 +397,27 @@ async function approveOrOverrideMessage(clinicId, messageId, staffOverrideText =
   // 4. Record metered SaaS billing usage
   await recordMeteredUsage(clinicId, 'ai_message_generated', 1);
 
+  await recordAuditLog({
+    clinicId,
+    entityType: 'ai_message',
+    entityId: messageId,
+    actionType: hitlStatus === 'modified' ? 'ai.hitl_modified' : 'ai.hitl_approved',
+    actorUserId: options.actorUserId || null,
+    contextJson: {
+      leadId: Number(msg.lead_id),
+      threadId: Number(msg.thread_id),
+      finalSenderType,
+      overrideApplied: hitlStatus === 'modified'
+    }
+  });
+
   return updatedResult.rows[0];
 }
 
-async function getAiCopilotSuggestion(clinicId, leadId, messageText) {
+async function getAiCopilotSuggestion(clinicId, leadId, messageText, options = {}) {
   const pool = getPool();
   const lowerText = (messageText || '').toLowerCase();
+  const safetyClassification = classifyMedicalSafety(messageText);
   
   let matchedPromo = CLINIC_PROMOTIONS.find(promo => 
     promo.keywords.some(kw => lowerText.includes(kw))
@@ -392,6 +438,12 @@ async function getAiCopilotSuggestion(clinicId, leadId, messageText) {
     };
   }
 
+  if (safetyClassification.requiresHitl) {
+    confidenceScore = Math.min(confidenceScore, 0.72);
+    suggestedResponse = 'ข้อความนี้เกี่ยวข้องกับความปลอดภัยทางการแพทย์ ควรส่งให้เจ้าหน้าที่หรือแพทย์ตรวจสอบก่อนตอบกลับคนไข้';
+    promotion = null;
+  }
+
   const result = await pool.query(
     `insert into ai_copilot_suggestions (clinic_id, lead_id, message_text, suggested_response, confidence_score, used)
      values ($1, $2, $3, $4, $5, false)
@@ -399,12 +451,27 @@ async function getAiCopilotSuggestion(clinicId, leadId, messageText) {
     [Number(clinicId), Number(leadId), messageText, suggestedResponse, confidenceScore]
   );
 
+  await recordAuditLog({
+    clinicId: Number(clinicId),
+    entityType: 'ai_copilot_suggestion',
+    entityId: Number(result.rows[0].id),
+    actionType: safetyClassification.requiresHitl ? 'ai.copilot_requires_hitl' : 'ai.copilot_suggested',
+    actorUserId: options.actorUserId || null,
+    contextJson: {
+      leadId: Number(leadId),
+      confidenceScore,
+      medicalSafety: safetyClassification
+    }
+  });
+
   return {
     success: true,
     suggestionId: Number(result.rows[0].id),
     messageText,
     suggestedResponse,
     confidenceScore,
+    requiresHitl: safetyClassification.requiresHitl,
+    medicalSafety: safetyClassification,
     promotion
   };
 }

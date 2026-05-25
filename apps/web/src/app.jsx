@@ -12,18 +12,18 @@ const FlowBuilderContext = createContext(null);
 const ExecutionDebuggerContext = createContext(null);
 
 const NAV_ITEMS = [
-  { key: 'dashboard', label: 'Dashboard', caption: 'Tenant activity overview' },
-  { key: 'unified-inbox', label: 'Omnichannel Inbox', caption: 'Social chat and AI co-pilot' },
-  { key: 'roas-analytics', label: 'ROAS & Loyalty', caption: 'Ad spend, CAC & member referrals' },
-  { key: 'ai-agent-console', label: 'AI Agent Console', caption: 'Agent rules & HITL approvals' },
-  { key: 'blog-manager', label: 'Blog Manager', caption: 'Create, edit & publish articles' },
-  { key: 'forum-moderator', label: 'Forum Moderator', caption: 'Moderate topics & verify answers' },
-  { key: 'users', label: 'Users', caption: 'Memberships and roles' },
-  { key: 'workspaces', label: 'Workspaces', caption: 'Workspace configuration' },
-  { key: 'settings', label: 'Settings', caption: 'Tenant and org settings' },
-  { key: 'automation', label: 'Automation', caption: 'Flows and executions' },
-  { key: 'audit', label: 'Audit Logs', caption: 'Recent system activity' },
-  { key: 'system-health', label: 'System Health', caption: 'Worker and event ops' }
+  { key: 'dashboard', label: 'แดชบอร์ด', caption: 'ภาพรวมกิจกรรมคลินิก' },
+  { key: 'unified-inbox', label: 'กล่องแชทรวม', caption: 'Social chat และ AI co-pilot' },
+  { key: 'roas-analytics', label: 'ROAS และสะสมแต้ม', caption: 'ค่าโฆษณา CAC และแนะนำเพื่อน' },
+  { key: 'ai-agent-console', label: 'คอนโซล AI Agent', caption: 'กฎ Agent และคิว HITL' },
+  { key: 'blog-manager', label: 'จัดการบทความ', caption: 'สร้าง แก้ไข และเผยแพร่' },
+  { key: 'forum-moderator', label: 'ดูแลเว็บบอร์ด', caption: 'ตรวจหัวข้อและคำตอบแพทย์' },
+  { key: 'users', label: 'ผู้ใช้งาน', caption: 'สมาชิกและบทบาท' },
+  { key: 'workspaces', label: 'เวิร์กสเปซ', caption: 'ตั้งค่าพื้นที่ทำงาน' },
+  { key: 'settings', label: 'ตั้งค่า', caption: 'Tenant และองค์กร' },
+  { key: 'automation', label: 'Automation', caption: 'Flow และ execution' },
+  { key: 'audit', label: 'Audit Logs', caption: 'ประวัติระบบล่าสุด' },
+  { key: 'system-health', label: 'สุขภาพระบบ', caption: 'Worker และ event ops' }
 ];
 
 class ApiError extends Error {
@@ -85,7 +85,7 @@ function formatDateTime(value) {
     return String(value);
   }
 
-  return parsed.toLocaleString();
+  return parsed.toLocaleString('th-TH');
 }
 
 function formatNumber(value) {
@@ -118,6 +118,78 @@ function safeJsonStringify(value) {
   return JSON.stringify(value || {}, null, 2);
 }
 
+const ALLOWED_RICH_TAGS = new Set(['P', 'BR', 'STRONG', 'EM', 'UL', 'OL', 'LI', 'H1', 'H2', 'H3', 'A', 'IMG', 'BLOCKQUOTE']);
+const ALLOWED_RICH_ATTRS = {
+  A: new Set(['href', 'target', 'rel']),
+  IMG: new Set(['src', 'alt'])
+};
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function isSafeUrl(url) {
+  try {
+    const parsed = new URL(String(url || ''), window.location.origin);
+    return ['http:', 'https:'].includes(parsed.protocol);
+  } catch (_) {
+    return false;
+  }
+}
+
+function sanitizeRichHtml(html) {
+  const doc = document.implementation.createHTMLDocument('sanitizer');
+  doc.body.innerHTML = String(html || '');
+
+  const walk = (node) => {
+    for (const child of [...node.childNodes]) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        continue;
+      }
+
+      if (child.nodeType !== Node.ELEMENT_NODE || !ALLOWED_RICH_TAGS.has(child.tagName)) {
+        child.replaceWith(doc.createTextNode(child.textContent || ''));
+        continue;
+      }
+
+      for (const attr of [...child.attributes]) {
+        const allowedAttrs = ALLOWED_RICH_ATTRS[child.tagName] || new Set();
+        if (!allowedAttrs.has(attr.name)) {
+          child.removeAttribute(attr.name);
+        }
+      }
+
+      if (child.tagName === 'A') {
+        const href = child.getAttribute('href') || '';
+        if (!isSafeUrl(href)) {
+          child.removeAttribute('href');
+        } else {
+          child.setAttribute('target', '_blank');
+          child.setAttribute('rel', 'noopener noreferrer');
+        }
+      }
+
+      if (child.tagName === 'IMG') {
+        const src = child.getAttribute('src') || '';
+        if (!isSafeUrl(src)) {
+          child.remove();
+          continue;
+        }
+      }
+
+      walk(child);
+    }
+  };
+
+  walk(doc.body);
+  return doc.body.innerHTML;
+}
+
 function dedupeMembershipsByWorkspace(memberships) {
   const seen = new Set();
 
@@ -142,7 +214,7 @@ function describeError(error) {
     return `${error.status} ${error.code}: ${error.message}`;
   }
 
-  return error.message || 'Unknown error.';
+  return error.message || 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ';
 }
 
 function createApiClient(apiBaseUrl) {
@@ -473,10 +545,10 @@ function Sidebar({ route, onNavigate }) {
         <div className="brand-badge">FB</div>
         <div>
           <h1 className="brand-title">FlowBiz Admin</h1>
-          <p className="brand-subtitle">Control center and operator cockpit</p>
+          <p className="brand-subtitle">ศูนย์ควบคุมคลินิกและทีมปฏิบัติการ</p>
         </div>
       </div>
-      <nav className="nav-list" aria-label="Primary">
+      <nav className="nav-list" aria-label="เมนูหลัก">
         {NAV_ITEMS.map((item) => (
           <button
             key={item.key}
@@ -507,13 +579,13 @@ function TopBar() {
         </p>
         <div className="context-meta">
           <span className="context-chip">Tenant: {session.currentClinic?.slug}</span>
-          <span className="context-chip">Role: {session.currentMembership?.role}</span>
-          <span className="context-chip">Permissions: {(session.permissions || []).length}</span>
+          <span className="context-chip">บทบาท: {session.currentMembership?.role}</span>
+          <span className="context-chip">สิทธิ์: {(session.permissions || []).length}</span>
         </div>
       </div>
       <div className="toolbar top-toolbar-actions">
         <label className="field compact-field">
-          <span>Workspace</span>
+          <span>เวิร์กสเปซ</span>
           <select
             value={String(session.currentWorkspace?.id || '')}
             onChange={(event) => {
@@ -542,9 +614,9 @@ function TopBar() {
             setSession(null);
           }}
         >
-          Sign out
+          ออกจากระบบ
         </button>
-        {switchWorkspaceState.status === 'loading' ? <span className="pill status-running">Switching workspace</span> : null}
+        {switchWorkspaceState.status === 'loading' ? <span className="pill status-running">กำลังสลับเวิร์กสเปซ</span> : null}
       </div>
     </header>
   );
@@ -588,7 +660,7 @@ function StatusBanner({ state, testId = 'status-banner' }) {
   );
 }
 
-function LoadingCard({ label = 'Loading…' }) {
+function LoadingCard({ label = 'กำลังโหลดข้อมูล...' }) {
   return (
     <div className="notice-card" data-testid="loading-state">
       <p className="muted">{label}</p>
@@ -599,7 +671,7 @@ function LoadingCard({ label = 'Loading…' }) {
 function ErrorCard({ error }) {
   return (
     <div className="notice-card error-card" data-testid="error-state">
-      <h3 className="section-heading">Request failed</h3>
+      <h3 className="section-heading">ดำเนินการไม่สำเร็จ</h3>
       <p className="muted">{describeError(error)}</p>
     </div>
   );
@@ -643,11 +715,11 @@ function DashboardPage() {
   }, [api, canViewAnalytics, canViewAudit, canViewOps, sessionOptions], canView);
 
   if (!canView) {
-    return <PermissionNotice title="Dashboard unavailable" message="Dashboard requires analytics, audit, or automation read permission." />;
+    return <PermissionNotice title="ไม่สามารถเปิดแดชบอร์ดได้" message="ต้องมีสิทธิ์อ่าน analytics, audit หรือ automation" />;
   }
 
   if (state.status === 'loading' || state.status === 'idle') {
-    return <LoadingCard label="Loading dashboard…" />;
+    return <LoadingCard label="กำลังโหลดแดชบอร์ด..." />;
   }
 
   if (state.status === 'error') {
@@ -658,24 +730,24 @@ function DashboardPage() {
 
   return (
     <PageShell
-      title="Dashboard"
-      intro="Tenant overview for leads, messaging, automation activity, and operator-visible system state."
+      title="แดชบอร์ด"
+      intro="ภาพรวมลีด ข้อความ Automation และสุขภาพระบบที่ทีมปฏิบัติการต้องเห็นก่อนให้บริการ"
     >
       <div className="metric-grid" data-testid="dashboard-metrics">
-        <MetricCard label="Leads Today" value={formatNumber(overview.daily.leadsCreated)} hint="Daily leads created" />
-        <MetricCard label="Messages Sent" value={formatNumber(overview.daily.messagesSent)} hint="Outbound messages today" />
+        <MetricCard label="ลีดวันนี้" value={formatNumber(overview.daily.leadsCreated)} hint="ลีดที่สร้างในวันนี้" />
+        <MetricCard label="ข้อความที่ส่ง" value={formatNumber(overview.daily.messagesSent)} hint="ข้อความ outbound วันนี้" />
         <MetricCard
-          label="Automation Executions"
+          label="Automation ที่รัน"
           value={formatNumber(overview.daily.automationExecutions)}
-          hint="Daily automation runs"
+          hint="จำนวนรันรายวัน"
         />
       </div>
       <div className="two-column-grid">
         <section className="section-card">
           <div className="split-header compact-gap">
             <div>
-              <h3 className="section-heading">Recent activity</h3>
-              <p className="muted">Latest audit trail for tenant activity.</p>
+              <h3 className="section-heading">กิจกรรมล่าสุด</h3>
+              <p className="muted">Audit trail ล่าสุดของคลินิก</p>
             </div>
             <span className={`pill status-${health.systemStatus}`}>{health.systemStatus}</span>
           </div>
@@ -690,22 +762,22 @@ function DashboardPage() {
           </ul>
         </section>
         <section className="section-card">
-          <h3 className="section-heading">Automation health</h3>
+          <h3 className="section-heading">สุขภาพ Automation</h3>
           <div className="stacked-metrics">
             <div className="metric-row">
-              <span>Queue depth</span>
+              <span>งานค้างในคิว</span>
               <strong>{formatNumber(health.worker.queueDepth)}</strong>
             </div>
             <div className="metric-row">
-              <span>Failed jobs</span>
+              <span>งานล้มเหลว</span>
               <strong>{formatNumber(health.worker.failedJobs)}</strong>
             </div>
             <div className="metric-row">
-              <span>Execution success</span>
+              <span>อัตราสำเร็จ</span>
               <strong>{formatPercent(health.automation.successRate)}</strong>
             </div>
             <div className="metric-row">
-              <span>Event throughput/hr</span>
+              <span>Event ต่อชั่วโมง</span>
               <strong>{formatNumber(health.eventBus.throughputPerHour)}</strong>
             </div>
           </div>
@@ -735,11 +807,11 @@ function UsersPage() {
   );
 
   if (!canView) {
-    return <PermissionNotice title="Users unavailable" message="Users page requires user.read or user.manage permission." />;
+    return <PermissionNotice title="ไม่สามารถเปิดหน้าผู้ใช้งานได้" message="ต้องมีสิทธิ์ user.read หรือ user.manage" />;
   }
 
   if (!canList) {
-    return <PermissionNotice title="Users list unavailable" message="This view needs user.read to load membership records from the API." />;
+    return <PermissionNotice title="ไม่สามารถโหลดรายชื่อผู้ใช้ได้" message="ต้องมีสิทธิ์ user.read เพื่ออ่านข้อมูลสมาชิก" />;
   }
 
   async function refreshMembers() {
@@ -758,7 +830,7 @@ function UsersPage() {
 
     try {
       await api.inviteMember(sessionOptions, session.currentWorkspace.id, inviteForm);
-      setFlash({ kind: 'success', message: `Invitation sent to ${inviteForm.email}.` });
+      setFlash({ kind: 'success', message: `ส่งคำเชิญไปที่ ${inviteForm.email} แล้ว` });
       setInviteForm({ email: '', role: 'viewer' });
       await refreshMembers();
     } catch (error) {
@@ -770,7 +842,7 @@ function UsersPage() {
     try {
       const nextRole = roleDrafts[member.id] || member.role;
       await api.changeRole(sessionOptions, session.currentWorkspace.id, member.id, { role: nextRole });
-      setFlash({ kind: 'success', message: `Updated role for ${member.user?.email || 'member'}.` });
+      setFlash({ kind: 'success', message: `อัปเดตบทบาทของ ${member.user?.email || 'สมาชิก'} แล้ว` });
       await refreshMembers();
     } catch (error) {
       setFlash({ kind: 'error', message: describeError(error) });
@@ -780,7 +852,7 @@ function UsersPage() {
   async function handleDeactivate(member) {
     try {
       await api.deactivateMember(sessionOptions, session.currentWorkspace.id, member.id);
-      setFlash({ kind: 'success', message: `Deactivated ${member.user?.email || 'member'}.` });
+      setFlash({ kind: 'success', message: `ปิดใช้งาน ${member.user?.email || 'สมาชิก'} แล้ว` });
       await refreshMembers();
     } catch (error) {
       setFlash({ kind: 'error', message: describeError(error) });
@@ -789,13 +861,13 @@ function UsersPage() {
 
   return (
     <PageShell
-      title="Users"
-      intro="Manage workspace memberships, invitations, role assignments, and access removal."
+      title="ผู้ใช้งาน"
+      intro="จัดการสมาชิก คำเชิญ บทบาท และการยกเลิกสิทธิ์ของเวิร์กสเปซ"
     >
       <StatusBanner state={flash} />
       {canInvite ? (
         <section className="section-card">
-          <h3 className="section-heading">Invite member</h3>
+          <h3 className="section-heading">เชิญสมาชิก</h3>
           <form className="form-grid" onSubmit={handleInviteSubmit} data-testid="invite-form">
             <label className="field">
               <span>Email</span>
@@ -807,45 +879,45 @@ function UsersPage() {
               />
             </label>
             <label className="field">
-              <span>Role</span>
+              <span>บทบาท</span>
               <select
                 value={inviteForm.role}
                 onChange={(event) => setInviteForm((current) => ({ ...current, role: event.target.value }))}
                 data-testid="invite-role"
               >
-                <option value="admin">Admin</option>
-                <option value="operator">Operator</option>
-                <option value="viewer">Viewer</option>
+                <option value="admin">ผู้ดูแล</option>
+                <option value="operator">เจ้าหน้าที่</option>
+                <option value="viewer">ผู้ดูอย่างเดียว</option>
               </select>
             </label>
             <div className="inline-actions">
               <button type="submit" className="primary-button" data-testid="invite-submit">
-                Send invite
+                ส่งคำเชิญ
               </button>
             </div>
           </form>
         </section>
       ) : null}
-      {state.status === 'loading' || state.status === 'idle' ? <LoadingCard label="Loading workspace members…" /> : null}
+      {state.status === 'loading' || state.status === 'idle' ? <LoadingCard label="กำลังโหลดสมาชิกเวิร์กสเปซ..." /> : null}
       {state.status === 'error' ? <ErrorCard error={state.error} /> : null}
       {state.status === 'ready' ? (
         <section className="section-card">
           <div className="split-header compact-gap">
             <div>
-              <h3 className="section-heading">Workspace members</h3>
-              <p className="muted">Current members and invited users for the selected workspace.</p>
+              <h3 className="section-heading">สมาชิกเวิร์กสเปซ</h3>
+              <p className="muted">สมาชิกและผู้ที่ได้รับเชิญของเวิร์กสเปซที่เลือก</p>
             </div>
-            <span className="pill">{state.data.items.length} records</span>
+            <span className="pill">{state.data.items.length} รายการ</span>
           </div>
           <div className="table-shell">
             <table className="data-table" data-testid="members-table">
               <thead>
                 <tr>
                   <th>Email</th>
-                  <th>Status</th>
-                  <th>Role</th>
-                  <th>Joined</th>
-                  <th>Actions</th>
+                  <th>สถานะ</th>
+                  <th>บทบาท</th>
+                  <th>เข้าร่วมเมื่อ</th>
+                  <th>การจัดการ</th>
                 </tr>
               </thead>
               <tbody>
@@ -863,9 +935,9 @@ function UsersPage() {
                             onChange={(event) => setRoleDrafts((current) => ({ ...current, [member.id]: event.target.value }))}
                             data-testid={`role-select-${member.id}`}
                           >
-                            <option value="admin">Admin</option>
-                            <option value="operator">Operator</option>
-                            <option value="viewer">Viewer</option>
+                            <option value="admin">ผู้ดูแล</option>
+                            <option value="operator">เจ้าหน้าที่</option>
+                            <option value="viewer">ผู้ดูอย่างเดียว</option>
                           </select>
                           <button
                             type="button"
@@ -873,7 +945,7 @@ function UsersPage() {
                             onClick={() => handleRoleChange(member)}
                             data-testid={`role-save-${member.id}`}
                           >
-                            Save role
+                            บันทึกบทบาท
                           </button>
                         </div>
                       ) : (
@@ -889,10 +961,10 @@ function UsersPage() {
                           onClick={() => handleDeactivate(member)}
                           data-testid={`deactivate-${member.id}`}
                         >
-                          Deactivate
+                          ปิดใช้งาน
                         </button>
                       ) : (
-                        <span className="muted">No actions</span>
+                        <span className="muted">ไม่มีการจัดการ</span>
                       )}
                     </td>
                   </tr>
@@ -927,7 +999,7 @@ function WorkspacesPage() {
   }, [api, session.currentWorkspace?.id, sessionOptions], canView);
 
   if (!canView) {
-    return <PermissionNotice title="Workspace settings unavailable" message="Workspace page requires workspace.read or workspace.manage." />;
+    return <PermissionNotice title="ไม่สามารถเปิดตั้งค่าเวิร์กสเปซได้" message="ต้องมีสิทธิ์ workspace.read หรือ workspace.manage" />;
   }
 
   async function handleSubmit(event) {
@@ -941,22 +1013,22 @@ function WorkspacesPage() {
         settings_json: normalizeJsonInput(form.settingsJsonText, 'settings_json')
       });
       updateSessionEntity('currentWorkspace', updated);
-      setFlash({ kind: 'success', message: 'Workspace settings updated.' });
+      setFlash({ kind: 'success', message: 'อัปเดตตั้งค่าเวิร์กสเปซเรียบร้อยแล้ว' });
     } catch (error) {
       setFlash({ kind: 'error', message: describeError(error) });
     }
   }
 
   return (
-    <PageShell title="Workspaces" intro="Manage metadata and JSON settings for the active workspace.">
+    <PageShell title="เวิร์กสเปซ" intro="จัดการชื่อ slug timezone และ JSON settings ของเวิร์กสเปซที่ใช้งาน">
       <StatusBanner state={flash} />
-      {state.status === 'loading' || state.status === 'idle' ? <LoadingCard label="Loading workspace settings…" /> : null}
+      {state.status === 'loading' || state.status === 'idle' ? <LoadingCard label="กำลังโหลดตั้งค่าเวิร์กสเปซ..." /> : null}
       {state.status === 'error' ? <ErrorCard error={state.error} /> : null}
       {state.status === 'ready' ? (
         <section className="section-card">
           <form className="form-grid" onSubmit={handleSubmit} data-testid="workspace-form">
             <label className="field">
-              <span>Name</span>
+              <span>ชื่อ</span>
               <input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} />
             </label>
             <label className="field">
@@ -978,11 +1050,11 @@ function WorkspacesPage() {
             {canEdit ? (
               <div className="inline-actions field-span-2">
                 <button type="submit" className="primary-button" data-testid="workspace-save">
-                  Save workspace
+                  บันทึกเวิร์กสเปซ
                 </button>
               </div>
             ) : (
-              <p className="muted field-span-2">You can view workspace configuration but cannot edit it.</p>
+              <p className="muted field-span-2">คุณดูการตั้งค่าเวิร์กสเปซได้ แต่ไม่มีสิทธิ์แก้ไข</p>
             )}
           </form>
         </section>
@@ -1573,7 +1645,7 @@ function SettingsPage() {
   }, [api, canReadOrganization, canReadTenant, session.currentOrganization?.id, sessionOptions], canView);
 
   if (!canView) {
-    return <PermissionNotice title="Settings unavailable" message="Settings require tenant or organization read access." />;
+    return <PermissionNotice title="ไม่สามารถเปิดหน้าตั้งค่าได้" message="ต้องมีสิทธิ์อ่าน tenant หรือ organization" />;
   }
 
   async function handleTenantSubmit(event) {
@@ -1587,7 +1659,7 @@ function SettingsPage() {
         settings_json: normalizeJsonInput(tenantForm.settingsJsonText, 'settings_json')
       });
       updateSessionEntity('currentClinic', updated);
-      setFlash({ kind: 'success', message: 'Tenant settings updated.' });
+      setFlash({ kind: 'success', message: 'อัปเดตตั้งค่า Tenant เรียบร้อยแล้ว' });
     } catch (error) {
       setFlash({ kind: 'error', message: describeError(error) });
     }
@@ -1604,22 +1676,22 @@ function SettingsPage() {
         settings_json: normalizeJsonInput(organizationForm.settingsJsonText, 'settings_json')
       });
       updateSessionEntity('currentOrganization', updated);
-      setFlash({ kind: 'success', message: 'Organization settings updated.' });
+      setFlash({ kind: 'success', message: 'อัปเดตตั้งค่าองค์กรเรียบร้อยแล้ว' });
     } catch (error) {
       setFlash({ kind: 'error', message: describeError(error) });
     }
   }
 
   return (
-    <PageShell title="Settings" intro="Manage tenant branding, locale, and organization-level configuration.">
+    <PageShell title="ตั้งค่า" intro="จัดการ branding, locale และการตั้งค่าระดับองค์กร">
       <StatusBanner state={flash} />
-      {state.status === 'loading' || state.status === 'idle' ? <LoadingCard label="Loading settings…" /> : null}
+      {state.status === 'loading' || state.status === 'idle' ? <LoadingCard label="กำลังโหลดการตั้งค่า..." /> : null}
       {state.status === 'error' ? <ErrorCard error={state.error} /> : null}
       {state.status === 'ready' ? (
         <div className="two-column-grid">
           {state.data.tenant ? (
             <section className="section-card">
-              <h3 className="section-heading">Tenant settings</h3>
+              <h3 className="section-heading">ตั้งค่า Tenant</h3>
               <form className="form-grid" onSubmit={handleTenantSubmit} data-testid="tenant-settings-form">
                 <label className="field">
                   <span>Timezone</span>
@@ -1655,7 +1727,7 @@ function SettingsPage() {
                 {canManageTenant ? (
                   <div className="inline-actions field-span-2">
                     <button type="submit" className="primary-button" data-testid="tenant-settings-save">
-                      Save tenant settings
+                      บันทึกตั้งค่า Tenant
                     </button>
                   </div>
                 ) : null}
@@ -1664,10 +1736,10 @@ function SettingsPage() {
           ) : null}
           {state.data.organization ? (
             <section className="section-card">
-              <h3 className="section-heading">Organization settings</h3>
+              <h3 className="section-heading">ตั้งค่าองค์กร</h3>
               <form className="form-grid" onSubmit={handleOrganizationSubmit} data-testid="organization-settings-form">
                 <label className="field">
-                  <span>Name</span>
+                  <span>ชื่อ</span>
                   <input
                     value={organizationForm.name}
                     onChange={(event) => setOrganizationForm((current) => ({ ...current, name: event.target.value }))}
@@ -1698,7 +1770,7 @@ function SettingsPage() {
                 {canManageOrganization ? (
                   <div className="inline-actions field-span-2">
                     <button type="submit" className="primary-button">
-                      Save organization settings
+                      บันทึกตั้งค่าองค์กร
                     </button>
                   </div>
                 ) : null}
@@ -2154,7 +2226,7 @@ function UnifiedInboxPage() {
     if (richContent.type === 'flex' || richContent.type === 'generic_template') {
       return (
         <div className="rich-card">
-          {richContent.imageUrl && (
+          {richContent.imageUrl && isSafeUrl(richContent.imageUrl) && (
             <img src={richContent.imageUrl} alt="Promo" className="rich-card-img" />
           )}
           <h4 className="rich-card-title">{richContent.text || 'Special Offer'}</h4>
@@ -2375,6 +2447,9 @@ function UnifiedInboxPage() {
 function RoasAnalyticsPage() {
   const api = useApi();
   const sessionOptions = useSessionRequestOptions();
+  const permissions = usePermissions();
+  const canView = permissions.hasAny(['loyalty.read', 'analytics.read']);
+  const canManage = permissions.has('loyalty.manage');
   const [flash, setFlash] = useState(null);
   
   // Lead info queries
@@ -2391,7 +2466,8 @@ function RoasAnalyticsPage() {
   // Load ROAS report
   const [state, setState] = usePageData(
     () => api.getRoasReport(sessionOptions),
-    [api, sessionOptions]
+    [api, sessionOptions],
+    canView
   );
 
   async function handleSyncAdSpend() {
@@ -2471,6 +2547,10 @@ function RoasAnalyticsPage() {
     }
   }
 
+  if (!canView) {
+    return <PermissionNotice title="ไม่สามารถเปิดรายงาน ROAS ได้" message="ต้องมีสิทธิ์ loyalty.read หรือ analytics.read" />;
+  }
+
   if (state.status === 'loading' || state.status === 'idle') {
     return <LoadingCard label="กำลังดึงข้อมูลรายงาน ROAS..." />;
   }
@@ -2486,13 +2566,13 @@ function RoasAnalyticsPage() {
 
   return (
     <PageShell
-      title="ROAS Analytics & Loyalty CRM"
+      title="ROAS และ Loyalty CRM"
       intro="วิเคราะห์ความคุ้มทุนในการซื้อแอดโฆษณา (ROAS, CAC, CPL) และบริการจัดการระบบแนะนำเพื่อน Member-Get-Member สะสมแต้มแบบ Omnichannel"
-      actions={(
+      actions={canManage ? (
         <button type="button" className="primary-button" onClick={handleSyncAdSpend}>
-          ซิงค์ข้อมูลโฆษณา (Mock Sync)
+          ซิงค์ข้อมูลโฆษณาจำลอง
         </button>
-      )}
+      ) : null}
     >
       <StatusBanner state={flash} />
 
@@ -2580,7 +2660,7 @@ function RoasAnalyticsPage() {
         </section>
 
         {/* Record Treatment Purchase Form */}
-        <section className="section-card">
+        {canManage ? <section className="section-card">
           <h3 className="section-heading">บันทึกคนไข้ชำระเงินที่หน้าร้าน</h3>
           <p className="muted">กรอกยอดชำระจริงของคนไข้เพื่อสะสมแต้มพอยต์และจ่ายค่าคอมมิชชั่นบอกต่อเพื่อน (MGM)</p>
           
@@ -2620,7 +2700,7 @@ function RoasAnalyticsPage() {
               </button>
             </div>
           </form>
-        </section>
+        </section> : null}
       </div>
 
       {/* Query Member Loyalty Points & MGM Referral Connections */}
@@ -3095,7 +3175,7 @@ function BlogManagerPage() {
   const { session } = useWorkspace();
   const sessionOptions = useSessionRequestOptions();
   const permissions = usePermissions();
-  const canManage = permissions.hasAny(['workspace.manage', 'tenant.manage']);
+  const canManage = permissions.hasAny(['blog.manage', 'workspace.manage', 'tenant.manage']);
   
   const [flash, setFlash] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -3183,10 +3263,10 @@ function BlogManagerPage() {
     try {
       if (currentPost) {
         await api.updateBlogPost(sessionOptions, currentPost.id, payload);
-        setFlash({ kind: 'success', message: 'Blog post updated successfully.' });
+      setFlash({ kind: 'success', message: 'อัปเดตบทความเรียบร้อยแล้ว' });
       } else {
         await api.createBlogPost(sessionOptions, payload);
-        setFlash({ kind: 'success', message: 'Blog post created successfully.' });
+        setFlash({ kind: 'success', message: 'สร้างบทความเรียบร้อยแล้ว' });
       }
       setIsEditing(false);
       setCurrentPost(null);
@@ -3202,7 +3282,7 @@ function BlogManagerPage() {
     }
     try {
       await api.deleteBlogPost(sessionOptions, postId);
-      setFlash({ kind: 'success', message: 'Blog post deleted.' });
+      setFlash({ kind: 'success', message: 'ลบบทความเรียบร้อยแล้ว' });
       await refreshPosts();
     } catch (error) {
       setFlash({ kind: 'error', message: describeError(error) });
@@ -3210,35 +3290,36 @@ function BlogManagerPage() {
   }
 
   if (!canManage) {
-    return <PermissionNotice title="Access Denied" message="You do not have permissions to manage blog posts." />;
+    return <PermissionNotice title="ไม่มีสิทธิ์เข้าใช้งาน" message="คุณไม่มีสิทธิ์จัดการบทความ" />;
   }
 
   // Simple Markdown parser for preview
   function renderMarkdown(text) {
     if (!text) return '';
-    let html = text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
+    let html = escapeHtml(text)
       .replace(/^### (.*$)/gim, '<h3>$1</h3>')
       .replace(/^## (.*$)/gim, '<h2>$1</h2>')
       .replace(/^# (.*$)/gim, '<h1>$1</h1>')
       .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
       .replace(/\*(.*)\*/gim, '<em>$1</em>')
-      .replace(/!\[(.*?)\]\((.*?)\)/gim, '<img alt="$1" src="$2" style="max-width:100%; border-radius:8px;" />')
-      .replace(/\[(.*?)\]\((.*?)\)/gim, '<a href="$2" target="_blank">$1</a>')
+      .replace(/!\[(.*?)\]\((.*?)\)/gim, (_, alt, src) => (
+        isSafeUrl(src) ? `<img alt="${escapeHtml(alt)}" src="${escapeHtml(src)}" />` : ''
+      ))
+      .replace(/\[(.*?)\]\((.*?)\)/gim, (_, label, href) => (
+        isSafeUrl(href) ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${label}</a>` : label
+      ))
       .replace(/\n\n/g, '</p><p>');
-    return '<p>' + html + '</p>';
+    return sanitizeRichHtml('<p>' + html + '</p>');
   }
 
   return (
     <PageShell 
-      title="Blog Manager" 
-      intro="Publish medical articles, beauty clinic updates, and health tips to engage clients and boost SEO rankings."
+      title="จัดการบทความ"
+      intro="เผยแพร่บทความความงาม ข่าวคลินิก และคำแนะนำสุขภาพผิวอย่างปลอดภัยต่อ SEO"
       actions={
         !isEditing && (
           <button type="button" className="primary-button" onClick={handleCreateNew}>
-            + Create New Post
+            + สร้างบทความใหม่
           </button>
         )
       }
@@ -3250,22 +3331,22 @@ function BlogManagerPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '24px' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <label className="field">
-                <span>Title *</span>
+                <span>หัวข้อ *</span>
                 <input 
                   type="text" 
                   value={form.title} 
                   onChange={e => setForm(f => ({ ...f, title: e.target.value }))} 
-                  placeholder="e.g. 5 Tips to Keep Your Skin Radiant This Summer" 
+                  placeholder="เช่น 5 วิธีดูแลผิวให้ฉ่ำวาวอย่างปลอดภัย"
                   required
                 />
               </label>
 
               <label className="field">
-                <span>Excerpt / Short Summary</span>
+                <span>สรุปสั้น</span>
                 <textarea 
                   value={form.excerpt} 
                   onChange={e => setForm(f => ({ ...f, excerpt: e.target.value }))} 
-                  placeholder="Provide a brief summary for the cards on the list page" 
+                  placeholder="สรุปเนื้อหาสำหรับการ์ดในหน้ารวมบทความ"
                   rows={2}
                 />
               </label>
@@ -3278,7 +3359,7 @@ function BlogManagerPage() {
                     style={{ background: activeTab === 'edit' ? 'var(--accent)' : 'transparent', color: activeTab === 'edit' ? '#fff' : 'var(--text)' }}
                     onClick={() => setActiveTab('edit')}
                   >
-                    Edit (Markdown)
+                    แก้ไข (Markdown)
                   </button>
                   <button 
                     type="button" 
@@ -3286,17 +3367,17 @@ function BlogManagerPage() {
                     style={{ background: activeTab === 'preview' ? 'var(--accent)' : 'transparent', color: activeTab === 'preview' ? '#fff' : 'var(--text)' }}
                     onClick={() => setActiveTab('preview')}
                   >
-                    Preview
+                    ตัวอย่าง
                   </button>
                 </div>
 
                 {activeTab === 'edit' ? (
                   <label className="field">
-                    <span>Content *</span>
+                    <span>เนื้อหา *</span>
                     <textarea 
                       value={form.content} 
                       onChange={e => setForm(f => ({ ...f, content: e.target.value }))} 
-                      placeholder="Write your article here using Markdown..." 
+                      placeholder="เขียนบทความด้วย Markdown..."
                       rows={15}
                       required
                     />
@@ -3320,10 +3401,10 @@ function BlogManagerPage() {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(0,0,0,0.02)', padding: '16px', borderRadius: '14px', border: '1px solid var(--border)' }}>
-              <h3>Settings</h3>
+              <h3>ตั้งค่าบทความ</h3>
               
               <label className="field">
-                <span>Author Name *</span>
+                <span>ชื่อผู้เขียน *</span>
                 <input 
                   type="text" 
                   value={form.authorName} 
@@ -3333,13 +3414,13 @@ function BlogManagerPage() {
               </label>
 
               <label className="field">
-                <span>Status</span>
+                <span>สถานะ</span>
                 <select 
                   value={form.status} 
                   onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
                 >
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
+                  <option value="draft">แบบร่าง</option>
+                  <option value="published">เผยแพร่</option>
                 </select>
               </label>
 
@@ -3399,22 +3480,22 @@ function BlogManagerPage() {
 
           <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
             <button type="button" className="secondary-button" onClick={() => setIsEditing(false)}>
-              Cancel
+              ยกเลิก
             </button>
             <button type="submit" className="primary-button">
-              Save Post
+              บันทึกบทความ
             </button>
           </div>
         </form>
       ) : (
         <div>
-          {state.status === 'loading' && <LoadingCard label="Loading blog posts..." />}
+          {state.status === 'loading' && <LoadingCard label="กำลังโหลดบทความ..." />}
           {state.status === 'error' && <ErrorCard error={state.error} />}
           {state.status === 'ready' && (
             <div>
               {state.data.items.length === 0 ? (
                 <div style={{ padding: '40px', textAlign: 'center', background: 'rgba(255,255,255,0.5)', borderRadius: '16px', border: '1px solid var(--border)' }}>
-                  <p style={{ color: 'var(--text-muted)' }}>No blog posts found. Create your first post by clicking "+ Create New Post".</p>
+                  <p style={{ color: 'var(--text-muted)' }}>ยังไม่มีบทความ กด "+ สร้างบทความใหม่" เพื่อเริ่มเผยแพร่</p>
                 </div>
               ) : (
                 <div className="table-shell card">
@@ -3423,9 +3504,9 @@ function BlogManagerPage() {
                       <tr>
                         <th>Title</th>
                         <th>Author</th>
-                        <th>Status</th>
-                        <th>Published At</th>
-                        <th>Updated At</th>
+                        <th>สถานะ</th>
+                        <th>เผยแพร่เมื่อ</th>
+                        <th>อัปเดตเมื่อ</th>
                         <th style={{ textAlign: 'right' }}>Actions</th>
                       </tr>
                     </thead>
@@ -3453,10 +3534,10 @@ function BlogManagerPage() {
                           <td style={{ textAlign: 'right' }}>
                             <div style={{ display: 'inline-flex', gap: '8px' }}>
                               <button type="button" className="secondary-button" onClick={() => handleEditClick(post)}>
-                                Edit
+                                แก้ไข
                               </button>
                               <button type="button" className="ghost-danger-button" onClick={() => handleDelete(post.id)}>
-                                Delete
+                                ลบ
                               </button>
                             </div>
                           </td>
@@ -3479,7 +3560,7 @@ function ForumModeratorPage() {
   const { session } = useWorkspace();
   const sessionOptions = useSessionRequestOptions();
   const permissions = usePermissions();
-  const canManage = permissions.hasAny(['workspace.manage', 'tenant.manage']);
+  const canManage = permissions.hasAny(['forum.moderate', 'forum.medical_answer', 'workspace.manage', 'tenant.manage']);
 
   const [flash, setFlash] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -3515,7 +3596,7 @@ function ForumModeratorPage() {
       const detail = await api.getForumTopicDetail(sessionOptions, topic.id);
       setTopicReplies(detail.replies || []);
     } catch (err) {
-      setFlash({ kind: 'error', message: 'Failed to load topic replies.' });
+      setFlash({ kind: 'error', message: 'โหลดคำตอบของหัวข้อไม่สำเร็จ' });
     } finally {
       setLoadingReplies(false);
     }
@@ -3524,25 +3605,25 @@ function ForumModeratorPage() {
   async function handleUpdateStatus(topicId, status) {
     try {
       await api.updateForumTopicStatus(sessionOptions, topicId, { status });
-      setFlash({ kind: 'success', message: `Topic status updated to ${status}.` });
+      setFlash({ kind: 'success', message: `อัปเดตสถานะหัวข้อเป็น ${status} แล้ว` });
       if (selectedTopic && selectedTopic.id === topicId) {
         setSelectedTopic(null);
         setTopicReplies([]);
       }
       await refreshTopics();
     } catch (err) {
-      setFlash({ kind: 'error', message: 'Failed to update topic status.' });
+      setFlash({ kind: 'error', message: 'อัปเดตสถานะหัวข้อไม่สำเร็จ' });
     }
   }
 
   async function handleVerifyReply(replyId, isVerified) {
     try {
       await api.verifyForumReply(sessionOptions, replyId, { isVerified });
-      setFlash({ kind: 'success', message: isVerified ? 'Reply marked as verified.' : 'Reply verification removed.' });
+      setFlash({ kind: 'success', message: isVerified ? 'ทำเครื่องหมายคำตอบแนะนำแล้ว' : 'ยกเลิกคำตอบแนะนำแล้ว' });
       setTopicReplies(prev => prev.map(r => r.id === replyId ? { ...r, is_verified_answer: isVerified } : r));
       await refreshTopics();
     } catch (err) {
-      setFlash({ kind: 'error', message: 'Failed to update reply verification.' });
+      setFlash({ kind: 'error', message: 'อัปเดตการรับรองคำตอบไม่สำเร็จ' });
     }
   }
 
@@ -3554,39 +3635,39 @@ function ForumModeratorPage() {
     try {
       const newReply = await api.createForumReply(sessionOptions, selectedTopic.id, {
         content: replyText,
-        authorDisplayName: session.user?.name || 'Doctor Admin',
+        authorDisplayName: session.user?.name || 'แพทย์ประจำคลินิก',
         isAnonymous: false,
         isDoctorReply: true
       });
-      setFlash({ kind: 'success', message: 'Doctor response posted successfully.' });
+      setFlash({ kind: 'success', message: 'โพสต์คำตอบแพทย์เรียบร้อยแล้ว' });
       setTopicReplies(prev => [...prev, newReply]);
       setReplyText('');
       await refreshTopics();
     } catch (err) {
-      setFlash({ kind: 'error', message: 'Failed to post reply.' });
+      setFlash({ kind: 'error', message: 'โพสต์คำตอบไม่สำเร็จ' });
     } finally {
       setPostingReply(false);
     }
   }
 
   const categories = [
-    { key: 'all', label: 'All Categories' },
-    { key: 'skincare', label: 'Skincare' },
-    { key: 'surgery', label: 'Surgery' },
+    { key: 'all', label: 'ทุกหมวดหมู่' },
+    { key: 'skincare', label: 'สุขภาพผิว' },
+    { key: 'surgery', label: 'ศัลยกรรม/ปรับรูปหน้า' },
     { key: 'qa', label: 'Q&A' },
-    { key: 'general', label: 'General' }
+    { key: 'general', label: 'ทั่วไป' }
   ];
 
   const statuses = [
-    { key: 'active', label: 'Active' },
-    { key: 'locked', label: 'Locked' },
-    { key: 'hidden', label: 'Hidden' }
+    { key: 'active', label: 'เปิดใช้งาน' },
+    { key: 'locked', label: 'ล็อก' },
+    { key: 'hidden', label: 'ซ่อน' }
   ];
 
   return (
     <PageShell 
-      title="Forum Moderator" 
-      intro="Moderate public forum topics, post doctor-verified replies, and approve helpful answers."
+      title="ดูแลเว็บบอร์ด"
+      intro="ตรวจหัวข้อสาธารณะ โพสต์คำตอบแพทย์ และรับรองคำตอบที่เหมาะสม"
     >
       <StatusBanner state={flash} />
 
@@ -3594,36 +3675,36 @@ function ForumModeratorPage() {
         <div>
           <div className="card" style={{ padding: '16px', marginBottom: '20px', display: 'flex', gap: '16px', alignItems: 'center' }}>
             <div>
-              <label style={{ marginRight: '8px', fontSize: '14px', fontWeight: 'bold' }}>Category:</label>
+              <label style={{ marginRight: '8px', fontSize: '14px', fontWeight: 'bold' }}>หมวดหมู่:</label>
               <select value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setSelectedTopic(null); }} className="input" style={{ width: '160px', padding: '6px' }}>
                 {categories.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ marginRight: '8px', fontSize: '14px', fontWeight: 'bold' }}>Status:</label>
+              <label style={{ marginRight: '8px', fontSize: '14px', fontWeight: 'bold' }}>สถานะ:</label>
               <select value={selectedStatus} onChange={e => { setSelectedStatus(e.target.value); setSelectedTopic(null); }} className="input" style={{ width: '120px', padding: '6px' }}>
                 {statuses.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
               </select>
             </div>
           </div>
 
-          {state.status === 'loading' && <LoadingCard label="Loading forum topics..." />}
+          {state.status === 'loading' && <LoadingCard label="กำลังโหลดหัวข้อถามตอบ..." />}
           {state.status === 'error' && <ErrorCard error={state.error} />}
           {state.status === 'ready' && (
             <div className="table-shell card">
               {state.data.items.length === 0 ? (
                 <div style={{ padding: '40px', textAlign: 'center' }}>
-                  <p style={{ color: 'var(--text-muted)' }}>No topics found for this criteria.</p>
+                  <p style={{ color: 'var(--text-muted)' }}>ไม่พบหัวข้อตามเงื่อนไขนี้</p>
                 </div>
               ) : (
                 <table className="data-table">
                   <thead>
                     <tr>
-                      <th>Topic Title</th>
-                      <th>Category</th>
-                      <th>Author</th>
-                      <th>Replies</th>
-                      <th style={{ textAlign: 'right' }}>Actions</th>
+                      <th>หัวข้อ</th>
+                      <th>หมวดหมู่</th>
+                      <th>ผู้เขียน</th>
+                      <th>คำตอบ</th>
+                      <th style={{ textAlign: 'right' }}>การจัดการ</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3639,7 +3720,7 @@ function ForumModeratorPage() {
                         <td>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <strong>{topic.title}</strong>
-                            {topic.is_doctor_verified && <span className="pill" style={{ background: 'rgba(15,118,110,0.1)', color: 'var(--accent-strong)', fontSize: '10px' }}>Verified</span>}
+                            {topic.is_doctor_verified && <span className="pill" style={{ background: 'rgba(15,118,110,0.1)', color: 'var(--accent-strong)', fontSize: '10px' }}>แพทย์ตอบแล้ว</span>}
                           </div>
                           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
                             {new Date(topic.created_at).toLocaleString()}
@@ -3648,7 +3729,7 @@ function ForumModeratorPage() {
                         <td><span className="pill" style={{ background: 'rgba(0,0,0,0.06)' }}>{topic.category.toUpperCase()}</span></td>
                         <td>
                           {topic.author_display_name}
-                          {topic.is_anonymous && <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '4px' }}>(Anon)</span>}
+                          {topic.is_anonymous && <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '4px' }}>(ไม่ระบุตัวตน)</span>}
                         </td>
                         <td>{topic.reply_count}</td>
                         <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
@@ -3656,15 +3737,15 @@ function ForumModeratorPage() {
                             {topic.status === 'active' ? (
                               <>
                                 <button type="button" className="secondary-button" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => handleUpdateStatus(topic.id, 'locked')}>
-                                  Lock
+                                  ล็อก
                                 </button>
                                 <button type="button" className="ghost-danger-button" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => handleUpdateStatus(topic.id, 'hidden')}>
-                                  Hide
+                                  ซ่อน
                                 </button>
                               </>
                             ) : (
                               <button type="button" className="primary-button" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => handleUpdateStatus(topic.id, 'active')}>
-                                Activate
+                                เปิดใช้งาน
                               </button>
                             )}
                           </div>
@@ -3685,24 +3766,24 @@ function ForumModeratorPage() {
                 <span className="pill" style={{ background: 'rgba(0,0,0,0.06)', marginBottom: '8px', display: 'inline-block' }}>{selectedTopic.category.toUpperCase()}</span>
                 <h2 style={{ margin: '0 0 6px 0', fontSize: '1.4rem' }}>{selectedTopic.title}</h2>
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-                  By {selectedTopic.author_display_name} • {new Date(selectedTopic.created_at).toLocaleString()}
+                  โดย {selectedTopic.author_display_name} • {new Date(selectedTopic.created_at).toLocaleString('th-TH')}
                 </span>
               </div>
-              <button type="button" className="ghost-button" onClick={() => { setSelectedTopic(null); setTopicReplies([]); }}>Close</button>
+              <button type="button" className="ghost-button" onClick={() => { setSelectedTopic(null); setTopicReplies([]); }}>ปิด</button>
             </div>
 
             <div style={{ background: 'var(--surface-muted)', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', whiteSpace: 'pre-wrap' }}>
               {selectedTopic.content}
             </div>
 
-            <h3 style={{ margin: '12px 0 0 0', borderBottom: '1px solid var(--border)', paddingBottom: '6px' }}>Replies</h3>
+            <h3 style={{ margin: '12px 0 0 0', borderBottom: '1px solid var(--border)', paddingBottom: '6px' }}>คำตอบ</h3>
             
             {loadingReplies ? (
-              <p style={{ color: 'var(--text-muted)' }}>Loading replies...</p>
+              <p style={{ color: 'var(--text-muted)' }}>กำลังโหลดคำตอบ...</p>
             ) : (
               <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '350px', paddingRight: '4px' }}>
                 {topicReplies.length === 0 ? (
-                  <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No replies yet.</p>
+                  <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>ยังไม่มีคำตอบ</p>
                 ) : (
                   topicReplies.map(reply => (
                     <div 
@@ -3717,10 +3798,10 @@ function ForumModeratorPage() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                         <span style={{ fontSize: '12px', fontWeight: 'bold' }}>
                           {reply.author_display_name} 
-                          {reply.is_doctor_reply && <span style={{ color: 'var(--accent)', marginLeft: '4px' }}>(🩺 Doctor)</span>}
+                          {reply.is_doctor_reply && <span style={{ color: 'var(--accent)', marginLeft: '4px' }}>(แพทย์)</span>}
                         </span>
                         <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                          {new Date(reply.created_at).toLocaleString()}
+                          {new Date(reply.created_at).toLocaleString('th-TH')}
                         </span>
                       </div>
                       <p style={{ margin: '0 0 8px 0', fontSize: '13px', whiteSpace: 'pre-wrap' }}>{reply.content}</p>
@@ -3733,7 +3814,7 @@ function ForumModeratorPage() {
                             style={{ padding: '2px 6px', fontSize: '11px' }}
                             onClick={() => handleVerifyReply(reply.id, false)}
                           >
-                            Unverify Answer
+                            ยกเลิกคำตอบแนะนำ
                           </button>
                         ) : (
                           <button 
@@ -3742,7 +3823,7 @@ function ForumModeratorPage() {
                             style={{ padding: '2px 6px', fontSize: '11px' }}
                             onClick={() => handleVerifyReply(reply.id, true)}
                           >
-                            Verify Answer
+                            รับรองคำตอบ
                           </button>
                         )}
                       </div>
@@ -3753,11 +3834,11 @@ function ForumModeratorPage() {
             )}
 
             <form onSubmit={handlePostReply} style={{ borderTop: '1px solid var(--border)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Post Official Doctor Reply</label>
+              <label style={{ fontSize: '13px', fontWeight: 'bold' }}>โพสต์คำตอบแพทย์อย่างเป็นทางการ</label>
               <textarea
                 value={replyText}
                 onChange={e => setReplyText(e.target.value)}
-                placeholder="Type official doctor response..."
+                placeholder="พิมพ์คำตอบจากแพทย์หรือเจ้าหน้าที่ที่ได้รับอนุมัติ..."
                 rows={3}
                 style={{ padding: '8px', borderRadius: '6px', border: '1px solid var(--border)', font: 'inherit', fontSize: '13px' }}
                 required
@@ -3768,7 +3849,7 @@ function ForumModeratorPage() {
                 style={{ alignSelf: 'flex-end' }} 
                 disabled={postingReply || !replyText.trim()}
               >
-                {postingReply ? 'Posting...' : 'Post Reply'}
+                {postingReply ? 'กำลังโพสต์...' : 'โพสต์คำตอบ'}
               </button>
             </form>
           </div>
@@ -3841,13 +3922,13 @@ function LoginView() {
   return (
     <main className="login-shell">
       <section className="login-card" data-testid="login-card">
-        <p className="pill">Admin Control Center</p>
-        <h1 className="page-title">Sign in to FlowBiz</h1>
-        <p className="page-intro">Use a tenant account to load dashboard context, workspaces, and operator tools.</p>
+        <p className="pill">ศูนย์ควบคุมผู้ดูแล</p>
+        <h1 className="page-title">เข้าสู่ระบบ FlowBiz</h1>
+        <p className="page-intro">ใช้บัญชีคลินิกเพื่อเปิดแดชบอร์ด เวิร์กสเปซ และเครื่องมือปฏิบัติการ</p>
         <StatusBanner state={state.status === 'error' ? { kind: 'error', message: describeError(state.error) } : null} testId="login-error" />
         <form className="form-grid" onSubmit={handleSubmit} data-testid="login-form">
           <label className="field field-span-2">
-            <span>Email</span>
+            <span>อีเมล</span>
             <input
               value={form.email}
               onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
@@ -3856,7 +3937,7 @@ function LoginView() {
             />
           </label>
           <label className="field field-span-2">
-            <span>Password</span>
+            <span>รหัสผ่าน</span>
             <input
               type="password"
               value={form.password}
@@ -3865,7 +3946,7 @@ function LoginView() {
             />
           </label>
           <label className="field field-span-2">
-            <span>Clinic slug (optional)</span>
+            <span>Clinic slug (ไม่บังคับ)</span>
             <input
               value={form.clinicSlug}
               onChange={(event) => setForm((current) => ({ ...current, clinicSlug: event.target.value }))}
@@ -3874,7 +3955,7 @@ function LoginView() {
           </label>
           <div className="inline-actions field-span-2">
             <button type="submit" className="primary-button" data-testid="login-submit" disabled={state.status === 'loading'}>
-              {state.status === 'loading' ? 'Signing in…' : 'Sign in'}
+              {state.status === 'loading' ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
             </button>
           </div>
         </form>
@@ -4025,7 +4106,7 @@ function AdminApp({ config }) {
             {token ? (
               bootstrap.status === 'loading' ? (
                 <main className="login-shell">
-                  <LoadingCard label="Bootstrapping admin session…" />
+                  <LoadingCard label="กำลังเตรียมเซสชันผู้ดูแล..." />
                 </main>
               ) : session ? (
                 <AdminShell />

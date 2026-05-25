@@ -40,7 +40,7 @@ async function syncMockAdSpend(clinicId) {
     }
 
     await client.query('commit');
-    return { success: true };
+    return { success: true, integrationStatus: 'mock_generated' };
   } catch (error) {
     await client.query('rollback');
     throw error;

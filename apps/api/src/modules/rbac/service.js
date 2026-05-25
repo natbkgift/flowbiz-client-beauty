@@ -22,6 +22,10 @@ function hasPermission(context, resource, action) {
   return permissions.includes(permissionKey);
 }
 
+function hasAnyPermission(context, permissions) {
+  return permissions.some(([resource, action]) => hasPermission(context, resource, action));
+}
+
 function authorize(context, resource, action) {
   if (!hasPermission(context, resource, action)) {
     throw new AppError(403, 'FORBIDDEN', `Missing permission ${buildPermissionKey(resource, action)}.`);
@@ -59,6 +63,7 @@ module.exports = {
   normalizeRoleKey,
   buildPermissionKey,
   hasPermission,
+  hasAnyPermission,
   authorize,
   authorizeAny,
   authenticateAndAuthorize,

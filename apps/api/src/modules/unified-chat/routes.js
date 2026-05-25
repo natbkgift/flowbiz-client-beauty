@@ -1,4 +1,6 @@
 const { matchPath } = require('../../common/routing');
+const { AppError } = require('../../common/errors');
+const { authenticateAndAuthorize } = require('../rbac/service');
 const {
   listUnifiedChats,
   getUnifiedChatMessages,
@@ -9,14 +11,14 @@ async function handleUnifiedChatRoutes(request, response, url, tools) {
   const { authenticateRequest, parseJsonBody, json } = tools;
 
   if (url.pathname === '/chats' && request.method === 'GET') {
-    const context = await authenticateRequest(request);
+    const context = await authenticateAndAuthorize(request, authenticateRequest, 'message', 'read');
     const chats = await listUnifiedChats(context);
     return json(response, 200, chats);
   }
 
   const threadMessagesParams = matchPath(url.pathname, '/chats/:threadId/messages');
   if (threadMessagesParams && request.method === 'GET') {
-    const context = await authenticateRequest(request);
+    const context = await authenticateAndAuthorize(request, authenticateRequest, 'message', 'read');
     const threadId = Number.parseInt(threadMessagesParams.threadId, 10);
     const messages = await getUnifiedChatMessages(context, threadId);
     return json(response, 200, messages);
@@ -24,12 +26,12 @@ async function handleUnifiedChatRoutes(request, response, url, tools) {
 
   const sendParams = matchPath(url.pathname, '/chats/:threadId/send');
   if (sendParams && request.method === 'POST') {
-    const context = await authenticateRequest(request);
+    const context = await authenticateAndAuthorize(request, authenticateRequest, 'message', 'write');
     const threadId = Number.parseInt(sendParams.threadId, 10);
     const body = await parseJsonBody(request);
     
     if (!body || !body.messageText) {
-      return json(response, 400, { error: 'Bad Request', message: 'messageText is required' });
+      throw new AppError(400, 'INVALID_PAYLOAD', 'messageText is required.');
     }
 
     const result = await sendUnifiedMessage(context, threadId, body);

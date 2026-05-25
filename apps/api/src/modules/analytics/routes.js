@@ -8,7 +8,7 @@ async function handleAnalyticsRoutes(request, response, url, tools) {
   const { authenticateRequest, json } = tools;
 
   if (url.pathname === '/analytics/executive/summary' && request.method === 'GET') {
-    const context = await authenticateRequest(request);
+    const context = await authenticateAndAuthorize(request, authenticateRequest, 'analytics', 'read');
     
     const userRes = await getPool().query('select is_franchise_admin from users where id = $1', [context.currentUser.id]);
     const isFranchiseAdmin = userRes.rows[0]?.is_franchise_admin || false;

@@ -81,7 +81,7 @@ async function routeRequest(request, response) {
   if (url.pathname === '/' && request.method === 'GET') {
     return json(response, 200, {
       name: 'flowbiz-api',
-      message: 'Sprint 1 tenant and auth foundation is running.',
+      message: 'FlowBiz Beauty API พร้อมให้บริการ',
       healthEndpoint: '/health',
       authEndpoints: ['/auth/signup', '/auth/login', '/auth/me', '/tenant-context', '/auth/logout']
     });

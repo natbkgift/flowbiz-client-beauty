@@ -1,4 +1,5 @@
 const { matchPath } = require('../../common/routing');
+const { authenticateAndAuthorize, hasPermission } = require('../rbac/service');
 const {
   createPost,
   updatePost,
@@ -18,9 +19,11 @@ async function handleBlogRoutes(request, response, url, tools) {
     // Wait! How do public clients identify the clinic? They pass clinicId in query params!
     // Let's support either authenticating using token or falling back to a query parameter `clinicId` for public page.
     let clinicId;
+    let canManageBlog = false;
     try {
       const context = await authenticateRequest(request);
       clinicId = context.currentClinic.id;
+      canManageBlog = hasPermission(context, 'blog', 'manage');
     } catch (_) {
       // Fallback for public requests
       clinicId = Number(url.searchParams.get('clinicId')) || 1001; // default to first seeded clinic if not provided
@@ -28,7 +31,7 @@ async function handleBlogRoutes(request, response, url, tools) {
 
     const reqStatus = url.searchParams.get('status');
     const posts = await listPosts(clinicId, {
-      status: reqStatus === 'all' ? null : (reqStatus || 'published'),
+      status: canManageBlog && reqStatus === 'all' ? null : (reqStatus && canManageBlog ? reqStatus : 'published'),
       limit: url.searchParams.get('limit'),
       offset: url.searchParams.get('offset')
     });
@@ -61,7 +64,7 @@ async function handleBlogRoutes(request, response, url, tools) {
 
   // 3. Admin POST /blog/posts (create post)
   if (url.pathname === '/blog/posts' && request.method === 'POST') {
-    const context = await authenticateRequest(request);
+    const context = await authenticateAndAuthorize(request, authenticateRequest, 'blog', 'manage');
     const body = await parseJsonBody(request);
     const post = await createPost(context, body);
     return json(response, 201, post);
@@ -70,7 +73,7 @@ async function handleBlogRoutes(request, response, url, tools) {
   // 4. Admin PUT /blog/posts/:id (update post)
   const idParams = matchPath(url.pathname, '/blog/posts/:id');
   if (idParams && request.method === 'PUT') {
-    const context = await authenticateRequest(request);
+    const context = await authenticateAndAuthorize(request, authenticateRequest, 'blog', 'manage');
     const body = await parseJsonBody(request);
     const postId = Number(idParams.id);
     
@@ -87,7 +90,7 @@ async function handleBlogRoutes(request, response, url, tools) {
 
   // 5. Admin DELETE /blog/posts/:id (delete post)
   if (idParams && request.method === 'DELETE') {
-    const context = await authenticateRequest(request);
+    const context = await authenticateAndAuthorize(request, authenticateRequest, 'blog', 'manage');
     const postId = Number(idParams.id);
     
     try {

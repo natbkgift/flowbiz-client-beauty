@@ -72,6 +72,78 @@ const MOCK_BLOG_POSTS = [
   }
 ];
 
+const ALLOWED_RICH_TAGS = new Set(['P', 'BR', 'STRONG', 'EM', 'UL', 'OL', 'LI', 'H1', 'H2', 'H3', 'A', 'IMG', 'BLOCKQUOTE']);
+const ALLOWED_RICH_ATTRS = {
+  A: new Set(['href', 'target', 'rel']),
+  IMG: new Set(['src', 'alt'])
+};
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function isSafeUrl(url) {
+  try {
+    const parsed = new URL(String(url || ''), window.location.origin);
+    return ['http:', 'https:'].includes(parsed.protocol);
+  } catch (_) {
+    return false;
+  }
+}
+
+function sanitizeRichHtml(html) {
+  const doc = document.implementation.createHTMLDocument('sanitizer');
+  doc.body.innerHTML = String(html || '');
+
+  const walk = (node) => {
+    for (const child of [...node.childNodes]) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        continue;
+      }
+
+      if (child.nodeType !== Node.ELEMENT_NODE || !ALLOWED_RICH_TAGS.has(child.tagName)) {
+        child.replaceWith(doc.createTextNode(child.textContent || ''));
+        continue;
+      }
+
+      for (const attr of [...child.attributes]) {
+        const allowedAttrs = ALLOWED_RICH_ATTRS[child.tagName] || new Set();
+        if (!allowedAttrs.has(attr.name)) {
+          child.removeAttribute(attr.name);
+        }
+      }
+
+      if (child.tagName === 'A') {
+        const href = child.getAttribute('href') || '';
+        if (!isSafeUrl(href)) {
+          child.removeAttribute('href');
+        } else {
+          child.setAttribute('target', '_blank');
+          child.setAttribute('rel', 'noopener noreferrer');
+        }
+      }
+
+      if (child.tagName === 'IMG') {
+        const src = child.getAttribute('src') || '';
+        if (!isSafeUrl(src)) {
+          child.remove();
+          continue;
+        }
+      }
+
+      walk(child);
+    }
+  };
+
+  walk(doc.body);
+  return doc.body.innerHTML;
+}
+
 const MOCK_FORUM_TOPICS = [
   {
     id: 1,
@@ -205,7 +277,7 @@ export function App() {
     return (
       <div className="public-container" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
         <h1 style={{ fontSize: '3rem', marginBottom: '1.5rem', color: 'var(--gold-primary)' }}>404</h1>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Page Not Found. ขออภัย ไม่พบหน้าที่ท่านต้องการ</p>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>ขออภัย ไม่พบหน้าที่ท่านต้องการ</p>
         <a href="#/" className="cta-btn">กลับหน้าแรก</a>
       </div>
     );
@@ -399,21 +471,25 @@ function BlogListPage({ posts }) {
 // ----------------------------------------------------
 function renderContent(text) {
   if (!text) return '';
-  // If it looks like HTML, render it directly
+  // If it looks like HTML, sanitize it before rendering.
   if (text.includes('</p>') || text.includes('</h2>') || text.includes('</ul>') || text.includes('</strong>')) {
-    return text;
+    return sanitizeRichHtml(text);
   }
   // Otherwise, parse simple Markdown:
-  let html = text
+  let html = escapeHtml(text)
     .replace(/^### (.*$)/gim, '<h3>$1</h3>')
     .replace(/^## (.*$)/gim, '<h2>$1</h2>')
     .replace(/^# (.*$)/gim, '<h1>$1</h1>')
     .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
     .replace(/\*(.*)\*/gim, '<em>$1</em>')
-    .replace(/!\[(.*?)\]\((.*?)\)/gim, '<img alt="$1" src="$2" style="max-width:100%; border-radius:8px;" />')
-    .replace(/\[(.*?)\]\((.*?)\)/gim, '<a href="$2" target="_blank">$1</a>')
+    .replace(/!\[(.*?)\]\((.*?)\)/gim, (_, alt, src) => (
+      isSafeUrl(src) ? `<img alt="${escapeHtml(alt)}" src="${escapeHtml(src)}" />` : ''
+    ))
+    .replace(/\[(.*?)\]\((.*?)\)/gim, (_, label, href) => (
+      isSafeUrl(href) ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${label}</a>` : label
+    ))
     .replace(/\n\n/g, '</p><p>');
-  return '<p>' + html.replace(/\n/g, '<br/>') + '</p>';
+  return sanitizeRichHtml('<p>' + html.replace(/\n/g, '<br/>') + '</p>');
 }
 
 function BlogDetailPage({ slug, initialPost }) {

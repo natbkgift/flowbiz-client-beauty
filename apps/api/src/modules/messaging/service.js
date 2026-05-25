@@ -226,6 +226,24 @@ async function createContactIdentity(clinicContext, payload) {
       ]
     );
 
+    const { recordAuditLog } = require('../audit/service');
+    await recordAuditLog(
+      {
+        clinicId: clinicContext.currentClinic.id,
+        entityType: normalized.entityType,
+        entityId: normalized.entityId,
+        actionType: 'contact_identity.create',
+        actorUserId: clinicContext.currentUser.id,
+        contextJson: {
+          contactIdentityId: result.rows[0].id,
+          channelType: result.rows[0].channel_type,
+          externalId: result.rows[0].external_id,
+          isPrimary: result.rows[0].is_primary
+        }
+      },
+      client
+    );
+
     await client.query('commit');
     return mapContactIdentity(result.rows[0]);
   } catch (error) {
@@ -752,7 +770,8 @@ async function sendCustomerOutboundMessage(clinicContext, customerId, payload, o
           channelType: channel.channel_type,
           messageType,
           outboundMessageId: result.rows[0].id,
-          status: result.rows[0].status
+          status: result.rows[0].status,
+          integrationStatus: providerResult.integrationStatus || 'unknown'
         }
       },
       client

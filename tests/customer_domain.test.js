@@ -123,9 +123,47 @@ test('customer note creation is tenant isolated', async () => {
     `,
     ['Other Tenant Clinic', clinicSlug]
   );
+  const organizationInsert = await pool.query(
+    `
+      insert into organizations (clinic_id, name, slug, status)
+      values ($1, 'Other Tenant Organization', $2, 'active')
+      returning id
+    `,
+    [clinicInsert.rows[0].id, `${clinicSlug}-org`]
+  );
+  const workspaceInsert = await pool.query(
+    `
+      insert into workspaces (clinic_id, organization_id, name, slug, status)
+      values ($1, $2, 'Other Tenant Workspace', $3, 'active')
+      returning id
+    `,
+    [clinicInsert.rows[0].id, organizationInsert.rows[0].id, `${clinicSlug}-workspace`]
+  );
+  const ownerRole = await pool.query(`select id from roles where key = 'owner' limit 1`);
   await pool.query(
-    `insert into clinic_users (clinic_id, user_id, role, status) values ($1, $2, 'owner', 'active') on conflict (clinic_id, user_id) do nothing`,
-    [clinicInsert.rows[0].id, context.currentUser.id]
+    `
+      insert into clinic_users (clinic_id, user_id, organization_id, workspace_id, role, role_id, status)
+      values ($1, $2, $3, $4, 'owner', $5, 'active')
+      on conflict (clinic_id, user_id) do nothing
+    `,
+    [clinicInsert.rows[0].id, context.currentUser.id, organizationInsert.rows[0].id, workspaceInsert.rows[0].id, ownerRole.rows[0].id]
+  );
+  await pool.query(
+    `
+      insert into workspace_memberships (
+        clinic_id,
+        organization_id,
+        workspace_id,
+        user_id,
+        role_id,
+        status,
+        invited_by,
+        invited_at,
+        joined_at
+      )
+      values ($1, $2, $3, $4, $5, 'active', $4, now(), now())
+    `,
+    [clinicInsert.rows[0].id, organizationInsert.rows[0].id, workspaceInsert.rows[0].id, context.currentUser.id, ownerRole.rows[0].id]
   );
 
   const otherContext = await buildContext(pool, clinicSlug);

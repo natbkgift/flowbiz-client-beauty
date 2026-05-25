@@ -1,15 +1,29 @@
 const { getPool } = require('../../db');
 const { AppError } = require('../../common/errors');
+const { recordAuditLog } = require('../audit/service');
 
 async function recordMeteredUsage(clinicId, usageType, quantity = 1) {
   const pool = getPool();
-  await pool.query(
+  const result = await pool.query(
     `
       insert into billing_usage_records (clinic_id, usage_type, quantity)
       values ($1, $2, $3)
+      returning id
     `,
     [clinicId, usageType, quantity]
   );
+
+  await recordAuditLog({
+    clinicId,
+    entityType: 'billing_usage',
+    entityId: Number(result.rows[0].id),
+    actionType: 'billing.usage_recorded',
+    actorUserId: null,
+    contextJson: {
+      usageType,
+      quantity: Number(quantity)
+    }
+  });
 }
 
 async function calculateCurrentBillingUsage(clinicId) {
@@ -102,25 +116,49 @@ async function calculateCurrentBillingUsage(clinicId) {
 async function syncUsageToStripe(clinicId) {
   const calculation = await calculateCurrentBillingUsage(clinicId);
   // Simulating external Stripe metered billing usage records sync
-  return {
+  const result = {
     success: true,
     processor: 'Stripe',
+    integrationStatus: 'simulated',
     syncedSubscriptionId: `sub_stripe_${clinicId}`,
     syncedAt: new Date().toISOString(),
     totalAmountDue: calculation.billingCalculation.totalAmountDue
   };
+
+  await recordAuditLog({
+    clinicId,
+    entityType: 'billing_subscription',
+    entityId: Number(calculation.subscription.id),
+    actionType: 'billing.sync_simulated',
+    actorUserId: null,
+    contextJson: result
+  });
+
+  return result;
 }
 
 async function syncUsageToOmise(clinicId) {
   const calculation = await calculateCurrentBillingUsage(clinicId);
   // Simulating external Omise recurring/metered billing sync
-  return {
+  const result = {
     success: true,
     processor: 'Omise',
+    integrationStatus: 'simulated',
     syncedSubscriptionId: `sub_omise_${clinicId}`,
     syncedAt: new Date().toISOString(),
     totalAmountDue: calculation.billingCalculation.totalAmountDue
   };
+
+  await recordAuditLog({
+    clinicId,
+    entityType: 'billing_subscription',
+    entityId: Number(calculation.subscription.id),
+    actionType: 'billing.sync_simulated',
+    actorUserId: null,
+    contextJson: result
+  });
+
+  return result;
 }
 
 module.exports = {

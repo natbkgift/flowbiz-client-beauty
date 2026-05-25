@@ -1,6 +1,7 @@
 const { createLead } = require('../leads/service');
 const { resolveWorkerContext } = require('../worker-engine/worker');
 const { AppError } = require('../../common/errors');
+const { verifyWebhookSecret, auditWebhookEvent } = require('./security');
 
 function parseWixLeadPayload(body) {
   const data = body.data || body;
@@ -55,9 +56,19 @@ async function handleWixWebhook(req, res, next) {
     const { clinicId, workspaceId } = req.params;
     
     // Security verification (e.g. check signature or token in query)
-    const secret = req.headers['x-wix-signature'] || req.headers['x-webhook-secret'] || req.query.secret;
-    if (secret === 'invalid-secret') {
-      return res.status(401).json({ error: 'Unauthorized: Invalid signature/secret' });
+    const verification = verifyWebhookSecret(req, ['x-wix-signature', 'x-webhook-secret']);
+    if (!verification.ok) {
+      await auditWebhookEvent({
+        clinicId,
+        source: 'wix',
+        status: 'rejected',
+        reason: verification.reason,
+        integrationStatus: verification.integrationStatus
+      });
+      return res.status(401).json({
+        error: 'Unauthorized: Invalid signature/secret',
+        message: 'ลายเซ็นหรือ secret ของ webhook ไม่ถูกต้อง'
+      });
     }
 
     const payload = parseWixLeadPayload(req.body);
@@ -76,10 +87,19 @@ async function handleWixWebhook(req, res, next) {
     // Create lead which will automatically publish lead.created event and trigger flows
     const lead = await createLead(context, payload);
 
+    await auditWebhookEvent({
+      clinicId,
+      source: 'wix',
+      status: 'accepted',
+      leadId: lead.id,
+      integrationStatus: verification.integrationStatus
+    });
+
     return res.status(201).json({
       success: true,
+      integrationStatus: verification.integrationStatus,
       leadId: lead.id,
-      message: 'Wix lead ingested successfully'
+      message: 'รับข้อมูล Wix lead สำเร็จ'
     });
   } catch (error) {
     next(error);

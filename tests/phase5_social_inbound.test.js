@@ -259,7 +259,9 @@ test('Facebook Page Comment Webhook scans intent, triggers auto-reply and create
   assert.equal(responseData.event, 'comment');
   assert.equal(responseData.processed, true);
   assert.ok(responseData.leadId);
-  assert.equal(responseData.autoReplySent, true);
+  assert.equal(responseData.autoReplySent, false);
+  assert.equal(responseData.autoReplyMode, 'simulated_pending_provider');
+  assert.equal(responseData.privateMessageSent, false);
   assert.ok(responseData.autoReplyText.includes('ขอบคุณที่สนใจ'));
 
   // Verify created lead in database

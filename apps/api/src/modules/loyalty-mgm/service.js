@@ -1,5 +1,6 @@
 const { getPool } = require('../../db');
 const { AppError } = require('../../common/errors');
+const { recordAuditLog } = require('../audit/service');
 
 /**
  * Generates a premium referral code for a lead.
@@ -20,7 +21,7 @@ function parseReferrerFromCode(referralCode) {
 /**
  * Connects a referee (referred lead) to their referrer using a referral code.
  */
-async function trackReferral(clinicId, referralCode, referredLeadId) {
+async function trackReferral(clinicId, referralCode, referredLeadId, options = {}) {
   const pool = getPool();
   const referrerId = parseReferrerFromCode(referralCode);
 
@@ -52,8 +53,24 @@ async function trackReferral(clinicId, referralCode, referredLeadId) {
        returning *`,
       [clinicId, referrerId, referredLeadId, referralCode]
     );
+    const referral = result.rows[0] || null;
+
+    if (referral) {
+      await recordAuditLog({
+        clinicId,
+        entityType: 'loyalty_referral',
+        entityId: referral.id,
+        actionType: 'loyalty.referral_tracked',
+        actorUserId: options.actorUserId || null,
+        contextJson: {
+          referrerLeadId: referrerId,
+          referredLeadId: Number(referredLeadId)
+        }
+      }, client);
+    }
+
     await client.query('commit');
-    return result.rows[0] || null;
+    return referral;
   } catch (error) {
     await client.query('rollback');
     throw error;
@@ -65,7 +82,7 @@ async function trackReferral(clinicId, referralCode, referredLeadId) {
 /**
  * Records a clinic purchase, awards points, and processes MGM bonuses.
  */
-async function recordPurchaseAndAwardPoints(clinicId, leadId, amount, description = 'หัตถการความงาม') {
+async function recordPurchaseAndAwardPoints(clinicId, leadId, amount, description = 'หัตถการความงาม', options = {}) {
   const pool = getPool();
   const pointsToEarn = Math.floor(amount / 100); // 1 point per 100 THB spent
 
@@ -78,7 +95,7 @@ async function recordPurchaseAndAwardPoints(clinicId, leadId, amount, descriptio
     await client.query('begin');
 
     // 1. Insert Earned Points into Ledger
-    await client.query(
+    const ledgerResult = await client.query(
       `insert into loyalty_points_ledger (clinic_id, lead_id, points, transaction_type, description)
        values ($1, $2, $3, 'earn', $4)`,
       [clinicId, leadId, pointsToEarn, `${description} (ยอดชำระ ${amount} บาท)`]
@@ -124,6 +141,23 @@ async function recordPurchaseAndAwardPoints(clinicId, leadId, amount, descriptio
 
       referralProcessed = true;
     }
+
+    await recordAuditLog({
+      clinicId,
+      entityType: 'loyalty_purchase',
+      entityId: leadId,
+      actionType: 'loyalty.purchase_recorded',
+      actorUserId: options.actorUserId || null,
+      contextJson: {
+        leadId: Number(leadId),
+        amount: Number(amount),
+        pointsEarned: pointsToEarn,
+        referralProcessed,
+        referrerBonus,
+        refereeBonus,
+        ledgerRowCount: ledgerResult.rowCount
+      }
+    }, client);
 
     await client.query('commit');
 

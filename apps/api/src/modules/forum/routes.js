@@ -1,4 +1,10 @@
 const { matchPath } = require('../../common/routing');
+const { AppError } = require('../../common/errors');
+const {
+  authenticateAndAuthorize,
+  hasAnyPermission,
+  hasPermission
+} = require('../rbac/service');
 const {
   createTopic,
   listTopics,
@@ -15,16 +21,18 @@ async function handleForumRoutes(request, response, url, tools) {
   // 1. GET /forum/topics (public listing)
   if (url.pathname === '/forum/topics' && request.method === 'GET') {
     let clinicId;
+    let canModerate = false;
     try {
       const context = await authenticateRequest(request);
       clinicId = context.currentClinic.id;
+      canModerate = hasAnyPermission(context, [['forum', 'moderate'], ['forum', 'medical_answer']]);
     } catch (_) {
       clinicId = Number(url.searchParams.get('clinicId')) || 1001;
     }
 
     const topics = await listTopics(clinicId, {
       category: url.searchParams.get('category'),
-      status: url.searchParams.get('status') || 'active',
+      status: canModerate ? (url.searchParams.get('status') || 'active') : 'active',
       limit: url.searchParams.get('limit'),
       offset: url.searchParams.get('offset')
     });
@@ -79,8 +87,7 @@ async function handleForumRoutes(request, response, url, tools) {
     
     try {
       clinicContext = await authenticateRequest(request);
-      const role = clinicContext.currentMembership?.role;
-      if (role === 'owner' || role === 'admin') {
+      if (hasPermission(clinicContext, 'forum', 'medical_answer')) {
         isDoctorReply = true; // Auto-detect as doctor/clinic reply if posted by owner/admin
       }
     } catch (_) {
@@ -95,7 +102,7 @@ async function handleForumRoutes(request, response, url, tools) {
     try {
       const reply = await createReply(clinicContext, topicId, {
         ...body,
-        isDoctorReply: body.isDoctorReply !== undefined ? body.isDoctorReply : isDoctorReply
+        isDoctorReply
       });
       return json(response, 201, reply);
     } catch (err) {
@@ -109,11 +116,7 @@ async function handleForumRoutes(request, response, url, tools) {
   // 5. PUT /forum/replies/:replyId/verify (mark reply as verified answer - Admin only)
   const verifyParams = matchPath(url.pathname, '/forum/replies/:replyId/verify');
   if (verifyParams && request.method === 'PUT') {
-    const context = await authenticateRequest(request);
-    const role = context.currentMembership?.role;
-    if (role !== 'owner' && role !== 'admin') {
-      return json(response, 403, { error: 'Forbidden', message: 'Only clinic administrators can verify forum answers.' });
-    }
+    const context = await authenticateAndAuthorize(request, authenticateRequest, 'forum', 'medical_answer');
 
     const body = await parseJsonBody(request);
     const replyId = Number(verifyParams.replyId);
@@ -133,18 +136,14 @@ async function handleForumRoutes(request, response, url, tools) {
   // 6. PUT /forum/topics/:topicId/status (lock/hide topic - Admin only)
   const statusParams = matchPath(url.pathname, '/forum/topics/:topicId/status');
   if (statusParams && request.method === 'PUT') {
-    const context = await authenticateRequest(request);
-    const role = context.currentMembership?.role;
-    if (role !== 'owner' && role !== 'admin') {
-      return json(response, 403, { error: 'Forbidden', message: 'Only clinic administrators can moderate forum topics.' });
-    }
+    const context = await authenticateAndAuthorize(request, authenticateRequest, 'forum', 'moderate');
 
     const body = await parseJsonBody(request);
     const topicId = Number(statusParams.topicId);
     const status = body.status; // active, locked, hidden
 
     if (!['active', 'locked', 'hidden'].includes(status)) {
-      return json(response, 400, { error: 'Bad Request', message: 'Invalid status value.' });
+      throw new AppError(400, 'INVALID_PAYLOAD', 'Invalid status value.');
     }
 
     try {

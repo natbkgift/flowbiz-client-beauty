@@ -1,6 +1,7 @@
 const { createLead } = require('../leads/service');
 const { resolveWorkerContext } = require('../worker-engine/worker');
 const { getPool } = require('../../db');
+const { verifyWebhookSecret, auditWebhookEvent } = require('./security');
 
 function parseFacebookLeadPayload(body) {
   const data = body.data || body;
@@ -54,9 +55,16 @@ async function handleFacebookWebhook(req, res, next) {
       return res.status(400).json({ error: 'Bad Request', message: 'clinicId and workspaceId are required' });
     }
 
-    const secret = req.headers['x-hub-signature-256'] || req.query.secret;
-    if (secret === 'invalid-secret') {
-      return res.status(401).json({ error: 'Unauthorized', message: 'Invalid signature/secret' });
+    const verification = verifyWebhookSecret(req, ['x-hub-signature-256']);
+    if (!verification.ok) {
+      await auditWebhookEvent({
+        clinicId,
+        source: 'facebook',
+        status: 'rejected',
+        reason: verification.reason,
+        integrationStatus: verification.integrationStatus
+      });
+      return res.status(401).json({ error: 'Unauthorized', message: 'ลายเซ็นหรือ secret ของ webhook ไม่ถูกต้อง' });
     }
 
     const pool = getPool();
@@ -114,17 +122,28 @@ async function handleFacebookWebhook(req, res, next) {
            where id = $2`,
           [lead.id, rawRecordId]
         );
+
+        await auditWebhookEvent({
+          clinicId,
+          source: 'facebook_comment',
+          status: 'accepted',
+          rawRecordId,
+          leadId: lead.id,
+          integrationStatus: verification.integrationStatus
+        });
       }
 
       // Simulate sending Facebook Page Auto-Reply & Private DM message
       return res.status(200).json({
         success: true,
         event: 'comment',
+        integrationStatus: verification.integrationStatus,
         processed: hasIntent,
         leadId: lead ? lead.id : null,
-        autoReplySent: hasIntent,
+        autoReplySent: false,
+        autoReplyMode: 'simulated_pending_provider',
         autoReplyText: 'ขอบคุณที่สนใจค่ะคุณคนไข้ แอดมินได้ส่งรายละเอียดโปรแกรมความงามพิเศษเข้าทางกล่องข้อความเรียบร้อยแล้วค่ะ 💖',
-        privateMessageSent: hasIntent
+        privateMessageSent: false
       });
     } else {
       // Handle Lead Ads Form Submission
@@ -137,12 +156,22 @@ async function handleFacebookWebhook(req, res, next) {
         [lead.id, rawRecordId]
       );
 
+      await auditWebhookEvent({
+        clinicId,
+        source: 'facebook_leadgen',
+        status: 'accepted',
+        rawRecordId,
+        leadId: lead.id,
+        integrationStatus: verification.integrationStatus
+      });
+
       return res.status(201).json({
         success: true,
         event: 'leadgen',
+        integrationStatus: verification.integrationStatus,
         leadId: lead.id,
         inboundRawId: rawRecordId,
-        message: 'Facebook LeadAds ingested successfully'
+        message: 'รับข้อมูล Facebook Lead Ads สำเร็จ'
       });
     }
   } catch (error) {

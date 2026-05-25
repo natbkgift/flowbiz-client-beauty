@@ -1,5 +1,6 @@
 const { getPool } = require('../../db');
 const { AppError } = require('../../common/errors');
+const { recordAuditLog } = require('../audit/service');
 
 function generateSlug(title) {
   let slug = title
@@ -55,7 +56,20 @@ async function createPost(clinicContext, data) {
     ]
   );
 
-  return result.rows[0];
+  const post = result.rows[0];
+  await recordAuditLog({
+    clinicId,
+    entityType: 'blog_post',
+    entityId: Number(post.id),
+    actionType: 'blog.post_created',
+    actorUserId: clinicContext.currentUser?.id || null,
+    contextJson: {
+      status: post.status,
+      slug: post.slug
+    }
+  });
+
+  return post;
 }
 
 async function updatePost(clinicContext, postId, data) {
@@ -107,7 +121,22 @@ async function updatePost(clinicContext, postId, data) {
     ]
   );
 
-  return result.rows[0];
+  const post = result.rows[0];
+  await recordAuditLog({
+    clinicId,
+    entityType: 'blog_post',
+    entityId: Number(post.id),
+    actionType: 'blog.post_updated',
+    actorUserId: clinicContext.currentUser?.id || null,
+    contextJson: {
+      statusBefore: existingPost.status,
+      statusAfter: post.status,
+      slugBefore: existingPost.slug,
+      slugAfter: post.slug
+    }
+  });
+
+  return post;
 }
 
 async function listPosts(clinicId, options = {}) {
@@ -168,6 +197,15 @@ async function deletePost(clinicContext, postId) {
   if (result.rowCount === 0) {
     throw new AppError(404, 'POST_NOT_FOUND', 'Blog post not found.');
   }
+
+  await recordAuditLog({
+    clinicId,
+    entityType: 'blog_post',
+    entityId: Number(postId),
+    actionType: 'blog.post_deleted',
+    actorUserId: clinicContext.currentUser?.id || null,
+    contextJson: {}
+  });
   return { success: true };
 }
 

@@ -1,6 +1,7 @@
 const { getPool } = require('../../db');
 const { AppError } = require('../../common/errors');
 const { generateSlug } = require('../blog/service'); // reuse Thai-safe slug helper
+const { recordAuditLog } = require('../audit/service');
 
 async function makeUniqueTopicSlug(client, clinicId, title) {
   const baseSlug = generateSlug(title);
@@ -45,7 +46,20 @@ async function createTopic(clinicContext, data) {
     ]
   );
 
-  return result.rows[0];
+  const topic = result.rows[0];
+  await recordAuditLog({
+    clinicId,
+    entityType: 'forum_topic',
+    entityId: Number(topic.id),
+    actionType: 'forum.topic_created',
+    actorUserId: clinicContext.currentUser?.id || null,
+    contextJson: {
+      category: topic.category,
+      isAnonymous: topic.is_anonymous
+    }
+  });
+
+  return topic;
 }
 
 async function listTopics(clinicId, options = {}) {
@@ -121,24 +135,24 @@ async function getTopicByIdOrSlug(clinicId, idOrSlug) {
 async function createReply(clinicContext, topicId, data) {
   const { content, authorDisplayName, isAnonymous, isDoctorReply } = data;
   const clinicId = clinicContext.currentClinic.id;
-  const pool = getPool();
+  const client = await getPool().connect();
 
-  if (!content || !authorDisplayName) {
-    throw new AppError(400, 'BAD_REQUEST', 'Content and author display name are required.');
-  }
-
-  // Verify topic exists
-  const topicCheck = await pool.query(
-    'select id from forum_topics where clinic_id = $1 and id = $2',
-    [clinicId, topicId]
-  );
-  if (topicCheck.rowCount === 0) {
-    throw new AppError(404, 'TOPIC_NOT_FOUND', 'Topic not found.');
-  }
-
-  await pool.query('begin');
   try {
-    const result = await pool.query(
+    if (!content || !authorDisplayName) {
+      throw new AppError(400, 'BAD_REQUEST', 'Content and author display name are required.');
+    }
+
+    // Verify topic exists
+    const topicCheck = await client.query(
+      'select id from forum_topics where clinic_id = $1 and id = $2',
+      [clinicId, topicId]
+    );
+    if (topicCheck.rowCount === 0) {
+      throw new AppError(404, 'TOPIC_NOT_FOUND', 'Topic not found.');
+    }
+
+    await client.query('begin');
+    const result = await client.query(
       `insert into forum_replies (
         topic_id, clinic_id, content, author_display_name, is_anonymous, is_doctor_reply, is_verified_answer
       ) values ($1, $2, $3, $4, $5, $6, $7)
@@ -150,25 +164,43 @@ async function createReply(clinicContext, topicId, data) {
         isDoctorReply || false // doctor replies are auto-verified answers
       ]
     );
+    const reply = result.rows[0];
 
     // Increment reply count and set is_doctor_verified to true if it is a doctor reply
     if (isDoctorReply) {
-      await pool.query(
+      await client.query(
         'update forum_topics set reply_count = reply_count + 1, is_doctor_verified = true, updated_at = now() where id = $1',
         [topicId]
       );
     } else {
-      await pool.query(
+      await client.query(
         'update forum_topics set reply_count = reply_count + 1, updated_at = now() where id = $1',
         [topicId]
       );
     }
 
-    await pool.query('commit');
-    return result.rows[0];
+    await recordAuditLog({
+      clinicId,
+      entityType: 'forum_reply',
+      entityId: Number(reply.id),
+      actionType: isDoctorReply ? 'forum.doctor_reply_created' : 'forum.reply_created',
+      actorUserId: clinicContext.currentUser?.id || null,
+      contextJson: {
+        topicId,
+        isDoctorReply: Boolean(isDoctorReply),
+        isVerifiedAnswer: Boolean(isDoctorReply)
+      }
+    }, client);
+
+    await client.query('commit');
+    return reply;
   } catch (error) {
-    await pool.query('rollback');
+    try {
+      await client.query('rollback');
+    } catch (_) {}
     throw error;
+  } finally {
+    client.release();
   }
 }
 
@@ -183,49 +215,64 @@ async function listReplies(clinicId, topicId) {
 
 async function verifyReply(clinicContext, replyId, isVerified) {
   const clinicId = clinicContext.currentClinic.id;
-  const pool = getPool();
+  const client = await getPool().connect();
 
-  const replyResult = await pool.query(
-    'select topic_id from forum_replies where clinic_id = $1 and id = $2',
-    [clinicId, replyId]
-  );
-  if (replyResult.rowCount === 0) {
-    throw new AppError(404, 'REPLY_NOT_FOUND', 'Forum reply not found.');
-  }
-
-  const { topic_id: topicId } = replyResult.rows[0];
-
-  await pool.query('begin');
   try {
-    await pool.query(
+    const replyResult = await client.query(
+      'select topic_id from forum_replies where clinic_id = $1 and id = $2',
+      [clinicId, replyId]
+    );
+    if (replyResult.rowCount === 0) {
+      throw new AppError(404, 'REPLY_NOT_FOUND', 'Forum reply not found.');
+    }
+
+    const { topic_id: topicId } = replyResult.rows[0];
+
+    await client.query('begin');
+    await client.query(
       'update forum_replies set is_verified_answer = $3 where clinic_id = $1 and id = $2',
       [clinicId, replyId, isVerified]
     );
 
     if (isVerified) {
-      await pool.query(
+      await client.query(
         'update forum_topics set is_doctor_verified = true, updated_at = now() where id = $1',
         [topicId]
       );
     } else {
       // Check if there are any other verified replies
-      const otherVerifiedCheck = await pool.query(
+      const otherVerifiedCheck = await client.query(
         'select id from forum_replies where topic_id = $1 and is_verified_answer = true limit 1',
         [topicId]
       );
       if (otherVerifiedCheck.rowCount === 0) {
-        await pool.query(
+        await client.query(
           'update forum_topics set is_doctor_verified = false, updated_at = now() where id = $1',
           [topicId]
         );
       }
     }
 
-    await pool.query('commit');
+    await recordAuditLog({
+      clinicId,
+      entityType: 'forum_reply',
+      entityId: Number(replyId),
+      actionType: isVerified ? 'forum.reply_verified' : 'forum.reply_unverified',
+      actorUserId: clinicContext.currentUser?.id || null,
+      contextJson: {
+        topicId: Number(topicId)
+      }
+    }, client);
+
+    await client.query('commit');
     return { success: true };
   } catch (error) {
-    await pool.query('rollback');
+    try {
+      await client.query('rollback');
+    } catch (_) {}
     throw error;
+  } finally {
+    client.release();
   }
 }
 
@@ -242,7 +289,19 @@ async function updateTopicStatus(clinicContext, topicId, status) {
     throw new AppError(404, 'TOPIC_NOT_FOUND', 'Forum topic not found.');
   }
 
-  return result.rows[0];
+  const topic = result.rows[0];
+  await recordAuditLog({
+    clinicId,
+    entityType: 'forum_topic',
+    entityId: Number(topicId),
+    actionType: 'forum.topic_status_updated',
+    actorUserId: clinicContext.currentUser?.id || null,
+    contextJson: {
+      status
+    }
+  });
+
+  return topic;
 }
 
 module.exports = {

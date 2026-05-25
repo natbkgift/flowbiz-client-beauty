@@ -1,4 +1,5 @@
 const { AppError } = require('./errors');
+const { getThaiErrorMessage } = require('./user-messages');
 
 function json(response, statusCode, payload) {
   response.writeHead(statusCode, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -52,7 +53,7 @@ function sendError(response, error) {
     return json(response, error.statusCode, {
       error: {
         code: error.code,
-        message: error.message,
+        message: getThaiErrorMessage(error.code, error.message),
         details: error.details || null
       }
     });
@@ -61,7 +62,7 @@ function sendError(response, error) {
   return json(response, 500, {
     error: {
       code: 'INTERNAL_SERVER_ERROR',
-      message: 'Internal server error.'
+      message: getThaiErrorMessage('INTERNAL_SERVER_ERROR')
     }
   });
 }

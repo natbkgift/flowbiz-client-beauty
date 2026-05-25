@@ -1,6 +1,7 @@
 const { createLead } = require('../leads/service');
 const { resolveWorkerContext } = require('../worker-engine/worker');
 const { getPool } = require('../../db');
+const { verifyWebhookSecret, auditWebhookEvent } = require('./security');
 
 function parseTikTokLeadPayload(body) {
   // TikTok Lead Ads webhook payload can be nested under raw values or mapped inputs
@@ -61,9 +62,16 @@ async function handleTikTokWebhook(req, res, next) {
     }
 
     // Security Verification
-    const secret = req.headers['x-tiktok-signature'] || req.query.secret;
-    if (secret === 'invalid-secret') {
-      return res.status(401).json({ error: 'Unauthorized', message: 'Invalid signature/secret' });
+    const verification = verifyWebhookSecret(req, ['x-tiktok-signature']);
+    if (!verification.ok) {
+      await auditWebhookEvent({
+        clinicId,
+        source: 'tiktok',
+        status: 'rejected',
+        reason: verification.reason,
+        integrationStatus: verification.integrationStatus
+      });
+      return res.status(401).json({ error: 'Unauthorized', message: 'ลายเซ็นหรือ secret ของ webhook ไม่ถูกต้อง' });
     }
 
     const pool = getPool();
@@ -99,11 +107,21 @@ async function handleTikTokWebhook(req, res, next) {
       [lead.id, rawRecordId]
     );
 
+    await auditWebhookEvent({
+      clinicId,
+      source: 'tiktok',
+      status: 'accepted',
+      rawRecordId,
+      leadId: lead.id,
+      integrationStatus: verification.integrationStatus
+    });
+
     return res.status(201).json({
       success: true,
+      integrationStatus: verification.integrationStatus,
       leadId: lead.id,
       inboundRawId: rawRecordId,
-      message: 'TikTok LeadAds ingested successfully'
+      message: 'รับข้อมูล TikTok Lead Ads สำเร็จ'
     });
   } catch (error) {
     next(error);

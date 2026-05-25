@@ -321,7 +321,7 @@ test('users page invites a member and refreshes the member list', async () => {
   setInputValue(app.document.querySelector('[data-testid="invite-role"]'), 'viewer', app.window);
   submitForm(app.document.querySelector('[data-testid="invite-form"]'), app.window);
 
-  await waitFor(() => app.document.body.textContent.includes('Invitation sent to new-member@example.com.'));
+  await waitFor(() => app.document.body.textContent.includes('ส่งคำเชิญไปที่ new-member@example.com แล้ว'));
   await waitFor(() => app.document.body.textContent.includes('new-member@example.com'));
   const inviteRequest = app.requests.find((request) => request.method === 'POST' && request.url.pathname.endsWith('/invite'));
 
@@ -377,7 +377,7 @@ test('users page changes role through membership role endpoint', async () => {
   setInputValue(app.document.querySelector('[data-testid="role-select-9003"]'), 'viewer', app.window);
   click(app.document.querySelector('[data-testid="role-save-9003"]'), app.window);
 
-  await waitFor(() => app.document.body.textContent.includes('Updated role for operator@example.com.'));
+  await waitFor(() => app.document.body.textContent.includes('อัปเดตบทบาทของ operator@example.com แล้ว'));
   const roleRequest = app.requests.find((request) => request.url.pathname.endsWith('/members/9003/role'));
 
   assert.ok(roleRequest);
@@ -430,7 +430,7 @@ test('settings page updates tenant settings and sends branding payload', async (
   );
   submitForm(app.document.querySelector('[data-testid="tenant-settings-form"]'), app.window);
 
-  await waitFor(() => app.document.body.textContent.includes('Tenant settings updated.'));
+  await waitFor(() => app.document.body.textContent.includes('อัปเดตตั้งค่า Tenant เรียบร้อยแล้ว'));
   const patchRequest = app.requests.find((request) => request.method === 'PATCH' && request.url.pathname === '/tenant/settings');
 
   assert.ok(patchRequest);
