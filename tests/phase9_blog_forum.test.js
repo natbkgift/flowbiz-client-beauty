@@ -119,3 +119,97 @@ test('Blog System Service Integration Tests', async (t) => {
   assert.equal(afterDeleteList.total, 1);
   assert.equal(afterDeleteList.items[0].id, duplicatePost.id);
 });
+
+const {
+  createTopic,
+  listTopics,
+  getTopicByIdOrSlug,
+  createReply,
+  listReplies,
+  verifyReply,
+  updateTopicStatus
+} = require('../apps/api/src/modules/forum/service');
+
+test('Forum Community Service Integration Tests', async (t) => {
+  const fixture = await createFixture(t);
+  const clinicId = fixture.session.currentClinic.id;
+
+  // 1. Test createTopic
+  const topicData = {
+    title: 'สอบถามปัญหาผิวสิวอักเสบหลังทำเลเซอร์',
+    content: 'ทำไมหลังทำเลเซอร์ผิวหน้าถึงเกิดสิวอักเสบขึ้นเยอะมากคะ? ผิดปกติไหม?',
+    authorDisplayName: 'คนไข้กังวลใจ',
+    isAnonymous: true,
+    category: 'skincare'
+  };
+
+  const createdTopic = await createTopic(fixture.clinicContext, topicData);
+  assert.ok(createdTopic.id);
+  assert.equal(createdTopic.title, topicData.title);
+  assert.equal(createdTopic.is_anonymous, true);
+  assert.equal(createdTopic.category, 'skincare');
+  assert.equal(createdTopic.slug, 'สอบถามปัญหาผิวสิวอักเสบหลังทำเลเซอร์');
+
+  // Test duplicate slug uniqueness
+  const duplicateTopic = await createTopic(fixture.clinicContext, topicData);
+  assert.notEqual(duplicateTopic.slug, createdTopic.slug);
+  assert.match(duplicateTopic.slug, /^สอบถามปัญหาผิวสิวอักเสบหลังทำเลเซอร์-.+$/);
+
+  // 2. Test createReply
+  const replyData = {
+    content: 'โดยปกติการทำเลเซอร์กลุ่มผลัดเซลล์ผิวอาจกระตุ้นให้สิวอุดตันใต้ผิวประทุออกมาเป็นสิวอักเสบได้ครับ',
+    authorDisplayName: 'นพ. สมบูรณ์',
+    isAnonymous: false,
+    isDoctorReply: false
+  };
+
+  const createdReply = await createReply(fixture.clinicContext, createdTopic.id, replyData);
+  assert.ok(createdReply.id);
+  assert.equal(createdReply.topic_id, createdTopic.id);
+  assert.equal(createdReply.content, replyData.content);
+  assert.equal(createdReply.is_doctor_reply, false);
+  assert.equal(createdReply.is_verified_answer, false);
+
+  // Check that reply count is updated
+  const topicAfterReply = await getTopicByIdOrSlug(clinicId, createdTopic.id);
+  assert.equal(topicAfterReply.reply_count, 1);
+  assert.equal(topicAfterReply.is_doctor_verified, false);
+
+  // 3. Test verifyReply (Doctor verified answer badge logic)
+  const verifyResult = await verifyReply(fixture.clinicContext, createdReply.id, true);
+  assert.ok(verifyResult.success);
+
+  // Verify that the reply is verified and topic has is_doctor_verified = true
+  const topicAfterVerify = await getTopicByIdOrSlug(clinicId, createdTopic.id);
+  assert.equal(topicAfterVerify.is_doctor_verified, true);
+
+  // 4. Test create doctor reply directly (auto-verified answer)
+  const docReplyData = {
+    content: 'แนะนำทายากลุ่มลดการอักเสบ และประคบเย็นได้ครับ',
+    authorDisplayName: 'หมอโอ๊ต (แพทย์ผู้เชี่ยวชาญ)',
+    isAnonymous: false,
+    isDoctorReply: true
+  };
+
+  const docReply = await createReply(fixture.clinicContext, createdTopic.id, docReplyData);
+  assert.equal(docReply.is_doctor_reply, true);
+  assert.equal(docReply.is_verified_answer, true);
+
+  // Check replies list
+  const replies = await listReplies(clinicId, createdTopic.id);
+  assert.equal(replies.length, 2);
+  assert.equal(replies[0].id, createdReply.id);
+  assert.equal(replies[1].id, docReply.id);
+
+  // 5. Test updateTopicStatus (moderation: lock/hide)
+  const lockedTopic = await updateTopicStatus(fixture.clinicContext, createdTopic.id, 'locked');
+  assert.equal(lockedTopic.status, 'locked');
+
+  const hiddenTopic = await updateTopicStatus(fixture.clinicContext, createdTopic.id, 'hidden');
+  assert.equal(hiddenTopic.status, 'hidden');
+
+  // 6. Test listTopics with category and status filters
+  const topicsList = await listTopics(clinicId, { category: 'skincare', status: 'hidden' });
+  assert.equal(topicsList.total, 1);
+  assert.equal(topicsList.items[0].id, createdTopic.id);
+});

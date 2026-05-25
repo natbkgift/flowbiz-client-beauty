@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { key: 'roas-analytics', label: 'ROAS & Loyalty', caption: 'Ad spend, CAC & member referrals' },
   { key: 'ai-agent-console', label: 'AI Agent Console', caption: 'Agent rules & HITL approvals' },
   { key: 'blog-manager', label: 'Blog Manager', caption: 'Create, edit & publish articles' },
+  { key: 'forum-moderator', label: 'Forum Moderator', caption: 'Moderate topics & verify answers' },
   { key: 'users', label: 'Users', caption: 'Memberships and roles' },
   { key: 'workspaces', label: 'Workspaces', caption: 'Workspace configuration' },
   { key: 'settings', label: 'Settings', caption: 'Tenant and org settings' },
@@ -339,6 +340,28 @@ function createApiClient(apiBaseUrl) {
     },
     deleteBlogPost(session, postId) {
       return request(`/blog/posts/${postId}`, { ...session, method: 'DELETE' });
+    },
+    listForumTopics(session, params = {}) {
+      const search = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          search.set(key, value);
+        }
+      });
+      const suffix = search.toString() ? `?${search.toString()}` : '';
+      return request(`/forum/topics${suffix}`, session);
+    },
+    getForumTopicDetail(session, topicIdOrSlug) {
+      return request(`/forum/topics/${topicIdOrSlug}`, session);
+    },
+    updateForumTopicStatus(session, topicId, body) {
+      return request(`/forum/topics/${topicId}/status`, { ...session, method: 'PUT', body });
+    },
+    verifyForumReply(session, replyId, body) {
+      return request(`/forum/replies/${replyId}/verify`, { ...session, method: 'PUT', body });
+    },
+    createForumReply(session, topicId, body) {
+      return request(`/forum/topics/${topicId}/replies`, { ...session, method: 'POST', body });
     }
   };
 }
@@ -3451,6 +3474,310 @@ function BlogManagerPage() {
   );
 }
 
+function ForumModeratorPage() {
+  const api = useApi();
+  const { session } = useWorkspace();
+  const sessionOptions = useSessionRequestOptions();
+  const permissions = usePermissions();
+  const canManage = permissions.hasAny(['workspace.manage', 'tenant.manage']);
+
+  const [flash, setFlash] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState('active');
+  
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [topicReplies, setTopicReplies] = useState([]);
+  const [loadingReplies, setLoadingReplies] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  const [postingReply, setPostingReply] = useState(false);
+
+  const [state, setState] = usePageData(
+    () => api.listForumTopics(sessionOptions, { category: selectedCategory, status: selectedStatus }),
+    [api, sessionOptions, selectedCategory, selectedStatus],
+    canManage
+  );
+
+  async function refreshTopics() {
+    setState((current) => ({ ...current, status: 'loading' }));
+    try {
+      const data = await api.listForumTopics(sessionOptions, { category: selectedCategory, status: selectedStatus });
+      setState({ status: 'ready', data, error: null });
+    } catch (error) {
+      setState({ status: 'error', data: null, error });
+    }
+  }
+
+  async function handleSelectTopic(topic) {
+    setSelectedTopic(topic);
+    setLoadingReplies(true);
+    setReplyText('');
+    try {
+      const detail = await api.getForumTopicDetail(sessionOptions, topic.id);
+      setTopicReplies(detail.replies || []);
+    } catch (err) {
+      setFlash({ kind: 'error', message: 'Failed to load topic replies.' });
+    } finally {
+      setLoadingReplies(false);
+    }
+  }
+
+  async function handleUpdateStatus(topicId, status) {
+    try {
+      await api.updateForumTopicStatus(sessionOptions, topicId, { status });
+      setFlash({ kind: 'success', message: `Topic status updated to ${status}.` });
+      if (selectedTopic && selectedTopic.id === topicId) {
+        setSelectedTopic(null);
+        setTopicReplies([]);
+      }
+      await refreshTopics();
+    } catch (err) {
+      setFlash({ kind: 'error', message: 'Failed to update topic status.' });
+    }
+  }
+
+  async function handleVerifyReply(replyId, isVerified) {
+    try {
+      await api.verifyForumReply(sessionOptions, replyId, { isVerified });
+      setFlash({ kind: 'success', message: isVerified ? 'Reply marked as verified.' : 'Reply verification removed.' });
+      setTopicReplies(prev => prev.map(r => r.id === replyId ? { ...r, is_verified_answer: isVerified } : r));
+      await refreshTopics();
+    } catch (err) {
+      setFlash({ kind: 'error', message: 'Failed to update reply verification.' });
+    }
+  }
+
+  async function handlePostReply(e) {
+    e.preventDefault();
+    if (!replyText.trim() || !selectedTopic) return;
+
+    setPostingReply(true);
+    try {
+      const newReply = await api.createForumReply(sessionOptions, selectedTopic.id, {
+        content: replyText,
+        authorDisplayName: session.user?.name || 'Doctor Admin',
+        isAnonymous: false,
+        isDoctorReply: true
+      });
+      setFlash({ kind: 'success', message: 'Doctor response posted successfully.' });
+      setTopicReplies(prev => [...prev, newReply]);
+      setReplyText('');
+      await refreshTopics();
+    } catch (err) {
+      setFlash({ kind: 'error', message: 'Failed to post reply.' });
+    } finally {
+      setPostingReply(false);
+    }
+  }
+
+  const categories = [
+    { key: 'all', label: 'All Categories' },
+    { key: 'skincare', label: 'Skincare' },
+    { key: 'surgery', label: 'Surgery' },
+    { key: 'qa', label: 'Q&A' },
+    { key: 'general', label: 'General' }
+  ];
+
+  const statuses = [
+    { key: 'active', label: 'Active' },
+    { key: 'locked', label: 'Locked' },
+    { key: 'hidden', label: 'Hidden' }
+  ];
+
+  return (
+    <PageShell 
+      title="Forum Moderator" 
+      intro="Moderate public forum topics, post doctor-verified replies, and approve helpful answers."
+    >
+      <StatusBanner state={flash} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: selectedTopic ? '1fr 1fr' : '1fr', gap: '20px' }}>
+        <div>
+          <div className="card" style={{ padding: '16px', marginBottom: '20px', display: 'flex', gap: '16px', alignItems: 'center' }}>
+            <div>
+              <label style={{ marginRight: '8px', fontSize: '14px', fontWeight: 'bold' }}>Category:</label>
+              <select value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setSelectedTopic(null); }} className="input" style={{ width: '160px', padding: '6px' }}>
+                {categories.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ marginRight: '8px', fontSize: '14px', fontWeight: 'bold' }}>Status:</label>
+              <select value={selectedStatus} onChange={e => { setSelectedStatus(e.target.value); setSelectedTopic(null); }} className="input" style={{ width: '120px', padding: '6px' }}>
+                {statuses.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {state.status === 'loading' && <LoadingCard label="Loading forum topics..." />}
+          {state.status === 'error' && <ErrorCard error={state.error} />}
+          {state.status === 'ready' && (
+            <div className="table-shell card">
+              {state.data.items.length === 0 ? (
+                <div style={{ padding: '40px', textAlign: 'center' }}>
+                  <p style={{ color: 'var(--text-muted)' }}>No topics found for this criteria.</p>
+                </div>
+              ) : (
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Topic Title</th>
+                      <th>Category</th>
+                      <th>Author</th>
+                      <th>Replies</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {state.data.items.map(topic => (
+                      <tr 
+                        key={topic.id} 
+                        style={{ 
+                          cursor: 'pointer',
+                          background: selectedTopic?.id === topic.id ? 'var(--surface-muted)' : 'transparent' 
+                        }}
+                        onClick={() => handleSelectTopic(topic)}
+                      >
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <strong>{topic.title}</strong>
+                            {topic.is_doctor_verified && <span className="pill" style={{ background: 'rgba(15,118,110,0.1)', color: 'var(--accent-strong)', fontSize: '10px' }}>Verified</span>}
+                          </div>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                            {new Date(topic.created_at).toLocaleString()}
+                          </span>
+                        </td>
+                        <td><span className="pill" style={{ background: 'rgba(0,0,0,0.06)' }}>{topic.category.toUpperCase()}</span></td>
+                        <td>
+                          {topic.author_display_name}
+                          {topic.is_anonymous && <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '4px' }}>(Anon)</span>}
+                        </td>
+                        <td>{topic.reply_count}</td>
+                        <td style={{ textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                          <div style={{ display: 'inline-flex', gap: '6px' }}>
+                            {topic.status === 'active' ? (
+                              <>
+                                <button type="button" className="secondary-button" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => handleUpdateStatus(topic.id, 'locked')}>
+                                  Lock
+                                </button>
+                                <button type="button" className="ghost-danger-button" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => handleUpdateStatus(topic.id, 'hidden')}>
+                                  Hide
+                                </button>
+                              </>
+                            ) : (
+                              <button type="button" className="primary-button" style={{ padding: '4px 8px', fontSize: '12px' }} onClick={() => handleUpdateStatus(topic.id, 'active')}>
+                                Activate
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+        </div>
+
+        {selectedTopic && (
+          <div className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
+              <div>
+                <span className="pill" style={{ background: 'rgba(0,0,0,0.06)', marginBottom: '8px', display: 'inline-block' }}>{selectedTopic.category.toUpperCase()}</span>
+                <h2 style={{ margin: '0 0 6px 0', fontSize: '1.4rem' }}>{selectedTopic.title}</h2>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  By {selectedTopic.author_display_name} • {new Date(selectedTopic.created_at).toLocaleString()}
+                </span>
+              </div>
+              <button type="button" className="ghost-button" onClick={() => { setSelectedTopic(null); setTopicReplies([]); }}>Close</button>
+            </div>
+
+            <div style={{ background: 'var(--surface-muted)', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', whiteSpace: 'pre-wrap' }}>
+              {selectedTopic.content}
+            </div>
+
+            <h3 style={{ margin: '12px 0 0 0', borderBottom: '1px solid var(--border)', paddingBottom: '6px' }}>Replies</h3>
+            
+            {loadingReplies ? (
+              <p style={{ color: 'var(--text-muted)' }}>Loading replies...</p>
+            ) : (
+              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '350px', paddingRight: '4px' }}>
+                {topicReplies.length === 0 ? (
+                  <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>No replies yet.</p>
+                ) : (
+                  topicReplies.map(reply => (
+                    <div 
+                      key={reply.id} 
+                      style={{ 
+                        padding: '12px', 
+                        borderRadius: '8px', 
+                        border: reply.is_doctor_reply ? '1px solid var(--accent)' : '1px solid var(--border)',
+                        background: reply.is_verified_answer ? 'rgba(15,118,110,0.04)' : 'transparent'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '12px', fontWeight: 'bold' }}>
+                          {reply.author_display_name} 
+                          {reply.is_doctor_reply && <span style={{ color: 'var(--accent)', marginLeft: '4px' }}>(🩺 Doctor)</span>}
+                        </span>
+                        <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                          {new Date(reply.created_at).toLocaleString()}
+                        </span>
+                      </div>
+                      <p style={{ margin: '0 0 8px 0', fontSize: '13px', whiteSpace: 'pre-wrap' }}>{reply.content}</p>
+                      
+                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                        {reply.is_verified_answer ? (
+                          <button 
+                            type="button" 
+                            className="secondary-button" 
+                            style={{ padding: '2px 6px', fontSize: '11px' }}
+                            onClick={() => handleVerifyReply(reply.id, false)}
+                          >
+                            Unverify Answer
+                          </button>
+                        ) : (
+                          <button 
+                            type="button" 
+                            className="primary-button" 
+                            style={{ padding: '2px 6px', fontSize: '11px' }}
+                            onClick={() => handleVerifyReply(reply.id, true)}
+                          >
+                            Verify Answer
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            <form onSubmit={handlePostReply} style={{ borderTop: '1px solid var(--border)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 'bold' }}>Post Official Doctor Reply</label>
+              <textarea
+                value={replyText}
+                onChange={e => setReplyText(e.target.value)}
+                placeholder="Type official doctor response..."
+                rows={3}
+                style={{ padding: '8px', borderRadius: '6px', border: '1px solid var(--border)', font: 'inherit', fontSize: '13px' }}
+                required
+              />
+              <button 
+                type="submit" 
+                className="primary-button" 
+                style={{ alignSelf: 'flex-end' }} 
+                disabled={postingReply || !replyText.trim()}
+              >
+                {postingReply ? 'Posting...' : 'Post Reply'}
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+    </PageShell>
+  );
+}
+
 function renderPage(route) {
   switch (route?.key) {
     case 'unified-inbox':
@@ -3459,6 +3786,8 @@ function renderPage(route) {
       return <RoasAnalyticsPage />;
     case 'blog-manager':
       return <BlogManagerPage />;
+    case 'forum-moderator':
+      return <ForumModeratorPage />;
     case 'ai-agent-console':
       return <AiAgentConsolePage />;
     case 'users':

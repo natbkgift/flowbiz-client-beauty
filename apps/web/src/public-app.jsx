@@ -191,22 +191,12 @@ export function App() {
     }
     
     if (hash.startsWith('/forum/')) {
-      const topicId = Number(hash.replace('/forum/', ''));
-      const topic = forumTopics.find(t => t.id === topicId);
+      const topicIdOrSlug = hash.replace('/forum/', '');
       return (
         <ForumDetailPage 
-          topic={topic}
-          onReplyAdded={(topicId, newReply) => {
-            setForumTopics(forumTopics.map(t => {
-              if (t.id === topicId) {
-                return {
-                  ...t,
-                  reply_count: t.reply_count + 1,
-                  replies: [...(t.replies || []), newReply]
-                };
-              }
-              return t;
-            }));
+          topicIdOrSlug={topicIdOrSlug}
+          onReplyAdded={() => {
+            loadData();
           }}
         />
       );
@@ -542,43 +532,46 @@ function ForumListPage({ topics, onTopicAdded }) {
     ? topics 
     : topics.filter(t => t.category === selectedCategory);
 
-  const handleCreateTopic = (e) => {
+  const handleCreateTopic = async (e) => {
     e.preventDefault();
     if (!newTitle.trim() || !newContent.trim()) {
       alert('กรุณากรอกหัวข้อและเนื้อหา');
       return;
     }
 
-    const topic = {
-      id: Date.now(),
-      title: newTitle,
-      slug: newTitle.toLowerCase().replace(/ /g, '-').replace(/[^\w\u0e00-\u0e7f-]/g, ''),
-      content: newContent,
-      author_display_name: isAnon ? 'คนไข้นิรนาม' : (newAuthor.trim() || 'สมาชิกทั่วไป'),
-      is_anonymous: isAnon,
-      category: newCategory,
-      reply_count: 0,
-      created_at: new Date().toISOString(),
-      replies: []
-    };
+    const authorDisplayName = isAnon ? 'คนไข้นิรนาม' : (newAuthor.trim() || 'สมาชิกทั่วไป');
 
-    onTopicAdded(topic);
+    const created = await apiFetch('/forum/topics', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: newTitle,
+        content: newContent,
+        authorDisplayName,
+        isAnonymous: isAnon,
+        category: newCategory
+      })
+    });
+
+    if (created) {
+      onTopicAdded(created);
+    } else {
+      onTopicAdded({
+        id: Date.now(),
+        title: newTitle,
+        slug: newTitle.toLowerCase().replace(/ /g, '-').replace(/[^\w\u0e00-\u0e7f-]/g, ''),
+        content: newContent,
+        author_display_name: authorDisplayName,
+        is_anonymous: isAnon,
+        category: newCategory,
+        reply_count: 0,
+        created_at: new Date().toISOString()
+      });
+    }
+
     setNewTitle('');
     setNewContent('');
     setNewAuthor('');
     setShowEditor(false);
-    
-    // Attempt back-end API post
-    apiFetch('/forum/topics', {
-      method: 'POST',
-      body: JSON.stringify({
-        title: topic.title,
-        content: topic.content,
-        authorDisplayName: topic.author_display_name,
-        isAnonymous: topic.is_anonymous,
-        category: topic.category
-      })
-    });
   };
 
   return (
@@ -683,8 +676,8 @@ function ForumListPage({ topics, onTopicAdded }) {
             <div className="forum-card-main">
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <span className="forum-tag">{topic.category}</span>
-                {topic.replies?.some(r => r.is_doctor_reply) && (
-                  <span className="verified-badge">✅ แพทย์ตอบแล้ว</span>
+                {topic.is_doctor_verified && (
+                  <span className="verified-badge" style={{ marginLeft: '0.5rem' }}>✅ แพทย์ตอบแล้ว</span>
                 )}
               </div>
               <h2 className="forum-card-title">{topic.title}</h2>
@@ -708,48 +701,87 @@ function ForumListPage({ topics, onTopicAdded }) {
 // ----------------------------------------------------
 // Page Component: Forum Detail Page
 // ----------------------------------------------------
-function ForumDetailPage({ topic, onReplyAdded }) {
+function ForumDetailPage({ topicIdOrSlug, onReplyAdded }) {
+  const [topic, setTopic] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [isAnon, setIsAnon] = useState(true);
   const [authorName, setAuthorName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  if (!topic) {
+  useEffect(() => {
+    async function fetchTopic() {
+      setLoading(true);
+      try {
+        const fetched = await apiFetch(`/forum/topics/${topicIdOrSlug}`);
+        if (fetched) {
+          setTopic(fetched);
+          setError(null);
+        } else {
+          setError('ไม่พบกระทู้ดังกล่าว');
+        }
+      } catch (err) {
+        setError('ไม่สามารถเชื่อมต่อข้อมูลได้');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchTopic();
+  }, [topicIdOrSlug]);
+
+  const handlePostReply = async (e) => {
+    e.preventDefault();
+    if (!replyText.trim() || submitting || !topic) return;
+
+    setSubmitting(true);
+    const authorDisplayName = isAnon ? 'คนไข้นิรนาม' : (authorName.trim() || 'สมาชิกเว็บบอร์ด');
+    
+    try {
+      const response = await apiFetch(`/forum/topics/${topic.id}/replies`, {
+        method: 'POST',
+        body: JSON.stringify({
+          content: replyText,
+          authorDisplayName,
+          isAnonymous: isAnon
+        })
+      });
+
+      if (response) {
+        setTopic(prev => ({
+          ...prev,
+          reply_count: (prev.reply_count || 0) + 1,
+          replies: [...(prev.replies || []), response]
+        }));
+        setReplyText('');
+        setAuthorName('');
+        if (onReplyAdded) onReplyAdded();
+      } else {
+        alert('เกิดข้อผิดพลาดในการส่งคำตอบ กรุณาลองใหม่อีกครั้ง');
+      }
+    } catch (err) {
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
     return (
       <div className="public-container" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
-        <h2>ขออภัย ไม่พบกระทู้ดังกล่าว</h2>
-        <a href="#/forum" className="cta-btn" style={{ marginTop: '1.5rem' }}>กลับหน้าบอร์ด</a>
+        <p style={{ color: 'var(--text-secondary)' }}>กำลังโหลดเนื้อหา...</p>
       </div>
     );
   }
 
-  const handlePostReply = (e) => {
-    e.preventDefault();
-    if (!replyText.trim()) return;
-
-    const newReply = {
-      id: Date.now(),
-      content: replyText,
-      author_display_name: isAnon ? 'ผู้ใช้ทั่วไป' : (authorName.trim() || 'สมาชิกเว็บบอร์ด'),
-      is_anonymous: isAnon,
-      is_doctor_reply: false,
-      is_verified_answer: false,
-      created_at: new Date().toISOString()
-    };
-
-    onReplyAdded(topic.id, newReply);
-    setReplyText('');
-    setAuthorName('');
-
-    // Attempt back-end API post
-    apiFetch(`/forum/topics/${topic.id}/replies`, {
-      method: 'POST',
-      body: JSON.stringify({
-        content: newReply.content,
-        authorDisplayName: newReply.author_display_name,
-        isAnonymous: newReply.is_anonymous
-      })
-    });
-  };
+  if (error || !topic) {
+    return (
+      <div className="public-container" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
+        <h2>ขออภัย {error || 'ไม่พบกระทู้ดังกล่าว'}</h2>
+        <a href="#/forum" className="cta-btn" style={{ marginTop: '1.5rem' }}>กลับหน้าบอร์ด</a>
+      </div>
+    );
+  }
 
   return (
     <div className="public-container">
@@ -806,7 +838,8 @@ function ForumDetailPage({ topic, onReplyAdded }) {
                   <div>
                     <div className="forum-author-name" style={{ fontSize: '0.95rem' }}>
                       {reply.author_display_name}
-                      {reply.is_doctor_reply && <span className="verified-badge">✅ แพทย์ผู้เชี่ยวชาญ</span>}
+                      {reply.is_doctor_reply && <span className="verified-badge" style={{ marginLeft: '0.5rem' }}>✅ แพทย์ผู้เชี่ยวชาญ</span>}
+                      {reply.is_verified_answer && <span className="verified-badge" style={{ backgroundColor: '#b45309', color: '#fff', marginLeft: '0.5rem', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem' }}>🏆 คำตอบแนะนำโดยแพทย์</span>}
                     </div>
                     <div className="forum-post-date" style={{ fontSize: '0.75rem' }}>{new Date(reply.created_at).toLocaleString('th-TH')}</div>
                   </div>
@@ -849,7 +882,9 @@ function ForumDetailPage({ topic, onReplyAdded }) {
                 />
               )}
             </div>
-            <button type="submit" className="cta-btn">ส่งความคิดเห็น</button>
+            <button type="submit" className="cta-btn" disabled={submitting}>
+              {submitting ? 'กำลังส่ง...' : 'ส่งความคิดเห็น'}
+            </button>
           </div>
         </form>
       </div>
