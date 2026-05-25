@@ -1,4 +1,4 @@
-import React, { createContext, startTransition, useContext, useEffect, useMemo, useState, useRef } from 'react';
+import React, { createContext, startTransition, useContext, useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 
 const STORAGE_KEY = 'flowbiz.admin.token';
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { key: 'dashboard', label: 'Dashboard', caption: 'Tenant activity overview' },
   { key: 'unified-inbox', label: 'Omnichannel Inbox', caption: 'Social chat and AI co-pilot' },
   { key: 'roas-analytics', label: 'ROAS & Loyalty', caption: 'Ad spend, CAC & member referrals' },
+  { key: 'ai-agent-console', label: 'AI Agent Console', caption: 'Agent rules & HITL approvals' },
   { key: 'users', label: 'Users', caption: 'Memberships and roles' },
   { key: 'workspaces', label: 'Workspaces', caption: 'Workspace configuration' },
   { key: 'settings', label: 'Settings', caption: 'Tenant and org settings' },
@@ -300,6 +301,18 @@ function createApiClient(apiBaseUrl) {
     },
     getRoasReport(session) {
       return request('/loyalty/roas-report', session);
+    },
+    getApprovalQueue(session) {
+      return request('/ai-agent/approval-queue', session);
+    },
+    approveMessage(session, messageId, body) {
+      return request(`/ai-agent/approve/${messageId}`, { ...session, method: 'POST', body });
+    },
+    getAgentRules(session) {
+      return request('/ai-agent/rules', session);
+    },
+    updateAgentRule(session, body) {
+      return request('/ai-agent/rules', { ...session, method: 'POST', body });
     },
     getSystemHealth(session) {
       return request('/ops/health', session);
@@ -2639,12 +2652,409 @@ function RoasAnalyticsPage() {
   );
 }
 
+function AiAgentConsolePage() {
+  const api = useApi();
+  const sessionOptions = useSessionRequestOptions();
+  const [activeTab, setActiveTab] = useState('hitl'); // 'hitl' or 'rules'
+  const [flash, setFlash] = useState(null);
+
+  // HITL Queue State
+  const [queue, setQueue] = useState([]);
+  const [loadingQueue, setLoadingQueue] = useState(false);
+  const [editingTexts, setEditingTexts] = useState({}); // messageId -> overridden text
+  const [submittingApprovals, setSubmittingApprovals] = useState({}); // messageId -> loading state
+
+  // Rules State
+  const [rules, setRules] = useState([]);
+  const [loadingRules, setLoadingRules] = useState(false);
+  const [savingRules, setSavingRules] = useState({}); // agentType -> loading state
+
+  // Fetch HITL Queue
+  const fetchQueue = useCallback(async () => {
+    setLoadingQueue(true);
+    try {
+      const data = await api.getApprovalQueue(sessionOptions);
+      setQueue(data || []);
+    } catch (err) {
+      setFlash({ kind: 'error', message: err.message || 'ดึงคิว HITL ล้มเหลว' });
+    } finally {
+      setLoadingQueue(false);
+    }
+  }, [api, sessionOptions]);
+
+  // Fetch Rules
+  const fetchRules = useCallback(async () => {
+    setLoadingRules(true);
+    try {
+      const data = await api.getAgentRules(sessionOptions);
+      setRules(data || []);
+    } catch (err) {
+      setFlash({ kind: 'error', message: err.message || 'ดึงกฎ AI Agent ล้มเหลว' });
+    } finally {
+      setLoadingRules(false);
+    }
+  }, [api, sessionOptions]);
+
+  useEffect(() => {
+    if (activeTab === 'hitl') {
+      fetchQueue();
+    } else {
+      fetchRules();
+    }
+  }, [activeTab, fetchQueue, fetchRules]);
+
+  async function handleApprove(messageId, isOverride) {
+    setSubmittingApprovals(prev => ({ ...prev, [messageId]: true }));
+    const overrideText = editingTexts[messageId];
+    try {
+      await api.approveMessage(sessionOptions, messageId, {
+        staffOverrideText: isOverride ? overrideText : null
+      });
+      setFlash({ kind: 'success', message: 'อนุมัติและส่งข้อความเรียบร้อยแล้ว!' });
+      // Remove from local queue list
+      setQueue(prev => prev.filter(item => item.id !== messageId));
+    } catch (err) {
+      setFlash({ kind: 'error', message: err.message || 'การอนุมัติล้มเหลว' });
+    } finally {
+      setSubmittingApprovals(prev => ({ ...prev, [messageId]: false }));
+    }
+  }
+
+  async function handleSaveRule(agentType, systemPrompt, temperature, rulesConfig = {}) {
+    setSavingRules(prev => ({ ...prev, [agentType]: true }));
+    try {
+      await api.updateAgentRule(sessionOptions, {
+        agentType,
+        systemPrompt,
+        temperature,
+        rulesConfig
+      });
+      setFlash({ kind: 'success', message: `บันทึก Prompts สำหรับบอต ${agentType} สำเร็จ!` });
+      await fetchRules(); // reload
+    } catch (err) {
+      setFlash({ kind: 'error', message: err.message || 'บันทึกกฎล้มเหลว' });
+    } finally {
+      setSavingRules(prev => ({ ...prev, [agentType]: false }));
+    }
+  }
+
+  return (
+    <PageShell
+      title="Advanced AI Agent & HITL Control Console"
+      intro="จัดการคิวการอนุมัติความถูกต้องก่อนส่งถึงคนไข้ (Human-In-The-Loop) และระบบปรับแต่ง System Prompts แยกรายหน้าที่ของ AI Multi-Agent"
+    >
+      <StatusBanner state={flash} />
+
+      {/* Tabs Menu */}
+      <div className="tab-menu" style={{ marginBottom: '24px', display: 'flex', gap: '8px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '12px' }}>
+        <button
+          type="button"
+          className={`tab-btn ${activeTab === 'hitl' ? 'active' : ''}`}
+          onClick={() => setActiveTab('hitl')}
+          style={{
+            background: activeTab === 'hitl' ? 'linear-gradient(135deg, var(--gold-primary), var(--gold-secondary))' : 'rgba(255,255,255,0.05)',
+            color: activeTab === 'hitl' ? '#0d1117' : '#e2e8f0',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '4px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          HITL Pending Queue ({queue.length})
+        </button>
+        <button
+          type="button"
+          className={`tab-btn ${activeTab === 'rules' ? 'active' : ''}`}
+          onClick={() => setActiveTab('rules')}
+          style={{
+            background: activeTab === 'rules' ? 'linear-gradient(135deg, var(--gold-primary), var(--gold-secondary))' : 'rgba(255,255,255,0.05)',
+            color: activeTab === 'rules' ? '#0d1117' : '#e2e8f0',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '4px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease'
+          }}
+        >
+          AI Agent Prompts & Rules
+        </button>
+      </div>
+
+      {activeTab === 'hitl' ? (
+        <section className="section-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div>
+              <h3 className="section-heading">คิวตรวจความถูกต้องก่อนตอบลูกค้า</h3>
+              <p className="muted">ข้อความที่ AI ประเมินความมั่นใจต่ำกว่า 85% จะถูกกักไว้ที่นี่เพื่อให้เซลส์กดยืนยันหรือแก้ไขก่อนส่งจริง</p>
+            </div>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={fetchQueue}
+              disabled={loadingQueue}
+            >
+              {loadingQueue ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล'}
+            </button>
+          </div>
+
+          {loadingQueue ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.5)' }}>กำลังโหลดข้อความ...</div>
+          ) : queue.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '60px 0', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: '8px', color: 'rgba(255,255,255,0.4)', background: 'rgba(255,255,255,0.01)' }}>
+              <div style={{ fontSize: '32px', marginBottom: '12px' }}>🎉</div>
+              <div>ยอดเยี่ยม! ไม่มีข้อความค้างในคิว HITL ขณะนี้</div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+              {queue.map(item => {
+                const isOverridden = editingTexts[item.id] !== undefined && editingTexts[item.id].trim() !== '';
+                const currentText = editingTexts[item.id] !== undefined ? editingTexts[item.id] : item.messageText;
+
+                return (
+                  <div
+                    key={item.id}
+                    className="hitl-queue-card"
+                    style={{
+                      border: '1px solid rgba(255, 215, 0, 0.2)',
+                      background: 'linear-gradient(145deg, rgba(20, 24, 33, 0.9), rgba(13, 17, 23, 0.95))',
+                      borderRadius: '8px',
+                      padding: '20px',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '10px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ fontWeight: 'bold', color: 'var(--gold-primary)', fontSize: '1.1em' }}>
+                          {item.leadName} (รหัส #{item.leadId})
+                        </span>
+                        <span style={{ fontSize: '0.85em', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px', color: 'rgba(255,255,255,0.6)' }}>
+                          Thread #{item.threadId}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span
+                          style={{
+                            fontSize: '0.85em',
+                            fontWeight: 'bold',
+                            padding: '4px 8px',
+                            borderRadius: '4px',
+                            background: item.confidenceScore < 0.70 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                            color: item.confidenceScore < 0.70 ? '#ef4444' : '#f59e0b',
+                            border: item.confidenceScore < 0.70 ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)'
+                          }}
+                        >
+                          Confidence: {(item.confidenceScore * 100).toFixed(0)}%
+                        </span>
+                        {item.confidenceScore < 0.70 && (
+                          <span style={{ fontSize: '0.85em', padding: '4px 8px', borderRadius: '4px', background: 'rgba(239,68,68,0.2)', color: '#ff7878', fontWeight: 'bold' }}>
+                            ⚠️ เฝ้าระวังพิเศษ
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="hitl-body-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '16px' }}>
+                      <div style={{ background: 'rgba(255,255,255,0.02)', padding: '12px 16px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div style={{ fontSize: '0.8em', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', marginBottom: '6px', fontWeight: 'bold' }}>
+                          คำถามของคนไข้ (Inbound Message)
+                        </div>
+                        <div style={{ fontSize: '1.05em', color: '#e2e8f0', whiteSpace: 'pre-wrap' }}>
+                          {item.messageText}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ fontSize: '0.8em', color: 'var(--gold-primary)', textTransform: 'uppercase', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>ร่างคำตอบของ AI (Draft Response)</span>
+                          {isOverridden && <span style={{ color: '#ef4444' }}>(แก้ไขแล้ว)</span>}
+                        </div>
+                        <textarea
+                          rows={3}
+                          value={currentText}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setEditingTexts(prev => ({ ...prev, [item.id]: val }));
+                          }}
+                          style={{
+                            background: 'rgba(0,0,0,0.3)',
+                            border: '1px solid rgba(255,215,0,0.3)',
+                            borderRadius: '6px',
+                            color: '#fff',
+                            padding: '10px',
+                            fontFamily: 'inherit',
+                            fontSize: '0.95em',
+                            resize: 'vertical',
+                            width: '100%',
+                            boxSizing: 'border-box'
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                      <button
+                        type="button"
+                        className="ghost-button"
+                        onClick={() => {
+                          setEditingTexts(prev => {
+                            const copy = { ...prev };
+                            delete copy[item.id];
+                            return copy;
+                          });
+                        }}
+                        disabled={submittingApprovals[item.id] || !isOverridden}
+                      >
+                        คืนค่าเดิม
+                      </button>
+                      <button
+                        type="button"
+                        className="primary-button gold-btn"
+                        onClick={() => handleApprove(item.id, isOverridden)}
+                        disabled={submittingApprovals[item.id]}
+                        style={{
+                          background: isOverridden ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, var(--gold-primary), var(--gold-secondary))',
+                          color: isOverridden ? '#0d1117' : '#0d1117'
+                        }}
+                      >
+                        {submittingApprovals[item.id] ? 'กำลังส่ง...' : isOverridden ? 'ส่งข้อความแก้ไข' : 'อนุมัติและส่งทันที'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      ) : (
+        <section className="section-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div>
+              <h3 className="section-heading">ปรับแต่งคำสั่งระบบ (Agent Prompts & Settings)</h3>
+              <p className="muted">กำหนดพฤติกรรม, ความเชี่ยวชาญ และความมั่นใจในคำพูดของ AI Agent รายหัตถการ</p>
+            </div>
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={fetchRules}
+              disabled={loadingRules}
+            >
+              {loadingRules ? 'กำลังรีเฟรช...' : 'รีเฟรชข้อมูล'}
+            </button>
+          </div>
+
+          {loadingRules ? (
+            <div style={{ textAlign: 'center', padding: '40px 0', color: 'rgba(255,255,255,0.5)' }}>กำลังโหลดรายการกฎ...</div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+              {rules.map(rule => (
+                <div
+                  key={rule.id}
+                  style={{
+                    background: 'rgba(255,255,255,0.02)',
+                    border: '1px solid rgba(255,255,255,0.05)',
+                    borderRadius: '8px',
+                    padding: '20px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-between',
+                    gap: '12px'
+                  }}
+                >
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '8px', marginBottom: '12px' }}>
+                      <span style={{ fontWeight: 'bold', color: 'var(--gold-primary)', textTransform: 'capitalize', fontSize: '1.1em' }}>
+                        {rule.agent_type === 'qualification' ? 'คัดกรองลีด (Qualification)' : rule.agent_type === 'consult' ? 'ที่ปรึกษาแพทย์ (Consult)' : rule.agent_type === 'retention' ? 'ดูแลลูกค้าซ้ำ (Retention)' : 'บอตประสานงาน (Orchestrator)'}
+                      </span>
+                      <span style={{ fontSize: '0.85em', background: 'rgba(255,255,255,0.05)', padding: '2px 8px', borderRadius: '4px', color: 'rgba(255,255,255,0.6)' }}>
+                        Type: {rule.agent_type}
+                      </span>
+                    </div>
+
+                    <div style={{ marginBottom: '12px' }}>
+                      <label style={{ display: 'block', fontSize: '0.85em', color: 'rgba(255,255,255,0.5)', marginBottom: '4px', fontWeight: 'bold' }}>
+                        System Prompt Instructions
+                      </label>
+                      <textarea
+                        rows={6}
+                        defaultValue={rule.system_prompt}
+                        id={`prompt-${rule.agent_type}`}
+                        style={{
+                          background: 'rgba(0,0,0,0.2)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: '6px',
+                          color: '#fff',
+                          padding: '10px',
+                          fontFamily: 'inherit',
+                          fontSize: '0.9em',
+                          resize: 'vertical',
+                          width: '100%',
+                          boxSizing: 'border-box'
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85em', color: 'rgba(255,255,255,0.5)', marginBottom: '4px', fontWeight: 'bold' }}>
+                        <span>Creativity / Temperature</span>
+                        <span style={{ color: 'var(--gold-primary)', fontWeight: 'bold' }} id={`temp-val-${rule.agent_type}`}>
+                          {rule.temperature}
+                        </span>
+                      </label>
+                      <input
+                        type="range"
+                        min="0.0"
+                        max="1.0"
+                        step="0.05"
+                        defaultValue={rule.temperature}
+                        id={`slider-${rule.agent_type}`}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          const el = document.getElementById(`temp-val-${rule.agent_type}`);
+                          if (el) el.textContent = val;
+                        }}
+                        style={{ width: '100%', cursor: 'pointer' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <button
+                      type="button"
+                      className="primary-button gold-btn"
+                      onClick={() => {
+                        const promptEl = document.getElementById(`prompt-${rule.agent_type}`);
+                        const tempEl = document.getElementById(`slider-${rule.agent_type}`);
+                        if (promptEl && tempEl) {
+                          handleSaveRule(rule.agent_type, promptEl.value, Number(tempEl.value), rule.rules_config);
+                        }
+                      }}
+                      disabled={savingRules[rule.agent_type]}
+                    >
+                      {savingRules[rule.agent_type] ? 'กำลังบันทึก...' : 'บันทึก Prompts'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+    </PageShell>
+  );
+}
+
 function renderPage(route) {
   switch (route?.key) {
     case 'unified-inbox':
       return <UnifiedInboxPage />;
     case 'roas-analytics':
       return <RoasAnalyticsPage />;
+    case 'ai-agent-console':
+      return <AiAgentConsolePage />;
     case 'users':
       return <UsersPage />;
     case 'workspaces':
