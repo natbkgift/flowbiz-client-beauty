@@ -258,3 +258,9 @@ test('Loyalty & Ad Spend API Integration routes', async (t) => {
   assert.ok(responseData.google);
   assert.ok(responseData.total);
 });
+
+const { closePool } = require('../apps/api/src/db');
+test.after(async () => {
+  await closePool();
+});
+

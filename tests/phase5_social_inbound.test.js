@@ -485,3 +485,9 @@ test('AI Agent Routes handles Co-Pilot promotions suggestions with intent scanni
   assert.ok(auditRows.rows[0].suggested_response.includes('2,900'));
   assert.equal(auditRows.rows[0].used, false);
 });
+
+const { closePool } = require('../apps/api/src/db');
+test.after(async () => {
+  await closePool();
+});
+

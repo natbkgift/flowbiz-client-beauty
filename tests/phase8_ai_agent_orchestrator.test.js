@@ -173,3 +173,9 @@ test('AI Agent Rules and Endpoint Routing', async (t) => {
   assert.equal(consultRule.system_prompt, updatedPrompt);
   assert.equal(Number(consultRule.temperature), 0.85);
 });
+
+const { closePool } = require('../apps/api/src/db');
+test.after(async () => {
+  await closePool();
+});
+
