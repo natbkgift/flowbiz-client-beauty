@@ -12,6 +12,7 @@
 - Integration status matrix ถูกสะท้อนใน code path สำคัญ: messaging provider เป็น `simulated`, ad spend เป็น `mock_generated`, sandbox/test secret เป็น `sandbox_like`
 - Medical safety classifier บังคับ HITL สำหรับข้อความเสี่ยงก่อน AI auto-reply และ campaign broadcast enqueue
 - Thai API/user-facing UX และ XSS-safe rendering สำหรับ blog/forum rich content
+- Post-review fix เพิ่มเติม: route-dispatch helper return handled marker, dev-only CORS allowlist, dev API host ตาม request host, public empty states, production config fail-closed เมื่อ secret/database ยังเป็น local default และ deploy script รับ DB secrets จาก environment เท่านั้น
 
 ยังเป็น stop condition ก่อน merge/deploy:
 
@@ -22,7 +23,7 @@
 Validation ล่าสุดใน local stabilization gate:
 
 - Docker PostgreSQL local พร้อมใช้งานและ apply migration 036 แล้ว
-- `npm test` ผ่าน 95/95
+- `npm test` ผ่าน 97/97
 - `npm run validate` ผ่าน
 - `npm run build:web` ผ่าน
 - `npm audit --audit-level=moderate` ผ่าน 0 vulnerabilities

@@ -41,11 +41,23 @@ if [ ! -f "$SHARED_DIR/.env" ]; then
     sed -i 's|BACKUP_ROOT=D:/FlowBiz/backups/flowbiz-client-beauty|BACKUP_ROOT=/opt/flowbiz/backups/flowbiz-client-beauty|g' "$SHARED_DIR/.env"
     sed -i 's|LOG_ROOT=D:/FlowBiz/data/flowbiz-client-beauty/logs|LOG_ROOT=/opt/flowbiz/data/flowbiz-client-beauty/logs|g' "$SHARED_DIR/.env"
     
-    # Use production DB configs
+    # Use production DB configs. Secrets must come from the deploy environment, not from git.
+    if [ -z "${FLOWBIZ_PRODUCTION_POSTGRES_PASSWORD:-}" ] || [ -z "${FLOWBIZ_PRODUCTION_DATABASE_URL:-}" ]; then
+      echo "[Config] Missing FLOWBIZ_PRODUCTION_POSTGRES_PASSWORD or FLOWBIZ_PRODUCTION_DATABASE_URL. Refusing to create production .env with placeholder secrets."
+      exit 1
+    fi
+
+    escape_sed_replacement() {
+      printf '%s' "$1" | sed -e 's/[\/&|]/\\&/g'
+    }
+
+    PROD_POSTGRES_PASSWORD_ESCAPED=$(escape_sed_replacement "$FLOWBIZ_PRODUCTION_POSTGRES_PASSWORD")
+    PROD_DATABASE_URL_ESCAPED=$(escape_sed_replacement "$FLOWBIZ_PRODUCTION_DATABASE_URL")
+
     sed -i 's/POSTGRES_DB=flowbiz_local/POSTGRES_DB=flowbiz_beauty/g' "$SHARED_DIR/.env"
     sed -i 's/POSTGRES_USER=flowbiz/POSTGRES_USER=flowbiz_beauty/g' "$SHARED_DIR/.env"
-    sed -i 's/POSTGRES_PASSWORD=flowbiz_local_dev_only/POSTGRES_PASSWORD=DexzRQ3c6PS2P8Fc1Tly9pfQ/g' "$SHARED_DIR/.env"
-    sed -i 's|DATABASE_URL=postgresql://flowbiz:flowbiz_local_dev_only@localhost:5432/flowbiz_local|DATABASE_URL=postgresql://flowbiz_beauty:DexzRQ3c6PS2P8Fc1Tly9pfQ@localhost:5432/flowbiz_beauty|g' "$SHARED_DIR/.env"
+    sed -i "s/POSTGRES_PASSWORD=flowbiz_local_dev_only/POSTGRES_PASSWORD=$PROD_POSTGRES_PASSWORD_ESCAPED/g" "$SHARED_DIR/.env"
+    sed -i "s|DATABASE_URL=postgresql://flowbiz:flowbiz_local_dev_only@localhost:5432/flowbiz_local|DATABASE_URL=$PROD_DATABASE_URL_ESCAPED|g" "$SHARED_DIR/.env"
   fi
 fi
 

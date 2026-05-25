@@ -13,16 +13,16 @@ const ExecutionDebuggerContext = createContext(null);
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'แดชบอร์ด', caption: 'ภาพรวมกิจกรรมคลินิก' },
-  { key: 'unified-inbox', label: 'กล่องแชทรวม', caption: 'Social chat และ AI co-pilot' },
+  { key: 'unified-inbox', label: 'กล่องแชทรวม', caption: 'แชทโซเชียลและ AI co-pilot' },
   { key: 'roas-analytics', label: 'ROAS และสะสมแต้ม', caption: 'ค่าโฆษณา CAC และแนะนำเพื่อน' },
   { key: 'ai-agent-console', label: 'คอนโซล AI Agent', caption: 'กฎ Agent และคิว HITL' },
   { key: 'blog-manager', label: 'จัดการบทความ', caption: 'สร้าง แก้ไข และเผยแพร่' },
   { key: 'forum-moderator', label: 'ดูแลเว็บบอร์ด', caption: 'ตรวจหัวข้อและคำตอบแพทย์' },
   { key: 'users', label: 'ผู้ใช้งาน', caption: 'สมาชิกและบทบาท' },
   { key: 'workspaces', label: 'เวิร์กสเปซ', caption: 'ตั้งค่าพื้นที่ทำงาน' },
-  { key: 'settings', label: 'ตั้งค่า', caption: 'Tenant และองค์กร' },
-  { key: 'automation', label: 'Automation', caption: 'Flow และ execution' },
-  { key: 'audit', label: 'Audit Logs', caption: 'ประวัติระบบล่าสุด' },
+  { key: 'settings', label: 'ตั้งค่า', caption: 'คลินิกและองค์กร' },
+  { key: 'automation', label: 'ระบบอัตโนมัติ', caption: 'Flow และประวัติการทำงาน' },
+  { key: 'audit', label: 'บันทึกตรวจสอบ', caption: 'ประวัติระบบล่าสุด' },
   { key: 'system-health', label: 'สุขภาพระบบ', caption: 'Worker และ event ops' }
 ];
 
@@ -105,12 +105,12 @@ function normalizeJsonInput(value, fieldName) {
     const parsed = JSON.parse(value);
 
     if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error('JSON payload must be an object.');
+    throw new Error('ข้อมูล JSON ต้องเป็นอ็อบเจกต์เท่านั้น');
     }
 
     return parsed;
   } catch (error) {
-    throw new Error(`${fieldName} must be valid JSON object text.`);
+    throw new Error(`${fieldName} ต้องเป็นข้อความ JSON object ที่ถูกต้อง`);
   }
 }
 
@@ -236,7 +236,7 @@ function createApiClient(apiBaseUrl) {
     const payload = text ? JSON.parse(text) : null;
 
     if (!response.ok) {
-      throw new ApiError(payload?.error?.message || 'Request failed.', {
+      throw new ApiError(payload?.error?.message || 'ส่งคำขอไม่สำเร็จ', {
         status: response.status,
         code: payload?.error?.code || 'REQUEST_FAILED',
         details: payload?.error?.details || null
@@ -578,7 +578,7 @@ function TopBar() {
           {session.currentOrganization?.name} / {session.currentWorkspace?.name}
         </p>
         <div className="context-meta">
-          <span className="context-chip">Tenant: {session.currentClinic?.slug}</span>
+          <span className="context-chip">คลินิก: {session.currentClinic?.slug}</span>
           <span className="context-chip">บทบาท: {session.currentMembership?.role}</span>
           <span className="context-chip">สิทธิ์: {(session.permissions || []).length}</span>
         </div>
@@ -731,13 +731,13 @@ function DashboardPage() {
   return (
     <PageShell
       title="แดชบอร์ด"
-      intro="ภาพรวมลีด ข้อความ Automation และสุขภาพระบบที่ทีมปฏิบัติการต้องเห็นก่อนให้บริการ"
+      intro="ภาพรวมลีด ข้อความระบบอัตโนมัติ และสุขภาพระบบที่ทีมปฏิบัติการต้องเห็นก่อนให้บริการ"
     >
       <div className="metric-grid" data-testid="dashboard-metrics">
         <MetricCard label="ลีดวันนี้" value={formatNumber(overview.daily.leadsCreated)} hint="ลีดที่สร้างในวันนี้" />
         <MetricCard label="ข้อความที่ส่ง" value={formatNumber(overview.daily.messagesSent)} hint="ข้อความ outbound วันนี้" />
         <MetricCard
-          label="Automation ที่รัน"
+          label="ระบบอัตโนมัติที่รัน"
           value={formatNumber(overview.daily.automationExecutions)}
           hint="จำนวนรันรายวัน"
         />
@@ -762,7 +762,7 @@ function DashboardPage() {
           </ul>
         </section>
         <section className="section-card">
-          <h3 className="section-heading">สุขภาพ Automation</h3>
+          <h3 className="section-heading">สุขภาพระบบอัตโนมัติ</h3>
           <div className="stacked-metrics">
             <div className="metric-row">
               <span>งานค้างในคิว</span>
@@ -1063,7 +1063,7 @@ function WorkspacesPage() {
   );
 }
 
-function createStarterFlowDefinition(name = 'New Visual Flow') {
+function createStarterFlowDefinition(name = 'Visual Flow ใหม่') {
   return {
     name,
     flowType: 'visual_builder',
@@ -1338,7 +1338,7 @@ function FlowBuilderPage({ flowId }) {
         flow,
         versions: versions.items
       }));
-      setFlash({ kind: 'success', message: `Publish version ${versionId} แล้ว` });
+      setFlash({ kind: 'success', message: `เผยแพร่เวอร์ชัน ${versionId} แล้ว` });
     } catch (error) {
       setFlash({ kind: 'error', message: describeError(error) });
     }
@@ -1359,11 +1359,11 @@ function FlowBuilderPage({ flowId }) {
   }
 
   if (!canView) {
-    return <PermissionNotice title="Builder unavailable" message="Automation builder requires automation.read or automation.manage." />;
+    return <PermissionNotice title="ไม่สามารถเปิดตัวสร้าง Flow ได้" message="ต้องมีสิทธิ์ automation.read หรือ automation.manage" />;
   }
 
   if (builderState.status === 'loading' || builderState.status === 'idle') {
-    return <LoadingCard label="Loading flow builder…" />;
+    return <LoadingCard label="กำลังโหลดตัวสร้างระบบอัตโนมัติ..." />;
   }
 
   if (builderState.status === 'error') {
@@ -1380,12 +1380,12 @@ function FlowBuilderPage({ flowId }) {
   return (
     <FlowBuilderContext.Provider value={contextValue}>
       <PageShell
-        title={`Flow Builder #${flowId}`}
+        title={`ตัวสร้าง Flow #${flowId}`}
         intro="สร้าง flow แบบ node-based, บันทึก draft version, และ publish version ที่ต้องการใช้งานจริง"
         actions={(
           <>
-            <button type="button" className="secondary-button" onClick={() => navigateTo('automation')}>Back</button>
-            {canManage ? <button type="button" className="primary-button" onClick={saveDraft} data-testid="builder-save-draft">Save draft</button> : null}
+            <button type="button" className="secondary-button" onClick={() => navigateTo('automation')}>กลับ</button>
+            {canManage ? <button type="button" className="primary-button" onClick={saveDraft} data-testid="builder-save-draft">บันทึกร่าง</button> : null}
           </>
         )}
       >
@@ -1398,9 +1398,9 @@ function FlowBuilderPage({ flowId }) {
                 <p className="muted">Node editor สำหรับ trigger, condition, action, และ delay</p>
               </div>
               <div className="toolbar">
-                <button type="button" className="secondary-button" onClick={() => addNode('action')}>Add action</button>
-                <button type="button" className="secondary-button" onClick={() => addNode('condition')}>Add condition</button>
-                <button type="button" className="secondary-button" onClick={() => addNode('delay')}>Add delay</button>
+                <button type="button" className="secondary-button" onClick={() => addNode('action')}>เพิ่ม Action</button>
+                <button type="button" className="secondary-button" onClick={() => addNode('condition')}>เพิ่มเงื่อนไข</button>
+                <button type="button" className="secondary-button" onClick={() => addNode('delay')}>เพิ่มเวลาหน่วง</button>
               </div>
             </div>
             <div className="builder-canvas" data-testid="builder-canvas">
@@ -1508,10 +1508,10 @@ function FlowBuilderPage({ flowId }) {
                 <li key={version.id} className="stack-item">
                   <strong>v{version.versionNumber}</strong>
                   <span className="muted">{formatDateTime(version.createdAt)}</span>
-                  <span className={`pill status-${version.isPublished ? 'active' : 'draft'}`}>{version.isPublished ? 'published' : 'draft'}</span>
+                  <span className={`pill status-${version.isPublished ? 'active' : 'draft'}`}>{version.isPublished ? 'เผยแพร่แล้ว' : 'ร่าง'}</span>
                   <div className="inline-actions">
                     <button type="button" className="secondary-button" onClick={() => loadVersion(version.id)}>Open</button>
-                    {canManage && !version.isPublished ? <button type="button" className="primary-button" onClick={() => publishVersion(version.id)}>Publish</button> : null}
+                    {canManage && !version.isPublished ? <button type="button" className="primary-button" onClick={() => publishVersion(version.id)}>เผยแพร่</button> : null}
                   </div>
                 </li>
               ))}
@@ -1539,11 +1539,11 @@ function ExecutionDebuggerPage({ executionId }) {
   }, [api, executionId, sessionOptions], canView);
 
   if (!canView) {
-    return <PermissionNotice title="Execution debugger unavailable" message="Execution debugger requires automation.read or automation.manage." />;
+    return <PermissionNotice title="ไม่สามารถเปิดรายละเอียด Execution ได้" message="ต้องมีสิทธิ์ automation.read หรือ automation.manage" />;
   }
 
   if (state.status === 'loading' || state.status === 'idle') {
-    return <LoadingCard label="Loading execution debugger…" />;
+    return <LoadingCard label="กำลังโหลดรายละเอียด Execution..." />;
   }
 
   if (state.status === 'error') {
@@ -1555,9 +1555,9 @@ function ExecutionDebuggerPage({ executionId }) {
   return (
     <ExecutionDebuggerContext.Provider value={{ execution: state.data.execution, steps: state.data.steps, selectedStep, setSelectedStepId }}>
       <PageShell
-        title={`Execution Debugger #${executionId}`}
+        title={`รายละเอียด Execution #${executionId}`}
         intro="ดู timeline ของ execution, ข้อมูล input/output, error และระยะเวลาของแต่ละ step"
-        actions={<button type="button" className="secondary-button" onClick={() => navigateTo('automation')}>Back</button>}
+        actions={<button type="button" className="secondary-button" onClick={() => navigateTo('automation')}>กลับ</button>}
       >
         <div className="two-column-grid">
           <section className="section-card">
@@ -1592,7 +1592,7 @@ function ExecutionDebuggerPage({ executionId }) {
                   <textarea rows="8" readOnly value={safeJsonStringify(selectedStep.output_data)} />
                 </label>
                 <label className="field">
-                  <span>Error</span>
+                  <span>ข้อผิดพลาด</span>
                   <textarea rows="6" readOnly value={selectedStep.error ? JSON.stringify(selectedStep.error, null, 2) : ''} />
                 </label>
               </div>
@@ -1691,7 +1691,7 @@ function SettingsPage() {
         <div className="two-column-grid">
           {state.data.tenant ? (
             <section className="section-card">
-              <h3 className="section-heading">ตั้งค่า Tenant</h3>
+              <h3 className="section-heading">ตั้งค่าคลินิก</h3>
               <form className="form-grid" onSubmit={handleTenantSubmit} data-testid="tenant-settings-form">
                 <label className="field">
                   <span>Timezone</span>
@@ -1727,7 +1727,7 @@ function SettingsPage() {
                 {canManageTenant ? (
                   <div className="inline-actions field-span-2">
                     <button type="submit" className="primary-button" data-testid="tenant-settings-save">
-                      บันทึกตั้งค่า Tenant
+                      บันทึกตั้งค่าคลินิก
                     </button>
                   </div>
                 ) : null}
@@ -1802,11 +1802,11 @@ function AutomationPage() {
   }, [api, sessionOptions], canView);
 
   if (!canView) {
-    return <PermissionNotice title="Automation unavailable" message="Automation page requires automation.read or automation.manage." />;
+    return <PermissionNotice title="ไม่สามารถเปิดระบบอัตโนมัติได้" message="ต้องมีสิทธิ์ automation.read หรือ automation.manage" />;
   }
 
   if (state.status === 'loading' || state.status === 'idle') {
-    return <LoadingCard label="Loading automation status…" />;
+    return <LoadingCard label="กำลังโหลดสถานะระบบอัตโนมัติ..." />;
   }
 
   if (state.status === 'error') {
@@ -1817,7 +1817,7 @@ function AutomationPage() {
 
   async function createFlow() {
     try {
-      const created = await api.createAutomationBuilderFlow(sessionOptions, createStarterFlowDefinition(`Visual Flow ${Date.now()}`));
+      const created = await api.createAutomationBuilderFlow(sessionOptions, createStarterFlowDefinition(`Flow ใหม่ ${Date.now()}`));
       navigateTo(`automation/builder/${created.id}`);
     } catch (error) {
       setFlash({ kind: 'error', message: describeError(error) });
@@ -1826,19 +1826,19 @@ function AutomationPage() {
 
   return (
     <PageShell
-      title="Automation"
+      title="ระบบอัตโนมัติ"
       intro="Monitor flows, execution history, and failed automations for the active tenant."
-      actions={canManage ? <button type="button" className="primary-button" onClick={createFlow}>New visual flow</button> : null}
+      actions={canManage ? <button type="button" className="primary-button" onClick={createFlow}>สร้าง Flow ใหม่</button> : null}
     >
       <StatusBanner state={flash} />
       <div className="metric-grid">
         <MetricCard label="Flows" value={formatNumber(flows.items.length)} hint="Configured automation flows" />
         <MetricCard label="Recent executions" value={formatNumber(executions.items.length)} hint="Latest execution records" />
-        <MetricCard label="Failed executions" value={formatNumber(failedExecutions.items.length)} hint="Failures in current view" />
+        <MetricCard label="Execution ล้มเหลว" value={formatNumber(failedExecutions.items.length)} hint="งานล้มเหลวในมุมมองปัจจุบัน" />
       </div>
       <div className="two-column-grid">
         <section className="section-card">
-          <h3 className="section-heading">Flow list</h3>
+          <h3 className="section-heading">รายการ Flow</h3>
           <ul className="stack-list" data-testid="flow-list">
             {flows.items.map((flow) => (
               <li key={flow.id} className="stack-item">
@@ -1847,7 +1847,7 @@ function AutomationPage() {
                 <span className={`pill status-${flow.status}`}>{flow.status}</span>
                 <div className="inline-actions">
                   <button type="button" className="secondary-button" onClick={() => navigateTo(`automation/builder/${flow.id}`)}>
-                    Open builder
+                    เปิดตัวสร้าง
                   </button>
                 </div>
               </li>
@@ -1855,7 +1855,7 @@ function AutomationPage() {
           </ul>
         </section>
         <section className="section-card">
-          <h3 className="section-heading">Execution history</h3>
+          <h3 className="section-heading">ประวัติการทำงาน</h3>
           <ul className="stack-list" data-testid="execution-history">
             {executions.items.map((execution) => (
               <li key={execution.id} className="stack-item">
@@ -1873,7 +1873,7 @@ function AutomationPage() {
         </section>
       </div>
       <section className="section-card">
-        <h3 className="section-heading">Open automation tasks</h3>
+        <h3 className="section-heading">งานระบบอัตโนมัติที่เปิดอยู่</h3>
         <div className="table-shell">
           <table className="data-table">
             <thead>
@@ -1940,11 +1940,11 @@ function AuditLogsPage() {
   }, [api, canView, filters, sessionOptions]);
 
   if (!canView) {
-    return <PermissionNotice title="Audit logs unavailable" message="Audit log viewer requires audit.read permission." />;
+    return <PermissionNotice title="ไม่สามารถเปิดบันทึกตรวจสอบได้" message="ต้องมีสิทธิ์ audit.read" />;
   }
 
   return (
-    <PageShell title="Audit Logs" intro="Filter recent tenant activity by entity, action, and time range.">
+    <PageShell title="บันทึกตรวจสอบ" intro="กรองกิจกรรมล่าสุดของคลินิกตาม entity, action และช่วงเวลา">
       <section className="section-card">
         <form className="form-grid" data-testid="audit-filter-form">
           <label className="field">
@@ -1952,7 +1952,7 @@ function AuditLogsPage() {
             <input value={filters.entityType} onChange={(event) => setFilters((current) => ({ ...current, entityType: event.target.value }))} />
           </label>
           <label className="field">
-            <span>Action</span>
+            <span>การกระทำ</span>
             <input value={filters.actionType} onChange={(event) => setFilters((current) => ({ ...current, actionType: event.target.value }))} />
           </label>
           <label className="field">
@@ -1965,7 +1965,7 @@ function AuditLogsPage() {
           </label>
         </form>
       </section>
-      {state.status === 'loading' || state.status === 'idle' ? <LoadingCard label="Loading audit events…" /> : null}
+      {state.status === 'loading' || state.status === 'idle' ? <LoadingCard label="กำลังโหลด Audit events..." /> : null}
       {state.status === 'error' ? <ErrorCard error={state.error} /> : null}
       {state.status === 'ready' ? (
         <section className="section-card">
@@ -1974,7 +1974,7 @@ function AuditLogsPage() {
               <thead>
                 <tr>
                   <th>Time</th>
-                  <th>Action</th>
+                  <th>การกระทำ</th>
                   <th>Entity</th>
                   <th>Actor</th>
                 </tr>
@@ -2022,21 +2022,21 @@ function SystemHealthPage() {
   }
 
   return (
-    <PageShell title="System Health" intro="Operator view of workers, throughput, failed jobs, and retry controls.">
+    <PageShell title="สุขภาพระบบ" intro="มุมมองสำหรับทีมปฏิบัติการเพื่อตรวจ worker, throughput, งานล้มเหลว และการ retry">
       <StatusBanner state={flash} />
-      {state.status === 'loading' || state.status === 'idle' ? <LoadingCard label="Loading operational metrics…" /> : null}
+      {state.status === 'loading' || state.status === 'idle' ? <LoadingCard label="กำลังโหลดตัวชี้วัดระบบ..." /> : null}
       {state.status === 'error' ? <ErrorCard error={state.error} /> : null}
       {state.status === 'ready' ? (
         <>
           <div className="metric-grid">
-            <MetricCard label="Queue depth" value={formatNumber(state.data.worker.queueDepth)} hint="Pending due worker jobs" />
-            <MetricCard label="Execution rate/hr" value={formatNumber(state.data.automation.executionRatePerHour)} hint="Avg automation throughput" />
+            <MetricCard label="จำนวนคิวค้าง" value={formatNumber(state.data.worker.queueDepth)} hint="จำนวนงาน worker ที่ถึงเวลาแล้วและรอดำเนินการ" />
+            <MetricCard label="Execution ต่อชั่วโมง" value={formatNumber(state.data.automation.executionRatePerHour)} hint="ค่าเฉลี่ย throughput ของระบบอัตโนมัติ" />
             <MetricCard label="Event throughput/hr" value={formatNumber(state.data.eventBus.throughputPerHour)} hint="Event bus throughput" />
           </div>
           <section className="section-card">
             <div className="split-header compact-gap">
               <div>
-                <h3 className="section-heading">Recent failures</h3>
+          <h3 className="section-heading">งานล้มเหลวล่าสุด</h3>
                 <p className="muted">Most recent failed worker jobs for the active tenant.</p>
               </div>
               <span className={`pill status-${state.data.systemStatus}`}>{state.data.systemStatus}</span>
@@ -2048,8 +2048,8 @@ function SystemHealthPage() {
                     <th>Job</th>
                     <th>Status</th>
                     <th>Attempts</th>
-                    <th>Error</th>
-                    <th>Action</th>
+                    <th>ข้อผิดพลาด</th>
+                    <th>การกระทำ</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2249,7 +2249,7 @@ function UnifiedInboxPage() {
 
   return (
     <PageShell 
-      title="Omnichannel Inbox & AI Co-Pilot" 
+      title="กล่องแชทรวมและ AI Co-Pilot"
       intro="แชทรวมศูนย์ความงามจากช่องทาง LINE, Facebook, และ Instagram พร้อมผู้ช่วย AI แนะนำโปรโมชั่นปิดการขายแบบเรียลไทม์"
     >
       <StatusBanner state={flash} />
@@ -2361,7 +2361,7 @@ function UnifiedInboxPage() {
           ) : (
             <div className="chat-empty-state">
               <div className="empty-bubble">💬</div>
-              <h3>ยินดีต้อนรับสู่ Omnichannel Inbox</h3>
+              <h3>ยินดีต้อนรับสู่กล่องแชทรวม</h3>
               <p>เลือกบทสนทนาจากคอลัมน์ซ้ายมือเพื่อเริ่มการตอบกลับและใช้ตัวช่วย AI อัจฉริยะ</p>
             </div>
           )}
@@ -2370,7 +2370,7 @@ function UnifiedInboxPage() {
         {/* Right column - AI Co-Pilot */}
         <div className="inbox-copilot-pane">
           <div className="pane-header gold-header">
-            <h3>AI Sales Co-Pilot ✨</h3>
+            <h3>AI ผู้ช่วยฝ่ายขาย ✨</h3>
             <span className="pill gold-pill">Smart Agent</span>
           </div>
 
@@ -2567,7 +2567,7 @@ function RoasAnalyticsPage() {
   return (
     <PageShell
       title="ROAS และ Loyalty CRM"
-      intro="วิเคราะห์ความคุ้มทุนในการซื้อแอดโฆษณา (ROAS, CAC, CPL) และบริการจัดการระบบแนะนำเพื่อน Member-Get-Member สะสมแต้มแบบ Omnichannel"
+      intro="วิเคราะห์ความคุ้มทุนในการซื้อแอดโฆษณา (ROAS, CAC, CPL) และบริการจัดการระบบแนะนำเพื่อน Member-Get-Member สะสมแต้มทุกช่องทาง"
       actions={canManage ? (
         <button type="button" className="primary-button" onClick={handleSyncAdSpend}>
           ซิงค์ข้อมูลโฆษณาจำลอง
@@ -2598,7 +2598,7 @@ function RoasAnalyticsPage() {
       <div className="two-column-grid">
         {/* Marketing Channel Breakdown Card */}
         <section className="section-card">
-          <h3 className="section-heading">เปรียบเทียบช่องทางโฆษณา (Facebook vs Google)</h3>
+          <h3 className="section-heading">เปรียบเทียบช่องทางโฆษณา Facebook และ Google</h3>
           <p className="muted">สรุปความคุ้มค่าโฆษณาและอัตราการแปลงของลีด</p>
 
           <div className="table-shell" style={{ marginTop: '16px' }}>
@@ -2863,7 +2863,7 @@ function AiAgentConsolePage() {
 
   return (
     <PageShell
-      title="Advanced AI Agent & HITL Control Console"
+      title="คอนโซลควบคุม AI Agent และ HITL"
       intro="จัดการคิวการอนุมัติความถูกต้องก่อนส่งถึงคนไข้ (Human-In-The-Loop) และระบบปรับแต่ง System Prompts แยกรายหน้าที่ของ AI Multi-Agent"
     >
       <StatusBanner state={flash} />
@@ -2885,7 +2885,7 @@ function AiAgentConsolePage() {
             transition: 'all 0.2s ease'
           }}
         >
-          HITL Pending Queue ({queue.length})
+          คิว HITL รอตรวจ ({queue.length})
         </button>
         <button
           type="button"
@@ -2902,7 +2902,7 @@ function AiAgentConsolePage() {
             transition: 'all 0.2s ease'
           }}
         >
-          AI Agent Prompts & Rules
+          Prompt และกฎของ AI Agent
         </button>
       </div>
 
@@ -3099,7 +3099,7 @@ function AiAgentConsolePage() {
 
                     <div style={{ marginBottom: '12px' }}>
                       <label style={{ display: 'block', fontSize: '0.85em', color: 'rgba(255,255,255,0.5)', marginBottom: '4px', fontWeight: 'bold' }}>
-                        System Prompt Instructions
+                      คำสั่ง System Prompt
                       </label>
                       <textarea
                         rows={6}
@@ -3157,7 +3157,7 @@ function AiAgentConsolePage() {
                       }}
                       disabled={savingRules[rule.agent_type]}
                     >
-                      {savingRules[rule.agent_type] ? 'กำลังบันทึก...' : 'บันทึก Prompts'}
+                      {savingRules[rule.agent_type] ? 'กำลังบันทึก...' : 'บันทึก Prompt'}
                     </button>
                   </div>
                 </div>
@@ -3217,7 +3217,7 @@ function BlogManagerPage() {
       excerpt: '',
       content: '',
       coverImageUrl: '',
-      authorName: session.user?.name || 'Doctor Admin',
+      authorName: session.user?.name || 'ทีมแพทย์ประจำคลินิก',
       status: 'draft',
       tags: '',
       seoTitle: '',
@@ -3457,11 +3457,11 @@ function BlogManagerPage() {
               </label>
 
               <label className="field">
-                <span>SEO Description</span>
+                <span>คำอธิบาย SEO</span>
                 <textarea 
                   value={form.seoDescription} 
                   onChange={e => setForm(f => ({ ...f, seoDescription: e.target.value }))} 
-                  placeholder="Google search snippet description" 
+                  placeholder="คำอธิบายที่แสดงในผลการค้นหา Google"
                   rows={3}
                 />
               </label>
@@ -3507,7 +3507,7 @@ function BlogManagerPage() {
                         <th>สถานะ</th>
                         <th>เผยแพร่เมื่อ</th>
                         <th>อัปเดตเมื่อ</th>
-                        <th style={{ textAlign: 'right' }}>Actions</th>
+                        <th style={{ textAlign: 'right' }}>การทำงาน</th>
                       </tr>
                     </thead>
                     <tbody>

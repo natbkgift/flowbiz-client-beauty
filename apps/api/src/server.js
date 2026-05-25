@@ -51,6 +51,28 @@ const { handleForumRoutes } = require('./modules/forum/routes');
 
 const config = loadConfig();
 
+function applyDevelopmentCors(request, response) {
+  if (config.appEnv !== 'development') {
+    return false;
+  }
+
+  const origin = request.headers.origin;
+  const allowedOrigins = new Set([
+    `http://localhost:${config.webPort}`,
+    `http://127.0.0.1:${config.webPort}`
+  ]);
+
+  if (!origin || !allowedOrigins.has(origin)) {
+    return false;
+  }
+
+  response.setHeader('Access-Control-Allow-Origin', origin);
+  response.setHeader('Vary', 'Origin');
+  response.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-clinic-slug, x-workspace-slug');
+  return true;
+}
+
 async function routeRequest(request, response) {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
 
@@ -350,6 +372,13 @@ async function routeRequest(request, response) {
 
 const server = http.createServer(async (request, response) => {
   try {
+    const corsApplied = applyDevelopmentCors(request, response);
+    if (request.method === 'OPTIONS' && corsApplied) {
+      response.writeHead(204);
+      response.end();
+      return;
+    }
+
     await routeRequest(request, response);
   } catch (error) {
     sendError(response, error);

@@ -14,14 +14,15 @@
 - เพิ่ม deterministic medical safety classifier เพื่อบังคับ HITL และห้าม auto-send สำหรับเคสตั้งครรภ์, โรคประจำตัว, อาการผิดปกติ, ผลข้างเคียง, ร้องเรียน, ยา/หัตถการ/การวินิจฉัย
 - ปรับ API error message ที่ส่งถึง user เป็นภาษาไทย โดยคง `error.code` เป็น machine-stable code
 - ปรับ Admin/Public UX เป็นภาษาไทยและ sanitize rich content ก่อน render
+- รอบ review หลัง commit พบและแก้ route-dispatch crash จาก `json()` ไม่ return handled marker, local dev CORS/API host, public empty states, production secret fail-closed และ deploy script secret handling
 
 Validation update:
 
 - `npm run validate` ผ่าน
 - `npm run build:web` ผ่าน
-- `npm test` ผ่าน 95/95 หลังเปิด PostgreSQL local ผ่าน Docker และ apply migration 036
+- `npm test` ผ่าน 97/97 หลังเปิด PostgreSQL local ผ่าน Docker และ apply migration 036
 - `npm audit --audit-level=moderate` ผ่าน 0 vulnerabilities
-- Browser smoke บน `http://127.0.0.1:4173/` และ `/admin` ผ่าน: title/`lang="th"` ถูกต้อง, public/admin ไม่ blank, ไม่มี console error. Public route มี warning fallback API เพราะ smoke ใช้ web server เดี่ยวโดยไม่มี API proxy ซึ่งเป็น expected local-web-only behavior
+- Browser smoke บน `http://127.0.0.1:4173/` และ `/admin` ผ่านทั้ง desktop/mobile: title/`lang="th"` ถูกต้อง, public/admin ไม่ blank, ไม่มี console error หลังรัน API+Web local
 - ยังไม่มี production deploy และไม่มี production data mutation
 
 ## Executive Summary

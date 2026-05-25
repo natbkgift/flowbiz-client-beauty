@@ -17,9 +17,10 @@ const mimeTypes = {
   '.txt': 'text/plain; charset=utf-8'
 };
 
-function renderIndex(templateName) {
+function renderIndex(templateName, requestHostname = 'localhost') {
   const template = fs.readFileSync(path.join(root, templateName), 'utf8');
-  const apiBaseUrl = config.appEnv === 'production' ? '/api' : `http://localhost:${config.apiPort}`;
+  const devApiHost = ['localhost', '127.0.0.1'].includes(requestHostname) ? requestHostname : 'localhost';
+  const apiBaseUrl = config.appEnv === 'production' ? '/api' : `http://${devApiHost}:${config.apiPort}`;
   return template.replace('__API_BASE_URL__', apiBaseUrl);
 }
 
@@ -89,7 +90,7 @@ const server = http.createServer((request, response) => {
   if (!filePath) {
     const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    response.end(renderIndex(isAdminRoute ? 'index.html' : 'public-index.html'));
+    response.end(renderIndex(isAdminRoute ? 'index.html' : 'public-index.html', parsedUrl.hostname));
     return;
   }
 
@@ -103,7 +104,7 @@ const server = http.createServer((request, response) => {
 
       const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
       response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      response.end(renderIndex(isAdminRoute ? 'index.html' : 'public-index.html'));
+      response.end(renderIndex(isAdminRoute ? 'index.html' : 'public-index.html', parsedUrl.hostname));
       return;
     }
 

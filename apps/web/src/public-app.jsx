@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 
 // Config & API Helpers
-const CONFIG = window.__FLOWBIZ_WEB_CONFIG__ || { apiBaseUrl: 'http://localhost:8103' };
-const API_BASE = '/api'; // proxied by Nginx
+const CONFIG = window.__FLOWBIZ_WEB_CONFIG__ || { apiBaseUrl: 'http://localhost:3001' };
+const API_BASE = CONFIG.apiBaseUrl || '/api';
 
 async function apiFetch(path, options = {}) {
   try {
@@ -14,7 +14,7 @@ async function apiFetch(path, options = {}) {
       },
       ...options
     });
-    if (!response.ok) throw new Error('API request failed');
+    if (!response.ok) throw new Error('เรียก API ไม่สำเร็จ');
     return await response.json();
   } catch (err) {
     console.warn(`API call to ${path} failed, using local fallback state:`, err.message);
@@ -142,6 +142,17 @@ function sanitizeRichHtml(html) {
 
   walk(doc.body);
   return doc.body.innerHTML;
+}
+
+function openExternalUrl(url) {
+  if (!isSafeUrl(url)) {
+    return;
+  }
+
+  const popup = window.open(url, '_blank', 'noopener,noreferrer');
+  if (popup) {
+    popup.opener = null;
+  }
 }
 
 const MOCK_FORUM_TOPICS = [
@@ -299,7 +310,7 @@ export function App() {
         </nav>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <a href="/admin" className="cta-btn secondary" target="_blank">เข้าระบบ CRM</a>
-          <button className="cta-btn" onClick={() => window.open('https://line.me', '_blank')}>ปรึกษาหมอฟรี</button>
+          <button className="cta-btn" onClick={() => openExternalUrl('https://line.me')}>ปรึกษาหมอฟรี</button>
         </div>
       </header>
 
@@ -368,13 +379,13 @@ function LandingPage() {
       {/* Hero Section */}
       <section className="hero">
         <div className="hero-content">
-          <div className="hero-subtitle">Premium Aesthetic & Skincare Clinic</div>
+          <div className="hero-subtitle">คลินิกความงามและดูแลผิวระดับพรีเมียม</div>
           <h1 className="hero-title">ที่สุดแห่งการดูแลผิวพรรณ<br/>และปรับรูปหน้าอย่างมีระดับ</h1>
           <p className="hero-desc">
             ยกระดับความสวยงามของผิวพรรณคุณอย่างปลอดภัย ด้วยเทคโนโลยีทางการแพทย์ที่ทันสมัยและทีมแพทย์ผู้ชำนาญการด้านหัตถการปรับรูปหน้า
           </p>
           <div className="hero-actions">
-            <button className="cta-btn" onClick={() => window.open('https://line.me', '_blank')}>จองคิวรับสิทธิ์พิเศษ</button>
+            <button className="cta-btn" onClick={() => openExternalUrl('https://line.me')}>จองคิวรับสิทธิ์พิเศษ</button>
             <a href="#/blog" className="cta-btn secondary">อ่านสาระความรู้ผิว</a>
           </div>
         </div>
@@ -414,7 +425,7 @@ function LandingPage() {
                 <span className="promo-currency">THB</span>
                 <span className="promo-original">{promo.original}.-</span>
               </div>
-              <button className="cta-btn" style={{ width: '100%' }} onClick={() => window.open('https://line.me', '_blank')}>
+              <button className="cta-btn" style={{ width: '100%' }} onClick={() => openExternalUrl('https://line.me')}>
                 จองสิทธิ์โปรนี้ทาง LINE
               </button>
             </div>
@@ -429,6 +440,8 @@ function LandingPage() {
 // Page Component: Blog List Page
 // ----------------------------------------------------
 function BlogListPage({ posts }) {
+  const visiblePosts = Array.isArray(posts) ? posts : [];
+
   return (
     <div className="public-container">
       <div className="blog-header">
@@ -438,10 +451,15 @@ function BlogListPage({ posts }) {
         </div>
       </div>
       <div className="blog-grid">
-        {posts.map((post) => (
+        {visiblePosts.length === 0 ? (
+          <div className="empty-state" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem 1rem' }}>
+            <h2>ยังไม่มีบทความเผยแพร่</h2>
+            <p style={{ color: 'var(--text-secondary)' }}>ทีมคลินิกกำลังเตรียมบทความความรู้ด้านผิวพรรณและหัตถการความงาม</p>
+          </div>
+        ) : visiblePosts.map((post) => (
           <article key={post.id} className="blog-card">
             <div className="blog-cover">
-              {post.cover_image_url ? (
+              {post.cover_image_url && isSafeUrl(post.cover_image_url) ? (
                 <img src={post.cover_image_url} alt={post.title} className="blog-cover-img" />
               ) : (
                 <span className="blog-cover-placeholder">🧬</span>
@@ -449,7 +467,7 @@ function BlogListPage({ posts }) {
             </div>
             <div className="blog-card-content">
               <div className="blog-meta">
-                <span>By {post.author_name}</span>
+                <span>โดย {post.author_name}</span>
                 <span>•</span>
                 <span>{new Date(post.published_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
               </div>
@@ -555,7 +573,7 @@ function BlogDetailPage({ slug, initialPost }) {
         </header>
 
         <div className="blog-post-cover">
-          {post.cover_image_url ? (
+          {post.cover_image_url && isSafeUrl(post.cover_image_url) ? (
             <img src={post.cover_image_url} alt={post.title} />
           ) : (
             <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, var(--bg-tertiary) 0%, rgba(212,175,55,0.08) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-primary)', fontSize: '5rem' }}>
@@ -574,7 +592,7 @@ function BlogDetailPage({ slug, initialPost }) {
                 navigator.clipboard.writeText(window.location.href);
                 alert('คัดลอกลิงก์บทความเรียบร้อยแล้ว!');
               }}>คัดลอกลิงก์</button>
-              <button className="forum-cat-btn" onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`, '_blank')}>Facebook</button>
+              <button className="forum-cat-btn" onClick={() => openExternalUrl(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`)}>Facebook</button>
             </div>
           </div>
           <a href="#/blog" className="cta-btn secondary">บทความอื่นๆ</a>
@@ -709,7 +727,7 @@ function ForumListPage({ topics, onTopicAdded }) {
                   checked={isAnon} 
                   onChange={(e) => setIsAnon(e.target.checked)} 
                 />
-                ตั้งคำถามโดยไม่ระบุตัวตน (Anonymous)
+                ตั้งคำถามโดยไม่ระบุตัวตน
               </label>
               
               {!isAnon && (
@@ -747,7 +765,12 @@ function ForumListPage({ topics, onTopicAdded }) {
 
       {/* Forum List */}
       <div className="forum-list">
-        {filteredTopics.map((topic) => (
+        {filteredTopics.length === 0 ? (
+          <div className="empty-state" style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+            <h2>ยังไม่มีกระทู้ในหมวดนี้</h2>
+            <p style={{ color: 'var(--text-secondary)' }}>เริ่มตั้งคำถามแรกเพื่อให้ทีมคลินิกเข้ามาดูแลและตอบกลับ</p>
+          </div>
+        ) : filteredTopics.map((topic) => (
           <a key={topic.id} href={`#/forum/${topic.id}`} className="forum-card">
             <div className="forum-card-main">
               <div style={{ display: 'flex', alignItems: 'center' }}>
@@ -758,7 +781,7 @@ function ForumListPage({ topics, onTopicAdded }) {
               </div>
               <h2 className="forum-card-title">{topic.title}</h2>
               <div className="forum-card-meta">
-                <span>By {topic.author_display_name}</span>
+                <span>โดย {topic.author_display_name}</span>
                 <span>•</span>
                 <span>{new Date(topic.created_at).toLocaleDateString('th-TH')}</span>
               </div>
