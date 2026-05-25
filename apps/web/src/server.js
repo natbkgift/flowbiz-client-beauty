@@ -19,7 +19,8 @@ const mimeTypes = {
 
 function renderIndex(templateName) {
   const template = fs.readFileSync(path.join(root, templateName), 'utf8');
-  return template.replace('__API_BASE_URL__', `http://localhost:${config.apiPort}`);
+  const apiBaseUrl = config.appEnv === 'production' ? '/api' : `http://localhost:${config.apiPort}`;
+  return template.replace('__API_BASE_URL__', apiBaseUrl);
 }
 
 function generateSitemap() {
