@@ -12,17 +12,56 @@ const mimeTypes = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
-  '.json': 'application/json; charset=utf-8'
+  '.json': 'application/json; charset=utf-8',
+  '.xml': 'application/xml; charset=utf-8',
+  '.txt': 'text/plain; charset=utf-8'
 };
 
-function renderIndex() {
-  const template = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+function renderIndex(templateName) {
+  const template = fs.readFileSync(path.join(root, templateName), 'utf8');
   return template.replace('__API_BASE_URL__', `http://localhost:${config.apiPort}`);
+}
+
+function generateSitemap() {
+  const dateStr = new Date().toISOString().split('T')[0];
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://beauty.flowbiz.cloud/</loc>
+    <lastmod>${dateStr}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://beauty.flowbiz.cloud/blog</loc>
+    <lastmod>${dateStr}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://beauty.flowbiz.cloud/forum</loc>
+    <lastmod>${dateStr}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+</urlset>`;
 }
 
 function getFilePath(urlPath) {
   if (urlPath.startsWith('/assets/')) {
     return path.join(distRoot, urlPath.replace(/^\//, ''));
+  }
+
+  if (urlPath === '/robots.txt') {
+    return path.join(root, 'robots.txt');
+  }
+
+  if (urlPath === '/public.css') {
+    return path.join(root, 'public.css');
+  }
+
+  if (urlPath === '/styles.css') {
+    return path.join(root, 'styles.css');
   }
 
   if (urlPath === '/' || urlPath === '' || !path.extname(urlPath)) {
@@ -35,24 +74,35 @@ function getFilePath(urlPath) {
 buildWeb();
 
 const server = http.createServer((request, response) => {
-  const filePath = getFilePath(request.url || '/');
+  const parsedUrl = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
+  const pathname = parsedUrl.pathname;
+
+  if (pathname === '/sitemap.xml') {
+    response.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' });
+    response.end(generateSitemap());
+    return;
+  }
+
+  const filePath = getFilePath(pathname);
 
   if (!filePath) {
+    const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
     response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-    response.end(renderIndex());
+    response.end(renderIndex(isAdminRoute ? 'index.html' : 'public-index.html'));
     return;
   }
 
   fs.readFile(filePath, (error, content) => {
     if (error) {
-      if ((request.url || '/').includes('.')) {
+      if (path.extname(filePath)) {
         response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
         response.end('Not Found');
         return;
       }
 
+      const isAdminRoute = pathname === '/admin' || pathname.startsWith('/admin/');
       response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      response.end(renderIndex());
+      response.end(renderIndex(isAdminRoute ? 'index.html' : 'public-index.html'));
       return;
     }
 
@@ -62,6 +112,12 @@ const server = http.createServer((request, response) => {
   });
 });
 
-server.listen(config.webPort, () => {
-  process.stdout.write(`FlowBiz Web listening on http://localhost:${config.webPort}\n`);
-});
+if (require.main === module) {
+  server.listen(config.webPort, () => {
+    process.stdout.write(`FlowBiz Web listening on http://localhost:${config.webPort}\n`);
+  });
+}
+
+module.exports = {
+  server
+};
