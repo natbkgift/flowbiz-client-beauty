@@ -19,12 +19,15 @@
 - ตัด public blog/forum default `clinicId=1001` ออกจาก API route; public route ต้องมี explicit clinic context หรือค่าจาก `PUBLIC_CLINIC_ID`
 - ปิด `POST /ai-agent/inbound` ใน production runtime จนกว่าจะมี service-account ingress ที่ตรวจสอบได้
 - แยก worker drain ออกจาก request/event subscriber path เพื่อลด latency/race และเพิ่ม scoped worker filters สำหรับ regression tests
+- ปิด public tenant signup เป็นค่าเริ่มต้นใน production; เปิดได้เฉพาะเมื่อกำหนด `PUBLIC_SIGNUP_ENABLED=true`
+- แก้ route matcher ให้ decode Thai slug/path params และเพิ่ม guard ไม่ให้ public/viewer เปิด draft blog หรือ hidden/locked forum ผ่าน direct URL
+- บล็อก public reply บน forum topic ที่ถูกซ่อน/ล็อก ยกเว้น moderator/medical answer actor
 
 Validation update:
 
 - `npm run validate` ผ่าน
 - `npm run build:web` ผ่าน
-- `npm test` ผ่าน 93/93 หลังเปิด PostgreSQL local ผ่าน Docker และ apply migration 036
+- `npm test` ผ่าน 92/92 หลังเปิด PostgreSQL local ผ่าน Docker และ apply migration 036
 - `npm audit --audit-level=moderate` ผ่าน 0 vulnerabilities
 - Browser smoke บน `http://127.0.0.1:4173/`, `#/blog`, `#/forum` และ `/admin` ผ่านทั้ง desktop/mobile: title/`lang="th"` ถูกต้อง, public/admin ไม่ blank, ไม่มี console warning/error หลังรัน API+Web local
 - ยังไม่มี production deploy และไม่มี production data mutation
@@ -81,7 +84,7 @@ Production gap: ไม่มี dedicated permission สำหรับ `broadca
 
 | Route / action | Current implementation | Phase 10 required roles/gate | Risk |
 |---|---|---|---|
-| `POST /auth/signup` | Public | Production ต้อง allow เฉพาะ approved onboarding หรือ invite/bootstrap mode, rate limit, audit `tenant.signup_attempt`/`tenant.created` | High |
+| `POST /auth/signup` | Public in non-production; production disabled by default unless `PUBLIC_SIGNUP_ENABLED=true` | Production ต้อง allow เฉพาะ approved onboarding หรือ invite/bootstrap mode, rate limit, audit `tenant.signup_attempt`/`tenant.created` | High |
 | `POST /auth/login` | Public | Public + brute force limit + login audit + suspicious login signal | High |
 | `POST /auth/logout` | Authenticated | Any active member, audit logout optional | Low |
 | `GET /auth/me`, `GET /tenant-context` | Any active member | Any active member | Low |

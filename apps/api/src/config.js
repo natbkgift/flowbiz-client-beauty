@@ -67,6 +67,7 @@ function loadConfig() {
     authTokenTtlHours: toPositiveInt(process.env.AUTH_TOKEN_TTL_HOURS, 12),
     inviteTokenSecret,
     inviteTokenTtlHours: toPositiveInt(process.env.INVITE_TOKEN_TTL_HOURS, 72),
+    publicSignupEnabled: toBoolean(process.env.PUBLIC_SIGNUP_ENABLED, appEnv !== 'production'),
     workerLoopEnabled: toBoolean(process.env.WORKER_LOOP_ENABLED, true),
     workerLoopIntervalMs: toPositiveInt(process.env.WORKER_LOOP_INTERVAL_MS, 5000),
     workerLoopBatchSize: toPositiveInt(process.env.WORKER_LOOP_BATCH_SIZE, 20),

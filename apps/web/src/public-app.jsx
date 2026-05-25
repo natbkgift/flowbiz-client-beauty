@@ -326,7 +326,7 @@ export function App() {
           </ul>
         </nav>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <a href="/admin" className="cta-btn secondary" target="_blank">เข้าระบบ CRM</a>
+          <a href="/admin" className="cta-btn secondary" target="_blank" rel="noopener noreferrer">เข้าระบบ CRM</a>
           <button className="cta-btn" onClick={() => openExternalUrl('https://line.me')}>ปรึกษาหมอฟรี</button>
         </div>
       </header>

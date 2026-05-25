@@ -105,11 +105,21 @@ async function routeRequest(request, response) {
       name: 'flowbiz-api',
       message: 'FlowBiz Beauty API พร้อมให้บริการ',
       healthEndpoint: '/health',
-      authEndpoints: ['/auth/signup', '/auth/login', '/auth/me', '/tenant-context', '/auth/logout']
+      authEndpoints: [
+        config.publicSignupEnabled ? '/auth/signup' : null,
+        '/auth/login',
+        '/auth/me',
+        '/tenant-context',
+        '/auth/logout'
+      ].filter(Boolean)
     });
   }
 
   if (url.pathname === '/auth/signup' && request.method === 'POST') {
+    if (!config.publicSignupEnabled) {
+      throw new AppError(403, 'PUBLIC_SIGNUP_DISABLED', 'Public signup is disabled.');
+    }
+
     const body = await parseJsonBody(request);
     const session = await signup(body);
     return json(response, 201, session);

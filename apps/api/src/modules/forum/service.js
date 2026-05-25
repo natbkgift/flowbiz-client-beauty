@@ -133,7 +133,7 @@ async function getTopicByIdOrSlug(clinicId, idOrSlug) {
 }
 
 async function createReply(clinicContext, topicId, data) {
-  const { content, authorDisplayName, isAnonymous, isDoctorReply } = data;
+  const { content, authorDisplayName, isAnonymous, isDoctorReply, allowRestrictedTopic = false } = data;
   const clinicId = clinicContext.currentClinic.id;
   const client = await getPool().connect();
 
@@ -144,10 +144,10 @@ async function createReply(clinicContext, topicId, data) {
 
     // Verify topic exists
     const topicCheck = await client.query(
-      'select id from forum_topics where clinic_id = $1 and id = $2',
+      'select id, status from forum_topics where clinic_id = $1 and id = $2',
       [clinicId, topicId]
     );
-    if (topicCheck.rowCount === 0) {
+    if (topicCheck.rowCount === 0 || (topicCheck.rows[0].status !== 'active' && !allowRestrictedTopic)) {
       throw new AppError(404, 'TOPIC_NOT_FOUND', 'Topic not found.');
     }
 

@@ -20,6 +20,46 @@ const {
   verifyReply,
   updateTopicStatus
 } = require('../apps/api/src/modules/forum/service');
+const { handleBlogRoutes } = require('../apps/api/src/modules/blog/routes');
+const { handleForumRoutes } = require('../apps/api/src/modules/forum/routes');
+const { json } = require('../apps/api/src/common/http');
+
+function createMockResponse() {
+  return {
+    statusCode: null,
+    headers: null,
+    body: '',
+    writeHead(statusCode, headers = {}) {
+      this.statusCode = statusCode;
+      this.headers = headers;
+    },
+    end(body = '') {
+      this.body = body;
+    }
+  };
+}
+
+async function routeJson(handler, { method = 'GET', path, authenticateRequest, body = {} }) {
+  const response = createMockResponse();
+  const handled = await handler(
+    { method },
+    response,
+    new URL(`http://localhost${path}`),
+    {
+      authenticateRequest: authenticateRequest || (async () => {
+        throw new Error('anonymous');
+      }),
+      parseJsonBody: async () => body,
+      json
+    }
+  );
+
+  assert.equal(handled, true);
+  return {
+    statusCode: response.statusCode,
+    body: response.body ? JSON.parse(response.body) : null
+  };
+}
 
 async function createFixture(t) {
   const uniqueId = Date.now() + Math.floor(Math.random() * 1000);
@@ -93,6 +133,31 @@ test('Blog & Forum System Service Integration Tests', async (t) => {
     });
     assert.notEqual(duplicatePost.slug, createdPost.slug);
     assert.match(duplicatePost.slug, /^5-เคล็ดลับบำรุงผิวสู้แดดเมืองไทย-.+$/);
+
+    const encodedDraftSlug = encodeURIComponent(duplicatePost.slug);
+    const publicDraftLookup = await routeJson(handleBlogRoutes, {
+      path: `/blog/posts/${encodedDraftSlug}?clinicId=${clinicId}`
+    });
+    assert.equal(publicDraftLookup.statusCode, 404);
+
+    const viewerDraftLookup = await routeJson(handleBlogRoutes, {
+      path: `/blog/posts/${encodedDraftSlug}`,
+      authenticateRequest: async () => ({
+        currentClinic: fixture.session.currentClinic,
+        currentMembership: { permissions: [] }
+      })
+    });
+    assert.equal(viewerDraftLookup.statusCode, 404);
+
+    const managerDraftLookup = await routeJson(handleBlogRoutes, {
+      path: `/blog/posts/${encodedDraftSlug}`,
+      authenticateRequest: async () => ({
+        currentClinic: fixture.session.currentClinic,
+        currentMembership: { permissions: ['blog.manage'] }
+      })
+    });
+    assert.equal(managerDraftLookup.statusCode, 200);
+    assert.equal(managerDraftLookup.body.id, duplicatePost.id);
 
     // 4. Test updatePost & draft-to-published flow
     const updatedPost = await updatePost(fixture.clinicContext, createdPost.id, {
@@ -209,5 +274,39 @@ test('Blog & Forum System Service Integration Tests', async (t) => {
     const topicsList = await listTopics(clinicId, { category: 'skincare', status: 'hidden' });
     assert.equal(topicsList.total, 1);
     assert.equal(topicsList.items[0].id, createdTopic.id);
+
+    const encodedTopicSlug = encodeURIComponent(createdTopic.slug);
+    const publicHiddenTopic = await routeJson(handleForumRoutes, {
+      path: `/forum/topics/${encodedTopicSlug}?clinicId=${clinicId}`
+    });
+    assert.equal(publicHiddenTopic.statusCode, 404);
+
+    const moderatorHiddenTopic = await routeJson(handleForumRoutes, {
+      path: `/forum/topics/${encodedTopicSlug}`,
+      authenticateRequest: async () => ({
+        currentClinic: fixture.session.currentClinic,
+        currentMembership: { permissions: ['forum.moderate'] }
+      })
+    });
+    assert.equal(moderatorHiddenTopic.statusCode, 200);
+    assert.equal(moderatorHiddenTopic.body.id, createdTopic.id);
+
+    await assert.rejects(
+      () => createReply(fixture.clinicContext, createdTopic.id, {
+        content: 'ตอบกลับหัวข้อที่ถูกซ่อนแบบ public ไม่ควรผ่าน',
+        authorDisplayName: 'ผู้ใช้ทั่วไป',
+        isAnonymous: true
+      }),
+      (error) => error.code === 'TOPIC_NOT_FOUND'
+    );
+
+    const moderatorReply = await createReply(fixture.clinicContext, createdTopic.id, {
+      content: 'ตอบกลับโดย moderator เพื่อปิดเคส',
+      authorDisplayName: 'ทีมแพทย์',
+      isAnonymous: false,
+      isDoctorReply: true,
+      allowRestrictedTopic: true
+    });
+    assert.equal(moderatorReply.is_doctor_reply, true);
   });
 });

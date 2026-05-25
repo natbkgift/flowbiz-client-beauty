@@ -10,6 +10,7 @@ const {
 } = require('../apps/api/src/modules/integration-gateway/security');
 const { getThaiErrorMessage } = require('../apps/api/src/common/user-messages');
 const { json, noContent } = require('../apps/api/src/common/http');
+const { matchPath } = require('../apps/api/src/common/routing');
 const { loadConfig } = require('../apps/api/src/config');
 const { resolvePublicClinicId } = require('../apps/api/src/modules/public-content/tenant');
 const { handleAiAgentRoutes } = require('../apps/api/src/modules/ai-agent/routes');
@@ -146,6 +147,7 @@ test('pre phase 10 webhook verifier fails closed for arbitrary production shared
 
 test('pre phase 10 user-facing API error messages are Thai while codes remain stable', () => {
   assert.equal(getThaiErrorMessage('FORBIDDEN'), 'คุณไม่มีสิทธิ์ดำเนินการนี้');
+  assert.equal(getThaiErrorMessage('PUBLIC_SIGNUP_DISABLED'), 'ยังไม่เปิดให้สมัครใช้งานสาธารณะ กรุณาติดต่อผู้ดูแลระบบ');
   assert.equal(getThaiErrorMessage('PUBLIC_CLINIC_REQUIRED'), 'กรุณาระบุคลินิกสำหรับหน้าเว็บสาธารณะ');
   assert.equal(getThaiErrorMessage('MEDICAL_SAFETY_REVIEW_REQUIRED'), 'เนื้อหานี้เกี่ยวข้องกับความปลอดภัยทางการแพทย์ ต้องให้เจ้าหน้าที่ตรวจสอบก่อนส่ง');
 });
@@ -156,6 +158,13 @@ test('public content routes require explicit clinic context instead of defaultin
     () => resolvePublicClinicId(new URL('http://localhost/blog/posts')),
     (error) => error.code === 'PUBLIC_CLINIC_REQUIRED'
   );
+});
+
+test('routing helper decodes Thai path params for public slugs', () => {
+  const slug = 'สอบถามปัญหาผิวสิวอักเสบหลังทำเลเซอร์';
+  const params = matchPath(`/forum/topics/${encodeURIComponent(slug)}`, '/forum/topics/:idOrSlug');
+
+  assert.equal(params.idOrSlug, slug);
 });
 
 test('AI inbound test route is disabled in production runtime', async () => {
@@ -201,7 +210,8 @@ test('production config refuses local default secrets and database url', () => {
     appEnv: process.env.APP_ENV,
     authTokenSecret: process.env.AUTH_TOKEN_SECRET,
     inviteTokenSecret: process.env.INVITE_TOKEN_SECRET,
-    databaseUrl: process.env.DATABASE_URL
+    databaseUrl: process.env.DATABASE_URL,
+    publicSignupEnabled: process.env.PUBLIC_SIGNUP_ENABLED
   };
 
   try {
@@ -209,6 +219,7 @@ test('production config refuses local default secrets and database url', () => {
     delete process.env.AUTH_TOKEN_SECRET;
     delete process.env.INVITE_TOKEN_SECRET;
     delete process.env.DATABASE_URL;
+    delete process.env.PUBLIC_SIGNUP_ENABLED;
 
     assert.throws(() => loadConfig(), /AUTH_TOKEN_SECRET/);
 
@@ -219,6 +230,7 @@ test('production config refuses local default secrets and database url', () => {
     const config = loadConfig();
     assert.equal(config.appEnv, 'production');
     assert.equal(config.databaseUrl, process.env.DATABASE_URL);
+    assert.equal(config.publicSignupEnabled, false);
   } finally {
     if (previous.appEnv === undefined) delete process.env.APP_ENV;
     else process.env.APP_ENV = previous.appEnv;
@@ -231,5 +243,8 @@ test('production config refuses local default secrets and database url', () => {
 
     if (previous.databaseUrl === undefined) delete process.env.DATABASE_URL;
     else process.env.DATABASE_URL = previous.databaseUrl;
+
+    if (previous.publicSignupEnabled === undefined) delete process.env.PUBLIC_SIGNUP_ENABLED;
+    else process.env.PUBLIC_SIGNUP_ENABLED = previous.publicSignupEnabled;
   }
 });

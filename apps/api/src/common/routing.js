@@ -1,3 +1,11 @@
+function decodePathSegment(segment) {
+  try {
+    return decodeURIComponent(segment);
+  } catch (_) {
+    return segment;
+  }
+}
+
 function matchPath(pathname, template) {
   const pathSegments = pathname.split('/').filter(Boolean);
   const templateSegments = template.split('/').filter(Boolean);
@@ -13,7 +21,7 @@ function matchPath(pathname, template) {
     const currentPath = pathSegments[index];
 
     if (currentTemplate.startsWith(':')) {
-      params[currentTemplate.slice(1)] = currentPath;
+      params[currentTemplate.slice(1)] = decodePathSegment(currentPath);
       continue;
     }
 

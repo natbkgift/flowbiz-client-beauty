@@ -42,9 +42,11 @@ async function handleBlogRoutes(request, response, url, tools) {
   const slugParams = matchPath(url.pathname, '/blog/posts/:slug');
   if (slugParams && request.method === 'GET') {
     let clinicId;
+    let canManageBlog = false;
     try {
       const context = await authenticateRequest(request);
       clinicId = context.currentClinic.id;
+      canManageBlog = hasPermission(context, 'blog', 'manage');
     } catch (_) {
       clinicId = resolvePublicClinicId(url);
     }
@@ -53,6 +55,9 @@ async function handleBlogRoutes(request, response, url, tools) {
     // Since PUT is handled separately, a GET request on this path is always a slug lookup.
     try {
       const post = await getPostBySlug(clinicId, slugParams.slug);
+      if (!canManageBlog && post.status !== 'published') {
+        return json(response, 404, { error: 'Not Found', message: 'Blog post not found.' });
+      }
       return json(response, 200, post);
     } catch (err) {
       if (err.code === 'POST_NOT_FOUND') {

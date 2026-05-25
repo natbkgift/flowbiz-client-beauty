@@ -17,6 +17,8 @@
 - Public blog/forum API ตัด default `clinicId=1001`; frontend inject `PUBLIC_CLINIC_ID` สำหรับ public routes และ API return Thai error เมื่อไม่มี explicit clinic context
 - `POST /ai-agent/inbound` ถูกปิดใน production runtime จนกว่าจะมี service-account ingress ที่ auditable
 - Worker queue ไม่ถูก drain จาก request/event subscriber path แล้ว; tests ใช้ scoped worker filters เพื่อลด race และลด latency risk
+- Public signup ถูกปิดเป็นค่าเริ่มต้นใน production และต้องเปิดด้วย `PUBLIC_SIGNUP_ENABLED=true` แบบ explicit เท่านั้น
+- Thai slug/path params ถูก decode ใน route matcher; draft blog และ hidden/locked forum direct URL ถูกบล็อกสำหรับ public/viewer
 
 ยังเป็น stop condition ก่อน merge/deploy:
 
@@ -27,7 +29,7 @@
 Validation ล่าสุดใน local stabilization gate:
 
 - Docker PostgreSQL local พร้อมใช้งานและ apply migration 036 แล้ว
-- `npm test` ผ่าน 93/93
+- `npm test` ผ่าน 92/92
 - `npm run validate` ผ่าน
 - `npm run build:web` ผ่าน
 - `npm audit --audit-level=moderate` ผ่าน 0 vulnerabilities

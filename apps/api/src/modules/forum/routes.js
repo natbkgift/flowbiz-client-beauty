@@ -44,15 +44,20 @@ async function handleForumRoutes(request, response, url, tools) {
   const idOrSlugParams = matchPath(url.pathname, '/forum/topics/:idOrSlug');
   if (idOrSlugParams && request.method === 'GET') {
     let clinicId;
+    let canModerate = false;
     try {
       const context = await authenticateRequest(request);
       clinicId = context.currentClinic.id;
+      canModerate = hasAnyPermission(context, [['forum', 'moderate'], ['forum', 'medical_answer']]);
     } catch (_) {
       clinicId = resolvePublicClinicId(url);
     }
 
     try {
       const topic = await getTopicByIdOrSlug(clinicId, idOrSlugParams.idOrSlug);
+      if (!canModerate && topic.status !== 'active') {
+        return json(response, 404, { error: 'Not Found', message: 'Forum topic not found.' });
+      }
       const replies = await listReplies(clinicId, topic.id);
       return json(response, 200, { ...topic, replies });
     } catch (err) {
@@ -82,12 +87,14 @@ async function handleForumRoutes(request, response, url, tools) {
   if (replyParams && request.method === 'POST') {
     let clinicContext;
     let isDoctorReply = false;
+    let allowRestrictedTopic = false;
     
     try {
       clinicContext = await authenticateRequest(request);
       if (hasPermission(clinicContext, 'forum', 'medical_answer')) {
         isDoctorReply = true; // Auto-detect as doctor/clinic reply if posted by owner/admin
       }
+      allowRestrictedTopic = hasAnyPermission(clinicContext, [['forum', 'moderate'], ['forum', 'medical_answer']]);
     } catch (_) {
       clinicContext = resolvePublicClinicContext(url);
     }
@@ -98,7 +105,8 @@ async function handleForumRoutes(request, response, url, tools) {
     try {
       const reply = await createReply(clinicContext, topicId, {
         ...body,
-        isDoctorReply
+        isDoctorReply,
+        allowRestrictedTopic
       });
       return json(response, 201, reply);
     } catch (err) {
