@@ -32,9 +32,14 @@ async function createFixture(t) {
   const pool = new Pool({ connectionString: loadConfig().databaseUrl });
 
   t.after(async () => {
-    await pool.query('delete from clinics where id = $1', [session.currentClinic.id]);
-    await pool.query('delete from users where id = $1', [session.user.id]);
-    await pool.end();
+    try {
+      await pool.query('delete from clinics where id = $1', [session.currentClinic.id]);
+      await pool.query('delete from users where id = $1', [session.user.id]);
+    } catch (err) {
+      // ignore constraint or cleanup errors
+    } finally {
+      await pool.end();
+    }
   });
 
   const ownerContext = await authenticateRequest(buildAuthRequest(session.token));
@@ -173,3 +178,9 @@ test('AI Agent Rules and Endpoint Routing', async (t) => {
   assert.equal(consultRule.system_prompt, updatedPrompt);
   assert.equal(Number(consultRule.temperature), 0.85);
 });
+
+const { closePool } = require('../apps/api/src/db');
+test.after(async () => {
+  await closePool();
+});
+

@@ -116,7 +116,23 @@ if [ "$SERVICE_UPDATED" -eq 1 ]; then
   systemctl daemon-reload
 fi
 
-# 11. Restart services
+# 11. Copy and configure Nginx configuration
+if [ -f "$NEW_RELEASE_DIR/infra/nginx/beauty.flowbiz.cloud.conf" ]; then
+  if [ ! -f "/etc/nginx/sites-available/beauty.flowbiz.cloud.conf" ] || \
+     ! cmp -s "$NEW_RELEASE_DIR/infra/nginx/beauty.flowbiz.cloud.conf" "/etc/nginx/sites-available/beauty.flowbiz.cloud.conf"; then
+    echo "[Nginx] Installing Nginx configuration..."
+    mkdir -p /etc/nginx/sites-available
+    mkdir -p /etc/nginx/sites-enabled
+    cp "$NEW_RELEASE_DIR/infra/nginx/beauty.flowbiz.cloud.conf" "/etc/nginx/sites-available/beauty.flowbiz.cloud.conf"
+    if [ ! -f "/etc/nginx/sites-enabled/beauty.flowbiz.cloud.conf" ]; then
+      ln -s "/etc/nginx/sites-available/beauty.flowbiz.cloud.conf" "/etc/nginx/sites-enabled/beauty.flowbiz.cloud.conf"
+    fi
+    echo "[Nginx] Testing and reloading Nginx..."
+    nginx -t && systemctl reload nginx
+  fi
+fi
+
+# 12. Restart services
 echo "[Systemd] Restarting services..."
 if [ -f "/etc/systemd/system/flowbiz-client-beauty-api.service" ]; then
   systemctl restart flowbiz-client-beauty-api
@@ -128,7 +144,7 @@ if [ -f "/etc/systemd/system/flowbiz-client-beauty-web.service" ]; then
   echo "[Systemd] Web service restarted."
 fi
 
-# 12. Clean up old releases, keep last 5
+# 13. Clean up old releases, keep last 5
 echo "[Deploy] Cleaning up old releases..."
 cd "$RELEASES_DIR"
 ls -1t | tail -n +6 | xargs -I {} rm -rf "{}" 2>/dev/null || true

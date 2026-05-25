@@ -26,9 +26,14 @@ async function createFixture(t) {
   const pool = new Pool({ connectionString: loadConfig().databaseUrl });
 
   t.after(async () => {
-    await pool.query('delete from clinics where id = $1', [session.currentClinic.id]);
-    await pool.query('delete from users where id = $1', [session.user.id]);
-    await pool.end();
+    try {
+      await pool.query('delete from clinics where id = $1', [session.currentClinic.id]);
+      await pool.query('delete from users where id = $1', [session.user.id]);
+    } catch (err) {
+      // ignore constraint or cleanup errors
+    } finally {
+      await pool.end();
+    }
   });
 
   const ownerContext = await authenticateRequest(buildAuthRequest(session.token));
@@ -485,3 +490,9 @@ test('AI Agent Routes handles Co-Pilot promotions suggestions with intent scanni
   assert.ok(auditRows.rows[0].suggested_response.includes('2,900'));
   assert.equal(auditRows.rows[0].used, false);
 });
+
+const { closePool } = require('../apps/api/src/db');
+test.after(async () => {
+  await closePool();
+});
+
