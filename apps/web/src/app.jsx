@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { key: 'unified-inbox', label: 'Omnichannel Inbox', caption: 'Social chat and AI co-pilot' },
   { key: 'roas-analytics', label: 'ROAS & Loyalty', caption: 'Ad spend, CAC & member referrals' },
   { key: 'ai-agent-console', label: 'AI Agent Console', caption: 'Agent rules & HITL approvals' },
+  { key: 'blog-manager', label: 'Blog Manager', caption: 'Create, edit & publish articles' },
   { key: 'users', label: 'Users', caption: 'Memberships and roles' },
   { key: 'workspaces', label: 'Workspaces', caption: 'Workspace configuration' },
   { key: 'settings', label: 'Settings', caption: 'Tenant and org settings' },
@@ -319,6 +320,25 @@ function createApiClient(apiBaseUrl) {
     },
     retryWorkerJob(session, jobId) {
       return request(`/ops/jobs/${jobId}/retry`, { ...session, method: 'POST' });
+    },
+    listBlogPosts(session, params = {}) {
+      const search = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          search.set(key, value);
+        }
+      });
+      const suffix = search.toString() ? `?${search.toString()}` : '';
+      return request(`/blog/posts${suffix}`, session);
+    },
+    createBlogPost(session, body) {
+      return request('/blog/posts', { ...session, method: 'POST', body });
+    },
+    updateBlogPost(session, postId, body) {
+      return request(`/blog/posts/${postId}`, { ...session, method: 'PUT', body });
+    },
+    deleteBlogPost(session, postId) {
+      return request(`/blog/posts/${postId}`, { ...session, method: 'DELETE' });
     }
   };
 }
@@ -3047,12 +3067,398 @@ function AiAgentConsolePage() {
   );
 }
 
+function BlogManagerPage() {
+  const api = useApi();
+  const { session } = useWorkspace();
+  const sessionOptions = useSessionRequestOptions();
+  const permissions = usePermissions();
+  const canManage = permissions.hasAny(['workspace.manage', 'tenant.manage']);
+  
+  const [flash, setFlash] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentPost, setCurrentPost] = useState(null);
+  const [activeTab, setActiveTab] = useState('edit'); // 'edit' or 'preview'
+  
+  const [form, setForm] = useState({
+    title: '',
+    excerpt: '',
+    content: '',
+    coverImageUrl: '',
+    authorName: '',
+    status: 'draft',
+    tags: '',
+    seoTitle: '',
+    seoDescription: '',
+    ogImageUrl: ''
+  });
+
+  const [state, setState] = usePageData(
+    () => api.listBlogPosts(sessionOptions, { status: 'all' }),
+    [api, sessionOptions],
+    canManage
+  );
+
+  async function refreshPosts() {
+    setState((current) => ({ ...current, status: 'loading' }));
+    try {
+      const data = await api.listBlogPosts(sessionOptions, { status: 'all' });
+      setState({ status: 'ready', data, error: null });
+    } catch (error) {
+      setState({ status: 'error', data: null, error });
+    }
+  }
+
+  function handleCreateNew() {
+    setForm({
+      title: '',
+      excerpt: '',
+      content: '',
+      coverImageUrl: '',
+      authorName: session.user?.name || 'Doctor Admin',
+      status: 'draft',
+      tags: '',
+      seoTitle: '',
+      seoDescription: '',
+      ogImageUrl: ''
+    });
+    setCurrentPost(null);
+    setIsEditing(true);
+    setActiveTab('edit');
+  }
+
+  function handleEditClick(post) {
+    setForm({
+      title: post.title || '',
+      excerpt: post.excerpt || '',
+      content: post.content || '',
+      coverImageUrl: post.cover_image_url || '',
+      authorName: post.author_name || '',
+      status: post.status || 'draft',
+      tags: Array.isArray(post.tags) ? post.tags.join(', ') : '',
+      seoTitle: post.seo_title || '',
+      seoDescription: post.seo_description || '',
+      ogImageUrl: post.og_image_url || ''
+    });
+    setCurrentPost(post);
+    setIsEditing(true);
+    setActiveTab('edit');
+  }
+
+  async function handleFormSubmit(e) {
+    e.preventDefault();
+    if (!form.title || !form.content || !form.authorName) {
+      setFlash({ kind: 'error', message: 'Title, content, and author name are required.' });
+      return;
+    }
+
+    const payload = {
+      ...form,
+      tags: form.tags.split(',').map(t => t.trim()).filter(Boolean),
+      ogImageUrl: form.ogImageUrl || form.coverImageUrl
+    };
+
+    try {
+      if (currentPost) {
+        await api.updateBlogPost(sessionOptions, currentPost.id, payload);
+        setFlash({ kind: 'success', message: 'Blog post updated successfully.' });
+      } else {
+        await api.createBlogPost(sessionOptions, payload);
+        setFlash({ kind: 'success', message: 'Blog post created successfully.' });
+      }
+      setIsEditing(false);
+      setCurrentPost(null);
+      await refreshPosts();
+    } catch (error) {
+      setFlash({ kind: 'error', message: describeError(error) });
+    }
+  }
+
+  async function handleDelete(postId) {
+    if (!window.confirm('Are you sure you want to delete this blog post?')) {
+      return;
+    }
+    try {
+      await api.deleteBlogPost(sessionOptions, postId);
+      setFlash({ kind: 'success', message: 'Blog post deleted.' });
+      await refreshPosts();
+    } catch (error) {
+      setFlash({ kind: 'error', message: describeError(error) });
+    }
+  }
+
+  if (!canManage) {
+    return <PermissionNotice title="Access Denied" message="You do not have permissions to manage blog posts." />;
+  }
+
+  // Simple Markdown parser for preview
+  function renderMarkdown(text) {
+    if (!text) return '';
+    let html = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+      .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+      .replace(/\*(.*)\*/gim, '<em>$1</em>')
+      .replace(/!\[(.*?)\]\((.*?)\)/gim, '<img alt="$1" src="$2" style="max-width:100%; border-radius:8px;" />')
+      .replace(/\[(.*?)\]\((.*?)\)/gim, '<a href="$2" target="_blank">$1</a>')
+      .replace(/\n\n/g, '</p><p>');
+    return '<p>' + html + '</p>';
+  }
+
+  return (
+    <PageShell 
+      title="Blog Manager" 
+      intro="Publish medical articles, beauty clinic updates, and health tips to engage clients and boost SEO rankings."
+      actions={
+        !isEditing && (
+          <button type="button" className="primary-button" onClick={handleCreateNew}>
+            + Create New Post
+          </button>
+        )
+      }
+    >
+      <StatusBanner state={flash} />
+      
+      {isEditing ? (
+        <form onSubmit={handleFormSubmit} className="blog-editor-form">
+          <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <label className="field">
+                <span>Title *</span>
+                <input 
+                  type="text" 
+                  value={form.title} 
+                  onChange={e => setForm(f => ({ ...f, title: e.target.value }))} 
+                  placeholder="e.g. 5 Tips to Keep Your Skin Radiant This Summer" 
+                  required
+                />
+              </label>
+
+              <label className="field">
+                <span>Excerpt / Short Summary</span>
+                <textarea 
+                  value={form.excerpt} 
+                  onChange={e => setForm(f => ({ ...f, excerpt: e.target.value }))} 
+                  placeholder="Provide a brief summary for the cards on the list page" 
+                  rows={2}
+                />
+              </label>
+
+              <div>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', borderBottom: '1px solid var(--border)', paddingBottom: '4px' }}>
+                  <button 
+                    type="button" 
+                    className={`secondary-button compact-inline-actions ${activeTab === 'edit' ? 'active' : ''}`}
+                    style={{ background: activeTab === 'edit' ? 'var(--accent)' : 'transparent', color: activeTab === 'edit' ? '#fff' : 'var(--text)' }}
+                    onClick={() => setActiveTab('edit')}
+                  >
+                    Edit (Markdown)
+                  </button>
+                  <button 
+                    type="button" 
+                    className={`secondary-button compact-inline-actions ${activeTab === 'preview' ? 'active' : ''}`}
+                    style={{ background: activeTab === 'preview' ? 'var(--accent)' : 'transparent', color: activeTab === 'preview' ? '#fff' : 'var(--text)' }}
+                    onClick={() => setActiveTab('preview')}
+                  >
+                    Preview
+                  </button>
+                </div>
+
+                {activeTab === 'edit' ? (
+                  <label className="field">
+                    <span>Content *</span>
+                    <textarea 
+                      value={form.content} 
+                      onChange={e => setForm(f => ({ ...f, content: e.target.value }))} 
+                      placeholder="Write your article here using Markdown..." 
+                      rows={15}
+                      required
+                    />
+                  </label>
+                ) : (
+                  <div 
+                    className="markdown-preview-card"
+                    style={{ 
+                      padding: '16px', 
+                      background: 'rgba(255,255,255,0.7)', 
+                      border: '1px solid var(--border)', 
+                      borderRadius: '14px',
+                      minHeight: '340px',
+                      maxHeight: '500px',
+                      overflowY: 'auto'
+                    }}
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(form.content) }}
+                  />
+                )}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(0,0,0,0.02)', padding: '16px', borderRadius: '14px', border: '1px solid var(--border)' }}>
+              <h3>Settings</h3>
+              
+              <label className="field">
+                <span>Author Name *</span>
+                <input 
+                  type="text" 
+                  value={form.authorName} 
+                  onChange={e => setForm(f => ({ ...f, authorName: e.target.value }))} 
+                  required
+                />
+              </label>
+
+              <label className="field">
+                <span>Status</span>
+                <select 
+                  value={form.status} 
+                  onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
+                >
+                  <option value="draft">Draft</option>
+                  <option value="published">Published</option>
+                </select>
+              </label>
+
+              <label className="field">
+                <span>Cover Image URL</span>
+                <input 
+                  type="text" 
+                  value={form.coverImageUrl} 
+                  onChange={e => setForm(f => ({ ...f, coverImageUrl: e.target.value }))} 
+                  placeholder="https://example.com/cover.jpg"
+                />
+              </label>
+
+              <label className="field">
+                <span>Tags (comma separated)</span>
+                <input 
+                  type="text" 
+                  value={form.tags} 
+                  onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} 
+                  placeholder="Skincare, Treatment, Botox"
+                />
+              </label>
+
+              <h3 style={{ marginTop: '12px' }}>SEO Tags (Optional)</h3>
+
+              <label className="field">
+                <span>SEO Title</span>
+                <input 
+                  type="text" 
+                  value={form.seoTitle} 
+                  onChange={e => setForm(f => ({ ...f, seoTitle: e.target.value }))} 
+                  placeholder="Falls back to title if empty"
+                />
+              </label>
+
+              <label className="field">
+                <span>SEO Description</span>
+                <textarea 
+                  value={form.seoDescription} 
+                  onChange={e => setForm(f => ({ ...f, seoDescription: e.target.value }))} 
+                  placeholder="Google search snippet description" 
+                  rows={3}
+                />
+              </label>
+
+              <label className="field">
+                <span>OG Image URL</span>
+                <input 
+                  type="text" 
+                  value={form.ogImageUrl} 
+                  onChange={e => setForm(f => ({ ...f, ogImageUrl: e.target.value }))} 
+                  placeholder="Falls back to cover image if empty"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+            <button type="button" className="secondary-button" onClick={() => setIsEditing(false)}>
+              Cancel
+            </button>
+            <button type="submit" className="primary-button">
+              Save Post
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div>
+          {state.status === 'loading' && <LoadingCard label="Loading blog posts..." />}
+          {state.status === 'error' && <ErrorCard error={state.error} />}
+          {state.status === 'ready' && (
+            <div>
+              {state.data.items.length === 0 ? (
+                <div style={{ padding: '40px', textAlign: 'center', background: 'rgba(255,255,255,0.5)', borderRadius: '16px', border: '1px solid var(--border)' }}>
+                  <p style={{ color: 'var(--text-muted)' }}>No blog posts found. Create your first post by clicking "+ Create New Post".</p>
+                </div>
+              ) : (
+                <div className="table-shell card">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Title</th>
+                        <th>Author</th>
+                        <th>Status</th>
+                        <th>Published At</th>
+                        <th>Updated At</th>
+                        <th style={{ textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {state.data.items.map((post) => (
+                        <tr key={post.id}>
+                          <td>
+                            <strong>{post.title}</strong>
+                            {post.excerpt && <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>{post.excerpt}</p>}
+                          </td>
+                          <td>{post.author_name}</td>
+                          <td>
+                            <span 
+                              className="pill" 
+                              style={{ 
+                                background: post.status === 'published' ? 'rgba(15,118,110,0.1)' : 'rgba(0,0,0,0.06)',
+                                color: post.status === 'published' ? 'var(--accent-strong)' : 'var(--text-muted)'
+                              }}
+                            >
+                              {post.status.toUpperCase()}
+                            </span>
+                          </td>
+                          <td>{formatDateTime(post.published_at)}</td>
+                          <td>{formatDateTime(post.updated_at)}</td>
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ display: 'inline-flex', gap: '8px' }}>
+                              <button type="button" className="secondary-button" onClick={() => handleEditClick(post)}>
+                                Edit
+                              </button>
+                              <button type="button" className="ghost-danger-button" onClick={() => handleDelete(post.id)}>
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </PageShell>
+  );
+}
+
 function renderPage(route) {
   switch (route?.key) {
     case 'unified-inbox':
       return <UnifiedInboxPage />;
     case 'roas-analytics':
       return <RoasAnalyticsPage />;
+    case 'blog-manager':
+      return <BlogManagerPage />;
     case 'ai-agent-console':
       return <AiAgentConsolePage />;
     case 'users':

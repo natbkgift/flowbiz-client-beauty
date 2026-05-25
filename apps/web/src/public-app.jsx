@@ -178,7 +178,7 @@ export function App() {
     if (hash.startsWith('/blog/')) {
       const slug = hash.replace('/blog/', '');
       const post = blogPosts.find(p => p.slug === slug);
-      return <BlogDetailPage post={post} />;
+      return <BlogDetailPage slug={slug} initialPost={post} />;
     }
     
     if (hash === '/forum') {
@@ -407,11 +407,63 @@ function BlogListPage({ posts }) {
 // ----------------------------------------------------
 // Page Component: Blog Detail Page
 // ----------------------------------------------------
-function BlogDetailPage({ post }) {
-  if (!post) {
+function renderContent(text) {
+  if (!text) return '';
+  // If it looks like HTML, render it directly
+  if (text.includes('</p>') || text.includes('</h2>') || text.includes('</ul>') || text.includes('</strong>')) {
+    return text;
+  }
+  // Otherwise, parse simple Markdown:
+  let html = text
+    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+    .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+    .replace(/\*(.*)\*/gim, '<em>$1</em>')
+    .replace(/!\[(.*?)\]\((.*?)\)/gim, '<img alt="$1" src="$2" style="max-width:100%; border-radius:8px;" />')
+    .replace(/\[(.*?)\]\((.*?)\)/gim, '<a href="$2" target="_blank">$1</a>')
+    .replace(/\n\n/g, '</p><p>');
+  return '<p>' + html.replace(/\n/g, '<br/>') + '</p>';
+}
+
+function BlogDetailPage({ slug, initialPost }) {
+  const [post, setPost] = useState(initialPost);
+  const [loading, setLoading] = useState(!initialPost);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function fetchPost() {
+      try {
+        const fetched = await apiFetch(`/blog/posts/${slug}`);
+        if (fetched) {
+          setPost(fetched);
+          setError(null);
+        } else if (!post) {
+          setError('ไม่พบบทความชิ้นนี้');
+        }
+      } catch (err) {
+        if (!post) {
+          setError('ไม่สามารถโหลดบทความได้');
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPost();
+  }, [slug]);
+
+  if (loading) {
     return (
       <div className="public-container" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
-        <h2>ขออภัย ไม่พบบทความชิ้นนี้</h2>
+        <p style={{ color: 'var(--text-secondary)' }}>กำลังโหลดบทความ...</p>
+      </div>
+    );
+  }
+
+  if (error || !post) {
+    return (
+      <div className="public-container" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
+        <h2>ขออภัย {error || 'ไม่พบบทความชิ้นนี้'}</h2>
         <a href="#/blog" className="cta-btn" style={{ marginTop: '1.5rem' }}>กลับหน้าบทความ</a>
       </div>
     );
@@ -427,7 +479,7 @@ function BlogDetailPage({ post }) {
           <h1 className="blog-post-title">{post.title}</h1>
           <div className="blog-post-meta">
             <span>✍️ ผู้เขียน: {post.author_name}</span>
-            <span>📅 เผยแพร่เมื่อ: {new Date(post.published_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+            <span>📅 เผยแพร่เมื่อ: {new Date(post.published_at || post.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
             {post.tags?.map((t, idx) => (
@@ -446,14 +498,17 @@ function BlogDetailPage({ post }) {
           )}
         </div>
 
-        <div className="blog-post-content" dangerouslySetInnerHTML={{ __html: post.content }} />
+        <div className="blog-post-content" dangerouslySetInnerHTML={{ __html: renderContent(post.content) }} />
         
         <footer className="blog-post-footer">
           <div>
             <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>แชร์ความรู้นี้ให้กับเพื่อนของคุณ</p>
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-              <button className="forum-cat-btn" onClick={() => alert('Link copied!')}>คัดลอกลิงก์</button>
-              <button className="forum-cat-btn" onClick={() => window.open('https://facebook.com', '_blank')}>Facebook</button>
+              <button className="forum-cat-btn" onClick={() => {
+                navigator.clipboard.writeText(window.location.href);
+                alert('คัดลอกลิงก์บทความเรียบร้อยแล้ว!');
+              }}>คัดลอกลิงก์</button>
+              <button className="forum-cat-btn" onClick={() => window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`, '_blank')}>Facebook</button>
             </div>
           </div>
           <a href="#/blog" className="cta-btn secondary">บทความอื่นๆ</a>
