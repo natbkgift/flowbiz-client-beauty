@@ -5,11 +5,16 @@ Scope: Post-Phase 10 PR 2 - live staging smoke preparation
 
 ## Current Decision
 
-Status: `BLOCKED_FOR_LIVE_EXECUTION`
+Status: `SUPERSEDED_BY_LIVE_SMOKE_BLOCKED_REPORT`
 
-No staging host, staging URL, SSH target, or approved staging environment file was provided in the current workspace context. Per the staging safety rule, this document replaces `docs/STAGING_LIVE_SMOKE_REPORT.md` until a real staging host is available.
+Initial preflight was created before a staging host was provided. A later operator update provided:
 
-No production deploy was attempted. No production database, production secret, real LINE credential, real AI credential, or real customer data was used.
+- Staging URL: `https://beauty.flowbiz.cloud/`
+- SSH target: `flowbiz-vps`
+
+The live check is now recorded in `docs/STAGING_LIVE_SMOKE_REPORT.md`.
+
+No production deploy was attempted. No production database, production secret, real LINE credential, real AI credential, or real customer data was used. The live smoke remained blocked because the target host currently reports production-like service settings and an older deployed release.
 
 ## Goal
 
