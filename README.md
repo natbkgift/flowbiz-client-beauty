@@ -1,172 +1,296 @@
-# FlowBiz Local Foundation
+# FlowBiz Beauty
 
-The repository now includes the Sprint 0 runnable baseline, the Sprint 1 multi-tenant foundation, the Sprint 2 Lead CRM core slice, the Sprint 3 messaging foundation, and the Sprint 4 automation engine foundation.
+FlowBiz Beauty is an AI Marketing and Revenue Automation Layer for aesthetic clinics.
 
-## What exists
+It helps clinics reduce missed lead follow-up, standardize staff response workflows, recover no-shows, request reviews, and surface Botox/Filler repeat-treatment opportunities. AI is used to draft operational and marketing suggestions, but customer-facing AI-generated messages must be reviewed and approved by staff before outbound delivery.
 
-- `apps/api`: minimal backend shell
-- `apps/web`: minimal frontend placeholder
-- `database/migrations`: SQL migration baseline
-- `database/seeds`: SQL seed baseline
-- `scripts`: migration, seed, and validation runners
-- `infra/docker`: Docker Compose for PostgreSQL 16
-- `infra/README.md`: local infrastructure guide
-- `apps/api/src/modules`: minimal modular-monolith auth and tenancy foundation
-- `apps/api/src/modules/leads`: tenant-safe Lead CRM core services and endpoints
-- `apps/api/src/modules/messaging`: channels, templates, identities, outbound logs, and manual send flow
-- `apps/api/src/modules/automation`: flow definitions, executions, tasks, reminders, and event-driven runtime
+This repository is currently prepared for MVP demo, friendly pilot conversations, staging preparation, and CI-gated development. It is not cleared for production deployment yet.
+
+## Current Positioning
+
+FlowBiz Beauty is designed for clinic revenue operations:
+
+- New lead response and follow-up visibility
+- Uncontacted lead alerts
+- AI-assisted message drafting with Human-In-The-Loop approval
+- No-show recovery workflows
+- Review request workflows
+- Botox/Filler repeat reminder workflows
+- Audit trail and RBAC for operational control
+- Staging and CI readiness foundations
+
+The core product sentence:
+
+FlowBiz Beauty helps aesthetic clinics turn inquiries, no-shows, reviews, and repeat-treatment cycles into a controlled revenue workflow, with AI helping staff draft messages but never sending medical or marketing content without human approval.
+
+## What FlowBiz Beauty Is
+
+- AI Marketing and Revenue Automation Layer
+- MVP demo and pilot workflow system for beauty/aesthetic clinics
+- Modular monolith backend with PostgreSQL
+- React/esbuild frontend
+- Tenant-aware SaaS foundation with RBAC and audit trail
+- HITL-first AI suggestion workflow
+- Simulated/default integration foundation for LINE and LLM providers
+- Staging-ready package after live smoke validation
+
+## What FlowBiz Beauty Is Not
+
+- Not an EMR or medical record system
+- Not a full doctor scheduling system
+- Not an inventory system
+- Not a payment processing system
+- Not a full CRM replacement on day one
+- Not a medical diagnosis or treatment-advice engine
+- Not an AI auto-reply system that sends customer-facing messages without staff approval
+- Not production deployment cleared without further staging, consent, integration, monitoring, and support validation
+
+## MVP Workflows
+
+The MVP scope is locked to these 8 workflows:
+
+1. New Lead Welcome
+2. Uncontacted Lead Alert
+3. Lead Qualification Nurture
+4. No-Show Recovery
+5. Review Request
+6. Botox Cycle Reminder
+7. Filler Cycle Reminder
+8. Daily Marketing Reminder
+
+See [docs/MVP_SCOPE_LOCK.md](docs/MVP_SCOPE_LOCK.md) for the full product contract.
+
+## Safety Model
+
+FlowBiz Beauty treats AI as a controlled assistant:
+
+- AI drafts suggestions.
+- Staff approves, rejects, or modifies suggestions.
+- AI-generated customer-facing messages cannot move to outbound unless approved or modified by staff.
+- Rejected AI suggestions cannot be sent.
+- Modified approvals preserve original and edited text.
+- Medical-risk text is labelled for careful review.
+- Approval actions are auditable with clinic/workspace context, approver, risk label, and timestamps.
+
+See [docs/HITL_APPROVAL_CONTRACT.md](docs/HITL_APPROVAL_CONTRACT.md) and [docs/AI_MEDICAL_SAFETY_POLICY.md](docs/AI_MEDICAL_SAFETY_POLICY.md).
+
+## LINE And AI Integration Status
+
+Current safe defaults:
+
+- LINE integration mode defaults to simulated.
+- LINE real outbound is not active by default.
+- AI provider defaults to mock.
+- Real OpenAI/Gemini generation is not active by default.
+- Real integrations require separate staging test plan, credentials outside the repo, explicit environment configuration, HITL preservation, and QA.
+
+Do not commit secrets. Do not use production credentials in local or staging env files.
+
+Relevant docs:
+
+- [docs/LINE_INTEGRATION_RUNBOOK.md](docs/LINE_INTEGRATION_RUNBOOK.md)
+- [docs/AI_PROVIDER_INTEGRATION_RUNBOOK.md](docs/AI_PROVIDER_INTEGRATION_RUNBOOK.md)
+
+## Project Structure
+
+- `apps/api`: Node.js modular monolith API
+- `apps/web`: React/esbuild admin and public web app
+- `database/migrations`: PostgreSQL migrations
+- `database/seeds`: base seed data
+- `scripts`: migration, seed, validation, smoke, and local infra helpers
+- `infra`: Docker, nginx, systemd, deploy, and rollback examples
+- `docs`: audit, scope, safety, staging, CI, demo, and sales documents
+- `tests` and `apps/api/tests`: Node test runner suites
 
 ## Prerequisites
 
 - Node.js 22+
 - npm 10+
-- Docker Desktop with Docker Compose support for PostgreSQL local infrastructure
+- Docker Desktop or Docker Engine with Docker Compose
+- PostgreSQL 16 for local/staging database
 
-## 1. Install dependencies
+## Local Setup
 
-```bash
+Install dependencies:
+
+```powershell
 npm install
 ```
 
-## 2. Configure environment
-
-Copy `.env.example` to `.env` and adjust values only if needed.
-
-PowerShell:
+Copy environment example:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-## 3. Start the database
-
-Use the infrastructure scripts documented in `infra/README.md`.
-
-PowerShell:
+Start local PostgreSQL:
 
 ```powershell
 & .\scripts\dev-up.ps1
 ```
 
-## 4. Run migrations
+Run migrations and base seeds:
 
-```bash
+```powershell
 npm run migrate
-```
-
-## 5. Run seeds
-
-```bash
 npm run seed
 ```
 
-## Seeded Sprint 1 credentials
+Start API:
 
-- clinic slug: `demo-clinic`
-- owner user: `owner@flowbiz.local`
-- staff user: `staff@flowbiz.local`
-- password: `Flowbiz123!`
-
-## 6. Start the backend
-
-```bash
+```powershell
 npm run dev:api
 ```
 
-Backend health endpoint:
+Start web app in another terminal:
 
-- `http://localhost:3001/health`
-
-Sprint 1 auth endpoints:
-
-- `POST http://localhost:3001/auth/login`
-- `GET http://localhost:3001/auth/me`
-- `GET http://localhost:3001/tenant-context`
-- `POST http://localhost:3001/auth/logout`
-
-Sprint 2 Lead CRM endpoints:
-
-- `GET http://localhost:3001/leads`
-- `POST http://localhost:3001/leads`
-- `GET http://localhost:3001/leads/:leadId`
-- `PATCH http://localhost:3001/leads/:leadId`
-- `POST http://localhost:3001/leads/:leadId/notes`
-- `POST http://localhost:3001/leads/:leadId/owner`
-- `POST http://localhost:3001/leads/:leadId/stage-status`
-
-Sprint 3 Messaging endpoints:
-
-- `GET http://localhost:3001/channels`
-- `POST http://localhost:3001/channels`
-- `GET http://localhost:3001/contact-identities?entityType=lead&entityId=:id`
-- `POST http://localhost:3001/contact-identities`
-- `GET http://localhost:3001/templates`
-- `POST http://localhost:3001/templates`
-- `PATCH http://localhost:3001/templates/:templateId`
-- `GET http://localhost:3001/messages/outbound`
-- `POST http://localhost:3001/leads/:leadId/messages`
-
-Sprint 4 Automation endpoints:
-
-- `GET http://localhost:3001/automation/flows`
-- `POST http://localhost:3001/automation/flows`
-- `POST http://localhost:3001/automation/flows/:flowId/steps`
-- `POST http://localhost:3001/automation/flows/:flowId/status`
-- `GET http://localhost:3001/automation/executions`
-- `GET http://localhost:3001/automation/tasks`
-- `GET http://localhost:3001/reminders`
-- `POST http://localhost:3001/automation/events`
-
-Example login body:
-
-```json
-{
-	"email": "owner@flowbiz.local",
-	"password": "Flowbiz123!",
-	"clinicSlug": "demo-clinic"
-}
-```
-
-## 7. Start the frontend placeholder
-
-In a second terminal:
-
-```bash
+```powershell
 npm run dev:web
 ```
 
-Frontend placeholder:
+Default local URLs:
 
-- `http://localhost:4173`
+- API: `http://localhost:3001`
+- Web: `http://localhost:4173`
 
-## 8. Run validation commands
+Health endpoints:
 
-```bash
-npm run validate
-npm test
+- `GET /live`: process liveness
+- `GET /ready`: readiness with database connectivity
+- `GET /health`: readiness alias for compatibility
+
+## Demo Seed
+
+The demo clinic seed is separate from base seed data:
+
+```powershell
+npm run seed:demo
 ```
 
-## Supported command contract
+Demo tenant details:
 
-- `& .\scripts\dev-up.ps1`: start PostgreSQL infrastructure
-- `& .\scripts\dev-down.ps1`: stop PostgreSQL infrastructure
-- `& .\scripts\db-health.ps1`: verify PostgreSQL health
-- `& .\scripts\db-logs.ps1`: export PostgreSQL logs to `D:\FlowBiz\data\flowbiz-client-beauty\logs`
-- `& .\scripts\db-backup.ps1`: write a PostgreSQL backup to `D:\FlowBiz\backups\flowbiz-client-beauty`
-- `npm run migrate`: execute SQL migrations
-- `npm run seed`: execute SQL seeds
-- `npm run dev:api`: start the backend shell
-- `npm run dev:web`: start the frontend placeholder
-- `npm run validate`: validate scaffold integrity and JavaScript syntax
-- `npm test`: run the minimal baseline test
+- Clinic slug: `flowbiz-beauty-demo`
+- Workspace slug: `beauty-revenue`
+- Owner: `owner.demo@flowbiz.local`
+- Admin: `admin.demo@flowbiz.local`
+- Operator: `operator.demo@flowbiz.local`
+- Demo password: `DemoPass123!`
 
-## Scope guardrails
+This credential is for local/demo use only. Do not create it in production.
 
-The current implementation is intentionally limited to Sprint 2 Lead CRM scope.
+See [docs/DEMO_CLINIC_SCRIPT.md](docs/DEMO_CLINIC_SCRIPT.md).
 
-Not included yet:
+## Staging Readiness Commands
 
-- AI integrations
-- Redis/workers
-- analytics
-- external services
+Staging is prepared through docs and scripts, but an actual staging host still needs live smoke validation.
+
+Validate staging compose config:
+
+```powershell
+docker compose --env-file .env.example -f infra/docker/docker-compose.staging.yml config
+```
+
+Dry-run smoke test without running services:
+
+```powershell
+$env:SMOKE_DRY_RUN="true"
+npm run smoke:staging
+Remove-Item Env:\SMOKE_DRY_RUN
+```
+
+Live staging smoke after services are deployed:
+
+```powershell
+$env:BASE_URL="https://staging.example.invalid"
+$env:API_BASE_URL="https://staging.example.invalid/api"
+$env:EXPECT_DEMO_DATA="true"
+npm run smoke:staging
+```
+
+Recommended staging flow:
+
+```powershell
+npm ci
+npm run build:web
+npm run migrate
+npm run validate
+npm test
+npm run seed:demo
+npm run smoke:staging
+```
+
+See [docs/STAGING_DEPLOYMENT_RUNBOOK.md](docs/STAGING_DEPLOYMENT_RUNBOOK.md) and [docs/ROLLBACK_PROCEDURE.md](docs/ROLLBACK_PROCEDURE.md).
+
+## CI Validation Commands
+
+Local equivalent of the CI gate:
+
+```powershell
+npm run migrate
+npm run validate
+npm run build:web
+npm test
+$env:SMOKE_DRY_RUN="true"; npm run smoke:staging; Remove-Item Env:\SMOKE_DRY_RUN
+docker compose --env-file .env.example -f infra/docker/docker-compose.staging.yml config
+```
+
+GitHub Actions runs the main gate with:
+
+- Node.js 22
+- PostgreSQL 16 service container
+- Migration check
+- Web build
+- Full test suite
+- Staging compose validation
+- Smoke dry-run
+- Safe LINE/AI environment defaults
+
+See [docs/CI_CD_RUNBOOK.md](docs/CI_CD_RUNBOOK.md).
+
+## Sales And Pilot Docs
+
+Sales package:
+
+- [docs/SALES_PACKAGE/ONE_PAGE_PITCH.md](docs/SALES_PACKAGE/ONE_PAGE_PITCH.md)
+- [docs/SALES_PACKAGE/PRICING_PACKAGES.md](docs/SALES_PACKAGE/PRICING_PACKAGES.md)
+- [docs/SALES_PACKAGE/FLOWBIZ_VS_CRM.md](docs/SALES_PACKAGE/FLOWBIZ_VS_CRM.md)
+- [docs/SALES_PACKAGE/ROI_CALCULATOR_SPEC.md](docs/SALES_PACKAGE/ROI_CALCULATOR_SPEC.md)
+- [docs/SALES_PACKAGE/DEMO_VIDEO_SCRIPT.md](docs/SALES_PACKAGE/DEMO_VIDEO_SCRIPT.md)
+- [docs/SALES_PACKAGE/OBJECTION_HANDLING.md](docs/SALES_PACKAGE/OBJECTION_HANDLING.md)
+- [docs/SALES_PACKAGE/PILOT_CUSTOMER_PLAN.md](docs/SALES_PACKAGE/PILOT_CUSTOMER_PLAN.md)
+- [docs/SALES_PACKAGE/SALES_CALL_SCRIPT.md](docs/SALES_PACKAGE/SALES_CALL_SCRIPT.md)
+- [docs/SALES_PACKAGE/GO_TO_MARKET_CHECKLIST.md](docs/SALES_PACKAGE/GO_TO_MARKET_CHECKLIST.md)
+
+Final execution report:
+
+- [docs/FLOWBIZ_BEAUTY_FINAL_EXECUTION_REPORT.md](docs/FLOWBIZ_BEAUTY_FINAL_EXECUTION_REPORT.md)
+
+## Go/No-Go Status
+
+| Area | Status |
+| --- | --- |
+| Internal demo | GO |
+| Friendly pilot demo | GO with limitations |
+| Staging deploy | GO after live smoke |
+| Production deploy | NO-GO until live staging validation, consent/PDPA, real integration QA, monitoring, and support process are complete |
+| Paid customer onboarding | CONDITIONAL after pilot metrics, operational acceptance, and integration scope are confirmed |
+
+## Residual Risks And Next Steps
+
+Known residual risks:
+
+- Live staging smoke has not been executed in this repository state.
+- Real LINE outbound requires integration wiring, credentials outside repo, provider QA, and HITL preservation.
+- Real OpenAI/Gemini generation requires provider QA and approved environment setup.
+- Consent/PDPA, data retention, and production support process need dedicated work.
+- Customer-level and broadcast-level HITL may need broader generalized workflow beyond the current lead-scoped queue.
+- Production observability, incident response, and backup restore drill remain future work.
+
+Recommended next PRs:
+
+1. Run and document first live staging deployment smoke.
+2. Add consent/PDPA and data retention workflow.
+3. Add live integration QA plan for LINE and AI providers.
+4. Expand HITL beyond lead-scoped AI suggestions.
+5. Add production observability and incident runbook.
+6. Build final pilot report template and ROI calculator spreadsheet.
