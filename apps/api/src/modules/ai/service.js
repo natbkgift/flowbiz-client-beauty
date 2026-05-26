@@ -8,6 +8,7 @@ const {
   buildLeadRecommendations,
   buildCustomerRecommendations
 } = require('./engine');
+const { generateProviderText, queueAiSuggestionForHitl } = require('./provider-adapter');
 const { recordCustomerEvent } = require('../customers/service');
 
 function mapLeadScore(row) {
@@ -688,17 +689,43 @@ async function generateLeadMessage(clinicContext, payload) {
     await client.query('begin');
     await assertMessageGenerationRateLimit(client, clinicContext, normalized.leadId);
     const { lead, signals, activityTimeline } = await collectLeadSignals(client, clinicContext, normalized.leadId);
-    const messageText = buildShortPersonalizedMessage({
+    const fallbackText = buildShortPersonalizedMessage({
       lead,
       signals,
       recentActivity: activityTimeline[0] || null,
       tone: normalized.tone,
       context: normalized.context
     });
+    const providerResult = await generateProviderText(
+      {
+        clinicId: clinicContext.currentClinic.id,
+        leadId: normalized.leadId,
+        actorUserId: clinicContext.currentUser?.id || null,
+        useCase: normalized.context?.useCase || 'reply_suggestion',
+        tone: normalized.tone,
+        inputText: normalized.context?.goal || '',
+        variables: {
+          source: lead.source,
+          stage: lead.stage,
+          status: lead.status,
+          tags: signals.tags,
+          noteCount: signals.noteCount,
+          outboundMessageCount: signals.outboundMessageCount,
+          daysSinceLastContact: signals.daysSinceLastContact,
+          goal: normalized.context?.goal || null,
+          fallbackText
+        }
+      }
+    );
+    const messageText = providerResult.text;
     const insight = await storeAiInsight(client, clinicContext, 'lead', normalized.leadId, 'message_generation', {
       tone: normalized.tone,
       messageText,
-      context: normalized.context
+      context: normalized.context,
+      provider: providerResult.provider,
+      model: providerResult.model,
+      preSafety: providerResult.preSafety,
+      postSafety: providerResult.postSafety
     });
     const { recordAuditLog } = require('../audit/service');
     await recordAuditLog(
@@ -717,6 +744,8 @@ async function generateLeadMessage(clinicContext, payload) {
     );
     await client.query('commit');
 
+    const hitl = await queueAiSuggestionForHitl(providerResult, providerResult.normalizedInput);
+
     await publishAiEventSafe(
       {
         clinicId: clinicContext.currentClinic.id,
@@ -734,7 +763,13 @@ async function generateLeadMessage(clinicContext, payload) {
 
     return {
       leadId: normalized.leadId,
-      messageText
+      messageText,
+      status: hitl.status,
+      hitlRequired: hitl.hitlRequired,
+      hitlMessageId: hitl.messageId,
+      provider: providerResult.provider,
+      model: providerResult.model,
+      medicalSafety: providerResult.postSafety
     };
   } catch (error) {
     await client.query('rollback');

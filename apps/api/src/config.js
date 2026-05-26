@@ -82,6 +82,12 @@ function loadConfig() {
     lineChannelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
     lineChannelSecret: process.env.LINE_CHANNEL_SECRET || '',
     lineRealSendEnabled: toBoolean(process.env.LINE_REAL_SEND_ENABLED, false),
+    aiProvider: toEnum(process.env.AI_PROVIDER, ['mock', 'gemini', 'openai'], 'mock'),
+    geminiApiKey: process.env.GEMINI_API_KEY || '',
+    openaiApiKey: process.env.OPENAI_API_KEY || '',
+    aiRealGenerationEnabled: toBoolean(process.env.AI_REAL_GENERATION_ENABLED, false),
+    geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+    openaiModel: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
     databaseUrl
   };
 }

@@ -218,6 +218,23 @@ test('message generation returns short personalized text', async () => {
   assert.equal(result.leadId, Number(lead.id));
   assert.equal(typeof result.messageText, 'string');
   assert.ok(result.messageText.length > 20);
+  assert.equal(result.status, 'pending_approval');
+  assert.equal(result.hitlRequired, true);
+
+  const queueRows = await pool.query(
+    `
+      select id
+      from ai_hitl_approval_queue
+      where clinic_id = $1
+        and lead_id = $2
+        and status = 'pending'
+      order by id desc
+      limit 1
+    `,
+    [context.currentClinic.id, lead.id]
+  );
+
+  assert.equal(queueRows.rowCount, 1);
   await pool.end();
 });
 
