@@ -709,8 +709,9 @@ function ForumListPage({ topics, onTopicAdded }) {
           <h3 className="reply-editor-title">ตั้งกระทู้ถามแพทย์</h3>
           
           <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>หมวดหมู่กระทู้</label>
+            <label htmlFor="forum-topic-category" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>หมวดหมู่กระทู้</label>
             <select 
+              id="forum-topic-category"
               value={newCategory} 
               onChange={(e) => setNewCategory(e.target.value)}
               className="reply-textarea"
@@ -724,8 +725,9 @@ function ForumListPage({ topics, onTopicAdded }) {
           </div>
 
           <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>หัวข้อคำถาม</label>
+            <label htmlFor="forum-topic-title" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>หัวข้อคำถาม</label>
             <input 
+              id="forum-topic-title"
               type="text" 
               placeholder="หัวข้อคำถาม (เช่น ฉีดโบท็อกซ์แล้วยิ้มแข็งแก้ยังไงคะ?)" 
               value={newTitle} 
@@ -737,8 +739,9 @@ function ForumListPage({ topics, onTopicAdded }) {
           </div>
 
           <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>รายละเอียดคำถาม</label>
+            <label htmlFor="forum-topic-content" style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>รายละเอียดคำถาม</label>
             <textarea 
+              id="forum-topic-content"
               placeholder="อธิบายรายละเอียดปัญหาของคุณอย่างละเอียด..." 
               value={newContent} 
               onChange={(e) => setNewContent(e.target.value)}
