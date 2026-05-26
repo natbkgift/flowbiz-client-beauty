@@ -27,6 +27,8 @@ const THAI_ERROR_MESSAGES = {
   AI_PROVIDER_API_KEY_REQUIRED: 'ยังไม่ได้ตั้งค่า API key สำหรับ AI provider',
   AI_PROVIDER_GENERATION_FAILED: 'สร้างข้อความจาก AI provider ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
   AI_HITL_QUEUE_REQUIRED: 'ข้อความจาก AI ต้องถูกส่งเข้าคิวให้เจ้าหน้าที่อนุมัติก่อน',
+  AI_MESSAGE_NOT_APPROVED: 'ข้อความ AI ต้องได้รับการอนุมัติก่อนส่ง',
+  AI_MESSAGE_REJECTED: 'ข้อความ AI ที่ถูกปฏิเสธแล้วไม่สามารถส่งได้',
   MESSAGE_NOT_FOUND: 'ไม่พบข้อความ AI ที่ต้องการ',
   THREAD_NOT_FOUND: 'ไม่พบห้องสนทนาที่ต้องการ',
   INVALID_STATUS: 'สถานะข้อมูลไม่พร้อมสำหรับการดำเนินการนี้',

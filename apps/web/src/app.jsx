@@ -2875,7 +2875,7 @@ function AiAgentConsolePage() {
       await api.approveMessage(sessionOptions, messageId, {
         staffOverrideText: isOverride ? overrideText : null
       });
-      setFlash({ kind: 'success', message: 'อนุมัติและส่งข้อความเรียบร้อยแล้ว!' });
+      setFlash({ kind: 'success', message: 'อนุมัติข้อความแล้ว ยังไม่ส่งออกจนกว่าจะสั่งส่งจากคิว outbound' });
       // Remove from local queue list
       setQueue(prev => prev.filter(item => item.id !== messageId));
     } catch (err) {
@@ -3085,7 +3085,7 @@ function AiAgentConsolePage() {
                           color: isOverridden ? '#0d1117' : '#0d1117'
                         }}
                       >
-                        {submittingApprovals[item.id] ? 'กำลังส่ง...' : isOverridden ? 'ส่งข้อความแก้ไข' : 'อนุมัติและส่งทันที'}
+                        {submittingApprovals[item.id] ? 'กำลังบันทึก...' : isOverridden ? 'อนุมัติข้อความแก้ไข' : 'อนุมัติรอส่ง'}
                       </button>
                     </div>
                   </div>

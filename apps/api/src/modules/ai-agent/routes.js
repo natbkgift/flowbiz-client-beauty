@@ -6,6 +6,8 @@ const {
   handleInboundMessage,
   getApprovalQueue,
   approveOrOverrideMessage,
+  rejectAiMessage,
+  queueApprovedMessageForOutbound,
   getAiCopilotSuggestion,
   getAgentRules,
   updateAgentRule
@@ -38,7 +40,7 @@ async function handleAiAgentRoutes(request, response, url, tools) {
 
   if (url.pathname === '/ai-agent/approval-queue' && request.method === 'GET') {
     const context = await authenticateAndAuthorize(request, authenticateRequest, 'ai', 'read');
-    const queue = await getApprovalQueue(context.currentClinic.id);
+    const queue = await getApprovalQueue(context.currentClinic.id, { workspaceId: context.currentWorkspace?.id || null });
     await recordAuditLog({
       clinicId: context.currentClinic.id,
       entityType: 'ai_hitl_queue',
@@ -60,9 +62,43 @@ async function handleAiAgentRoutes(request, response, url, tools) {
       context.currentClinic.id,
       Number(approveParams.messageId),
       body.staffOverrideText || null,
-      { actorUserId: context.currentUser.id }
+      {
+        actorUserId: context.currentUser.id,
+        workspaceId: context.currentWorkspace?.id || null
+      }
     );
     return json(response, 200, message);
+  }
+
+  const rejectParams = matchPath(url.pathname, '/ai-agent/reject/:messageId');
+  if (rejectParams && request.method === 'POST') {
+    const context = await authenticateAndAuthorize(request, authenticateRequest, 'ai', 'manage');
+    const body = await parseJsonBody(request).catch(() => ({}));
+    const message = await rejectAiMessage(
+      context.currentClinic.id,
+      Number(rejectParams.messageId),
+      {
+        actorUserId: context.currentUser.id,
+        workspaceId: context.currentWorkspace?.id || null,
+        rejectionReason: body.rejectionReason || null
+      }
+    );
+    return json(response, 200, message);
+  }
+
+  const outboundParams = matchPath(url.pathname, '/ai-agent/outbound/:messageId');
+  if (outboundParams && request.method === 'POST') {
+    const context = await authenticateAndAuthorize(request, authenticateRequest, 'ai', 'manage');
+    const body = await parseJsonBody(request);
+    const result = await queueApprovedMessageForOutbound(
+      context,
+      Number(outboundParams.messageId),
+      {
+        channelId: body.channelId,
+        scheduledAt: body.scheduledAt || null
+      }
+    );
+    return json(response, 201, result);
   }
 
   if (url.pathname === '/ai-agent/inbound' && request.method === 'POST') {

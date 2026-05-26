@@ -130,7 +130,7 @@ test('AI Agent Multi-Agent Orchestration, Memory Context and HITL Queue Logic', 
   // 7. Approve message with override text
   const approvedMsg = await approveOrOverrideMessage(clinicId, Number(msg4.id), 'สวัสดีค่ะสำหรับคุณลูกค้าที่มีโรคประจำตัวเป็นโรคหัวใจ หมอแนะนำให้ปรึกษาแพทย์ประจำตัวก่อน และนำใบรับรองแพทย์มาตรวจประเมินก่อนนะคะ');
   assert.ok(approvedMsg);
-  assert.equal(approvedMsg.status, 'sent');
+  assert.equal(approvedMsg.status, 'modified');
   assert.equal(approvedMsg.sender_type, 'staff_override');
   assert.ok(approvedMsg.message_text.includes('หมอแนะนำให้ปรึกษาแพทย์ประจำตัวก่อน'));
 
@@ -141,6 +141,9 @@ test('AI Agent Multi-Agent Orchestration, Memory Context and HITL Queue Logic', 
   );
   assert.equal(hitlRowsAfter.rowCount, 1);
   assert.equal(hitlRowsAfter.rows[0].ai_response_text, approvedMsg.message_text);
+  assert.equal(hitlRowsAfter.rows[0].original_text.length > 0, true);
+  assert.equal(hitlRowsAfter.rows[0].modified_text, approvedMsg.message_text);
+  assert.equal(hitlRowsAfter.rows[0].risk_label, 'high');
 });
 
 test('AI Agent Rules and Endpoint Routing', async (t) => {

@@ -2,7 +2,18 @@ const { getPool } = require('../../db');
 const { AppError } = require('../../common/errors');
 const { recordMeteredUsage } = require('../billing/service');
 const { recordAuditLog } = require('../audit/service');
+const { sendLeadOutboundMessage } = require('../messaging/service');
 const { classifyMedicalSafety } = require('./medical-safety');
+
+const HITL_MESSAGE_STATUSES = Object.freeze([
+  'draft',
+  'pending_approval',
+  'approved',
+  'rejected',
+  'modified',
+  'sent',
+  'failed'
+]);
 
 const CLINIC_PROMOTIONS = [
   {
@@ -140,9 +151,44 @@ async function getOrCreateAiThread(pool, clinicId, leadId) {
   return Number(newThread.rows[0].id);
 }
 
+async function resolveLeadWorkspaceId(pool, clinicId, leadId) {
+  const result = await pool.query(
+    'select workspace_id from leads where clinic_id = $1 and id = $2 limit 1',
+    [clinicId, leadId]
+  );
+
+  if (result.rowCount === 0) {
+    throw new AppError(404, 'LEAD_NOT_FOUND', 'Lead not found.');
+  }
+
+  return result.rows[0].workspace_id ? Number(result.rows[0].workspace_id) : null;
+}
+
+function getRiskLabel(text) {
+  return classifyMedicalSafety(text).severity || 'low';
+}
+
+function maxRiskLabel(...labels) {
+  const rank = { low: 1, medium: 2, high: 3 };
+  return labels
+    .filter(Boolean)
+    .reduce((current, label) => (rank[label] > rank[current] ? label : current), 'low');
+}
+
+function assertWorkspaceAccess(messageWorkspaceId, requestedWorkspaceId) {
+  if (!requestedWorkspaceId || !messageWorkspaceId) {
+    return;
+  }
+
+  if (Number(messageWorkspaceId) !== Number(requestedWorkspaceId)) {
+    throw new AppError(403, 'WORKSPACE_ACCESS_DENIED', 'Access to this HITL item is denied for the current workspace.');
+  }
+}
+
 async function createPendingAiApprovalMessage({
   clinicId,
   leadId,
+  workspaceId = null,
   inboundText,
   replyText,
   confidenceScore = 0.8,
@@ -154,6 +200,14 @@ async function createPendingAiApprovalMessage({
   const pool = getPool();
   const normalizedConfidence = Number.isFinite(Number(confidenceScore)) ? Number(confidenceScore) : 0.8;
   const threadId = await getOrCreateAiThread(pool, clinicId, leadId);
+  const resolvedWorkspaceId = workspaceId ? Number(workspaceId) : await resolveLeadWorkspaceId(pool, clinicId, leadId);
+  const responseSafety = classifyMedicalSafety(replyText);
+  const riskLabel = maxRiskLabel(
+    responseSafety.severity,
+    contextJson.medicalSafety?.severity,
+    contextJson.preSafety?.severity,
+    contextJson.postSafety?.severity
+  );
 
   const aiMessageRes = await pool.query(
     `
@@ -166,15 +220,31 @@ async function createPendingAiApprovalMessage({
 
   const messageId = aiMessageRes.rows[0].id;
   await pool.query(
-    `insert into ai_hitl_approval_queue (clinic_id, lead_id, message_text, ai_response_text, confidence_score, status, agent_type)
-     values ($1, $2, $3, $4, $5, 'pending', $6)`,
+    `insert into ai_hitl_approval_queue (
+       clinic_id,
+       workspace_id,
+       lead_id,
+       ai_message_id,
+       message_text,
+       ai_response_text,
+       original_text,
+       modified_text,
+       confidence_score,
+       status,
+       agent_type,
+       risk_label
+     )
+     values ($1, $2, $3, $4, $5, $6, $6, null, $7, 'pending', $8, $9)`,
     [
       clinicId,
+      resolvedWorkspaceId,
       leadId,
+      messageId,
       inboundText || 'AI-generated outbound suggestion requires staff approval before send.',
       replyText,
       normalizedConfidence,
-      agentType
+      agentType,
+      riskLabel
     ]
   );
 
@@ -187,12 +257,13 @@ async function createPendingAiApprovalMessage({
     contextJson: {
       leadId,
       threadId,
+      workspaceId: resolvedWorkspaceId,
       agentType,
       confidenceScore: normalizedConfidence,
       status: 'pending_approval',
       hitlRequired: true,
       autoSendBlocked: true,
-      responseMedicalSafety: classifyMedicalSafety(replyText),
+      responseMedicalSafety: responseSafety,
       ...contextJson
     }
   });
@@ -340,19 +411,47 @@ async function handleInboundMessage(clinicId, leadId, text, options = {}) {
   return aiMessage;
 }
 
-async function getApprovalQueue(clinicId) {
+async function getApprovalQueue(clinicId, options = {}) {
   const pool = getPool();
+  const values = [clinicId];
+  const workspaceClause = options.workspaceId ? 'and l.workspace_id = $2' : '';
+
+  if (options.workspaceId) {
+    values.push(Number(options.workspaceId));
+  }
+
   const queueResult = await pool.query(
     `
-      select m.*, t.lead_id, l.full_name as lead_name
+      select
+        m.*,
+        t.lead_id,
+        l.full_name as lead_name,
+        l.workspace_id,
+        q.id as approval_queue_id,
+        q.original_text,
+        q.modified_text,
+        q.risk_label,
+        q.reviewed_by,
+        q.reviewed_at,
+        q.outbound_message_id
       from ai_chat_messages m
       inner join ai_chat_threads t on t.id = m.thread_id
       inner join leads l on l.id = t.lead_id
+      left join lateral (
+        select *
+        from ai_hitl_approval_queue q
+        where q.clinic_id = t.clinic_id
+          and q.lead_id = t.lead_id
+          and (q.ai_message_id = m.id or (q.ai_message_id is null and q.ai_response_text = m.message_text))
+        order by q.created_at desc, q.id desc
+        limit 1
+      ) q on true
       where t.clinic_id = $1
         and m.status = 'pending_approval'
+        ${workspaceClause}
       order by m.created_at asc
     `,
-    [clinicId]
+    values
   );
 
   return queueResult.rows.map((row) => ({
@@ -360,8 +459,16 @@ async function getApprovalQueue(clinicId) {
     threadId: Number(row.thread_id),
     leadId: Number(row.lead_id),
     leadName: row.lead_name,
+    workspaceId: row.workspace_id ? Number(row.workspace_id) : null,
+    approvalQueueId: row.approval_queue_id ? Number(row.approval_queue_id) : null,
     senderType: row.sender_type,
     messageText: row.message_text,
+    originalText: row.original_text,
+    modifiedText: row.modified_text,
+    riskLabel: row.risk_label || getRiskLabel(row.message_text),
+    reviewedBy: row.reviewed_by ? Number(row.reviewed_by) : null,
+    reviewedAt: row.reviewed_at,
+    outboundMessageId: row.outbound_message_id ? Number(row.outbound_message_id) : null,
     confidenceScore: Number(row.confidence_score),
     status: row.status,
     createdAt: row.created_at
@@ -374,9 +481,10 @@ async function approveOrOverrideMessage(clinicId, messageId, staffOverrideText =
   // 1. Fetch message and verify clinic ownership
   const messageResult = await pool.query(
     `
-      select m.*, t.clinic_id, t.lead_id
+      select m.*, t.clinic_id, t.lead_id, l.workspace_id
       from ai_chat_messages m
       inner join ai_chat_threads t on t.id = m.thread_id
+      inner join leads l on l.id = t.lead_id and l.clinic_id = t.clinic_id
       where m.id = $1
       limit 1
     `,
@@ -393,12 +501,13 @@ async function approveOrOverrideMessage(clinicId, messageId, staffOverrideText =
     throw new AppError(403, 'FORBIDDEN', 'Access to approve this message is denied.');
   }
 
+  assertWorkspaceAccess(msg.workspace_id, options.workspaceId);
+
   if (msg.status !== 'pending_approval') {
     throw new AppError(400, 'INVALID_STATUS', 'Message is not in pending_approval state.');
   }
 
-  // 2. Perform approval or staff override
-  let finalStatus = 'sent';
+  // 2. Perform approval or staff override. Approval is not delivery.
   let finalSenderType = msg.sender_type;
   let finalMessageText = msg.message_text;
 
@@ -414,12 +523,11 @@ async function approveOrOverrideMessage(clinicId, messageId, staffOverrideText =
       update ai_chat_messages
       set sender_type = $2,
           message_text = $3,
-          status = $4,
-          created_at = now()
+          status = $4
       where id = $1
       returning *
     `,
-    [messageId, finalSenderType, finalMessageText, finalStatus]
+    [messageId, finalSenderType, finalMessageText, hitlStatus]
   );
 
   // 3. Update the matching HITL queue record for this exact AI response.
@@ -430,17 +538,33 @@ async function approveOrOverrideMessage(clinicId, messageId, staffOverrideText =
        where clinic_id = $4
          and lead_id = $5
          and status = 'pending'
-         and ai_response_text = $6
+         and (ai_message_id = $10 or (ai_message_id is null and ai_response_text = $6))
        order by created_at asc, id asc
        limit 1
      )
      update ai_hitl_approval_queue
      set status = $1,
          ai_response_text = $2,
+         original_text = coalesce(original_text, $6),
+         modified_text = $7,
+         workspace_id = coalesce(workspace_id, $8),
+         risk_label = $9,
          reviewed_by = $3,
-         reviewed_at = now()
+         reviewed_at = now(),
+         ai_message_id = coalesce(ai_message_id, $10)
      where id in (select id from target_queue)`,
-    [hitlStatus, finalMessageText, options.actorUserId || null, clinicId, msg.lead_id, msg.message_text]
+    [
+      hitlStatus,
+      finalMessageText,
+      options.actorUserId || null,
+      clinicId,
+      msg.lead_id,
+      msg.message_text,
+      hitlStatus === 'modified' ? finalMessageText : null,
+      msg.workspace_id || null,
+      getRiskLabel(finalMessageText),
+      messageId
+    ]
   );
 
   // 4. Record metered SaaS billing usage
@@ -460,13 +584,193 @@ async function approveOrOverrideMessage(clinicId, messageId, staffOverrideText =
     contextJson: {
       leadId: Number(msg.lead_id),
       threadId: Number(msg.thread_id),
+      workspaceId: msg.workspace_id ? Number(msg.workspace_id) : null,
       finalSenderType,
+      approvalStatus: hitlStatus,
+      originalTextLength: String(msg.message_text || '').length,
+      finalTextLength: String(finalMessageText || '').length,
       overrideApplied: hitlStatus === 'modified',
       riskLabel: classifyMedicalSafety(finalMessageText).severity || 'unknown'
     }
   });
 
   return updatedResult.rows[0];
+}
+
+async function rejectAiMessage(clinicId, messageId, options = {}) {
+  const pool = getPool();
+  const messageResult = await pool.query(
+    `
+      select m.*, t.clinic_id, t.lead_id, l.workspace_id
+      from ai_chat_messages m
+      inner join ai_chat_threads t on t.id = m.thread_id
+      inner join leads l on l.id = t.lead_id and l.clinic_id = t.clinic_id
+      where m.id = $1
+      limit 1
+    `,
+    [messageId]
+  );
+
+  if (messageResult.rowCount === 0) {
+    throw new AppError(404, 'MESSAGE_NOT_FOUND', 'AI message not found.');
+  }
+
+  const msg = messageResult.rows[0];
+
+  if (Number(msg.clinic_id) !== Number(clinicId)) {
+    throw new AppError(403, 'FORBIDDEN', 'Access to reject this message is denied.');
+  }
+
+  assertWorkspaceAccess(msg.workspace_id, options.workspaceId);
+
+  if (msg.status !== 'pending_approval') {
+    throw new AppError(400, 'INVALID_STATUS', 'Message is not in pending_approval state.');
+  }
+
+  const updatedResult = await pool.query(
+    `
+      update ai_chat_messages
+      set status = 'rejected'
+      where id = $1
+      returning *
+    `,
+    [messageId]
+  );
+
+  await pool.query(
+    `with target_queue as (
+       select id
+       from ai_hitl_approval_queue
+       where clinic_id = $3
+         and lead_id = $4
+         and status = 'pending'
+         and (ai_message_id = $1 or (ai_message_id is null and ai_response_text = $5))
+       order by created_at asc, id asc
+       limit 1
+     )
+     update ai_hitl_approval_queue
+     set status = 'rejected',
+         reviewed_by = $2,
+         reviewed_at = now(),
+         ai_message_id = coalesce(ai_message_id, $1),
+         workspace_id = coalesce(workspace_id, $6),
+         original_text = coalesce(original_text, $5),
+         modified_text = null,
+         risk_label = $7,
+         rejection_reason = $8
+     where id in (select id from target_queue)`,
+    [
+      messageId,
+      options.actorUserId || null,
+      clinicId,
+      msg.lead_id,
+      msg.message_text,
+      msg.workspace_id || null,
+      getRiskLabel(msg.message_text),
+      options.rejectionReason || null
+    ]
+  );
+
+  await recordAuditLog({
+    clinicId,
+    entityType: 'ai_message',
+    entityId: messageId,
+    actionType: 'ai.hitl_rejected',
+    actorUserId: options.actorUserId || null,
+    contextJson: {
+      leadId: Number(msg.lead_id),
+      threadId: Number(msg.thread_id),
+      workspaceId: msg.workspace_id ? Number(msg.workspace_id) : null,
+      riskLabel: getRiskLabel(msg.message_text),
+      rejectionReasonProvided: Boolean(options.rejectionReason)
+    }
+  });
+
+  return updatedResult.rows[0];
+}
+
+async function queueApprovedMessageForOutbound(clinicContext, messageId, payload = {}) {
+  const pool = getPool();
+  const messageResult = await pool.query(
+    `
+      select m.*, t.clinic_id, t.lead_id, l.workspace_id
+      from ai_chat_messages m
+      inner join ai_chat_threads t on t.id = m.thread_id
+      inner join leads l on l.id = t.lead_id and l.clinic_id = t.clinic_id
+      where m.id = $1
+      limit 1
+    `,
+    [messageId]
+  );
+
+  if (messageResult.rowCount === 0) {
+    throw new AppError(404, 'MESSAGE_NOT_FOUND', 'AI message not found.');
+  }
+
+  const msg = messageResult.rows[0];
+  const clinicId = clinicContext.currentClinic.id;
+
+  if (Number(msg.clinic_id) !== Number(clinicId)) {
+    throw new AppError(403, 'FORBIDDEN', 'Access to send this message is denied.');
+  }
+
+  assertWorkspaceAccess(msg.workspace_id, clinicContext.currentWorkspace?.id);
+
+  if (msg.status === 'rejected') {
+    throw new AppError(400, 'AI_MESSAGE_REJECTED', 'Rejected AI messages cannot be sent.');
+  }
+
+  if (!['approved', 'modified'].includes(msg.status)) {
+    throw new AppError(400, 'AI_MESSAGE_NOT_APPROVED', 'AI message must be approved before outbound queueing.');
+  }
+
+  const scheduledAt = payload.scheduledAt || new Date(Date.now() + 60 * 1000).toISOString();
+  const outbound = await sendLeadOutboundMessage(
+    clinicContext,
+    Number(msg.lead_id),
+    {
+      channelId: payload.channelId,
+      content: msg.message_text,
+      scheduledAt
+    },
+    {
+      messageType: 'manual'
+    }
+  );
+
+  await pool.query(
+    `
+      update ai_hitl_approval_queue
+      set outbound_message_id = $1
+      where clinic_id = $2
+        and lead_id = $3
+        and (ai_message_id = $4 or (ai_message_id is null and ai_response_text = $5))
+    `,
+    [outbound.id, clinicId, msg.lead_id, messageId, msg.message_text]
+  );
+
+  await recordAuditLog({
+    clinicId,
+    entityType: 'ai_message',
+    entityId: messageId,
+    actionType: 'ai.hitl_outbound_queued',
+    actorUserId: clinicContext.currentUser?.id || null,
+    contextJson: {
+      leadId: Number(msg.lead_id),
+      workspaceId: msg.workspace_id ? Number(msg.workspace_id) : null,
+      outboundMessageId: outbound.id,
+      outboundStatus: outbound.status,
+      channelId: payload.channelId,
+      approvalStatus: msg.status,
+      scheduledAt
+    }
+  });
+
+  return {
+    messageId: Number(messageId),
+    status: msg.status,
+    outboundMessage: outbound
+  };
 }
 
 async function getAiCopilotSuggestion(clinicId, leadId, messageText, options = {}) {
@@ -532,10 +836,13 @@ async function getAiCopilotSuggestion(clinicId, leadId, messageText, options = {
 }
 
 module.exports = {
+  HITL_MESSAGE_STATUSES,
   handleInboundMessage,
   createPendingAiApprovalMessage,
   getApprovalQueue,
   approveOrOverrideMessage,
+  rejectAiMessage,
+  queueApprovedMessageForOutbound,
   getAiCopilotSuggestion,
   getAgentRules,
   updateAgentRule

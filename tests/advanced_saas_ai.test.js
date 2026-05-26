@@ -168,7 +168,7 @@ test('Conversational AI - Two-Way messaging with Human-in-the-loop approvals', a
   const overrideText = 'สวัสดีค่ะ ทางคลินิกขอแนะนำนายแพทย์กิตติพงษ์ ผู้เชี่ยวชาญความงามระดับท็อป 3 ให้คุณลูกค้าศึกษาประวัติได้ผ่านหน้าเว็บหลักเลยค่ะ';
   const approvedMsg = await approveOrOverrideMessage(context.currentClinic.id, lowConfidenceMsg.id, overrideText);
   
-  assert.equal(approvedMsg.status, 'sent');
+  assert.equal(approvedMsg.status, 'modified');
   assert.equal(approvedMsg.sender_type, 'staff_override');
   assert.equal(approvedMsg.message_text, overrideText);
 
