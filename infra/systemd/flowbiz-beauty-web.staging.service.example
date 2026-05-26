@@ -1,0 +1,19 @@
+[Unit]
+Description=FlowBiz Beauty Web Service (staging)
+After=network.target
+
+[Service]
+Type=simple
+User=flowbiz
+Group=flowbiz
+WorkingDirectory=/opt/flowbiz/clients/flowbiz-client-beauty/current
+Environment=NODE_ENV=production
+EnvironmentFile=/etc/flowbiz/flowbiz-beauty-staging.env
+ExecStart=/usr/bin/node apps/web/src/server.js
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

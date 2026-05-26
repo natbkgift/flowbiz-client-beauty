@@ -29,8 +29,17 @@ function replaceAll(value, search, replacement) {
 function buildContentSecurityPolicy(nonce) {
   const connectSrc = ["'self'"];
   const imgSrc = ["'self'", 'https:', 'data:'];
+  const configuredApiBaseUrl = String(config.apiBaseUrl || '').trim();
 
-  if (config.appEnv !== 'production') {
+  if (configuredApiBaseUrl.startsWith('http://') || configuredApiBaseUrl.startsWith('https://')) {
+    try {
+      connectSrc.push(new URL(configuredApiBaseUrl).origin);
+    } catch {
+      // Ignore invalid runtime URL here; API calls will fail visibly if misconfigured.
+    }
+  }
+
+  if (config.appEnv === 'development') {
     connectSrc.push(`http://localhost:${config.apiPort}`, `http://127.0.0.1:${config.apiPort}`);
     imgSrc.push('http:');
   }
@@ -68,7 +77,9 @@ function buildResponseHeaders(contentType, options = {}) {
 function renderIndex(templateName, requestHostname = 'localhost', nonce = '') {
   const template = fs.readFileSync(path.join(root, templateName), 'utf8');
   const devApiHost = ['localhost', '127.0.0.1'].includes(requestHostname) ? requestHostname : 'localhost';
-  const apiBaseUrl = config.appEnv === 'production' ? '/api' : `http://${devApiHost}:${config.apiPort}`;
+  const apiBaseUrl =
+    config.apiBaseUrl ||
+    (config.appEnv === 'development' ? `http://${devApiHost}:${config.apiPort}` : '/api');
   return replaceAll(
     replaceAll(
       replaceAll(template, '__API_BASE_URL__', apiBaseUrl),

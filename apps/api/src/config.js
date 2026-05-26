@@ -48,8 +48,8 @@ function toEnum(value, allowedValues, fallback) {
 function loadConfig() {
   const appEnv = process.env.APP_ENV || 'development';
   const localTokenSecret = 'flowbiz_local_token_secret_change_me';
-  const authTokenSecret = process.env.AUTH_TOKEN_SECRET || localTokenSecret;
-  const inviteTokenSecret = process.env.INVITE_TOKEN_SECRET || process.env.AUTH_TOKEN_SECRET || localTokenSecret;
+  const authTokenSecret = process.env.AUTH_TOKEN_SECRET || process.env.AUTH_SECRET || localTokenSecret;
+  const inviteTokenSecret = process.env.INVITE_TOKEN_SECRET || process.env.AUTH_TOKEN_SECRET || process.env.AUTH_SECRET || localTokenSecret;
   const databaseUrl =
     process.env.DATABASE_URL ||
     'postgresql://flowbiz:flowbiz_local_dev_only@localhost:5432/flowbiz_local';
@@ -68,6 +68,8 @@ function loadConfig() {
     appEnv,
     apiPort: toPort(process.env.API_PORT, 3001),
     webPort: toPort(process.env.WEB_PORT, 4173),
+    publicAppUrl: process.env.PUBLIC_APP_URL || process.env.APP_BASE_URL || '',
+    apiBaseUrl: process.env.API_BASE_URL || '',
     authTokenSecret,
     authTokenTtlHours: toPositiveInt(process.env.AUTH_TOKEN_TTL_HOURS, 12),
     inviteTokenSecret,

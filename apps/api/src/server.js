@@ -77,12 +77,21 @@ function applyDevelopmentCors(request, response) {
 async function routeRequest(request, response) {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
 
-  if (url.pathname === '/health' && request.method === 'GET') {
+  if ((url.pathname === '/live' || url.pathname === '/healthz') && request.method === 'GET') {
+    return json(response, 200, {
+      status: 'ok',
+      check: 'liveness',
+      appEnv: config.appEnv
+    });
+  }
+
+  if ((url.pathname === '/ready' || url.pathname === '/health') && request.method === 'GET') {
     try {
       const db = await testConnection();
 
       return json(response, 200, {
         status: 'ok',
+        check: 'readiness',
         appEnv: config.appEnv,
         database: {
           status: 'connected',
@@ -90,8 +99,9 @@ async function routeRequest(request, response) {
         }
       });
     } catch (error) {
-      return json(response, 200, {
-        status: 'ok',
+      return json(response, 503, {
+        status: 'unavailable',
+        check: 'readiness',
         appEnv: config.appEnv,
         database: {
           status: 'unavailable',
@@ -105,6 +115,8 @@ async function routeRequest(request, response) {
     return json(response, 200, {
       name: 'flowbiz-api',
       message: 'FlowBiz Beauty API พร้อมให้บริการ',
+      livenessEndpoint: '/live',
+      readinessEndpoint: '/ready',
       healthEndpoint: '/health',
       authEndpoints: [
         config.publicSignupEnabled ? '/auth/signup' : null,
