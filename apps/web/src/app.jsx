@@ -3997,7 +3997,7 @@ function LoginView() {
             />
           </label>
           <label className="field field-span-2">
-            <span>Clinic slug (ไม่บังคับ)</span>
+            <span>รหัสคลินิก (ไม่บังคับ)</span>
             <input
               autoComplete="organization"
               value={form.clinicSlug}
