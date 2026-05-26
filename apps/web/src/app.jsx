@@ -1,6 +1,10 @@
 import React, { createContext, startTransition, useContext, useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
 import DOMPurify from 'dompurify';
+import { Button } from './components/ui/Button.jsx';
+import { Card } from './components/ui/Card.jsx';
+import { EmptyState } from './components/ui/EmptyState.jsx';
+import { LoadingState } from './components/ui/LoadingState.jsx';
 
 const STORAGE_KEY = 'flowbiz.admin.token';
 
@@ -653,9 +657,8 @@ function TopBar() {
             ))}
           </select>
         </label>
-        <button
-          type="button"
-          className="secondary-button"
+        <Button
+          variant="secondary"
           onClick={() => {
             clearStoredAdminToken();
             setToken('');
@@ -663,7 +666,7 @@ function TopBar() {
           }}
         >
           ออกจากระบบ
-        </button>
+        </Button>
         {switchWorkspaceState.status === 'loading' ? <span className="pill status-running">กำลังสลับเวิร์กสเปซ</span> : null}
       </div>
     </header>
@@ -673,7 +676,7 @@ function TopBar() {
 function PageShell({ title, intro, actions, children }) {
   return (
     <section className="page-shell">
-      <div className="hero-card">
+      <Card variant="hero">
         <div className="split-header">
           <div>
             <h1 className="page-title">{title}</h1>
@@ -681,19 +684,14 @@ function PageShell({ title, intro, actions, children }) {
           </div>
           {actions ? <div className="toolbar">{actions}</div> : null}
         </div>
-      </div>
+      </Card>
       {children}
     </section>
   );
 }
 
 function PermissionNotice({ title, message }) {
-  return (
-    <div className="notice-card" data-testid="permission-notice">
-      <h3 className="section-heading">{title}</h3>
-      <p className="muted">{message}</p>
-    </div>
-  );
+  return <EmptyState title={title} message={message} testId="permission-notice" />;
 }
 
 function StatusBanner({ state, testId = 'status-banner' }) {
@@ -709,29 +707,25 @@ function StatusBanner({ state, testId = 'status-banner' }) {
 }
 
 function LoadingCard({ label = 'กำลังโหลดข้อมูล...' }) {
-  return (
-    <div className="notice-card" data-testid="loading-state">
-      <p className="muted">{label}</p>
-    </div>
-  );
+  return <LoadingState label={label} />;
 }
 
 function ErrorCard({ error }) {
   return (
-    <div className="notice-card error-card" data-testid="error-state">
+    <Card variant="notice" className="error-card" data-testid="error-state">
       <h3 className="section-heading">ดำเนินการไม่สำเร็จ</h3>
       <p className="muted">{describeError(error)}</p>
-    </div>
+    </Card>
   );
 }
 
 function MetricCard({ label, value, hint }) {
   return (
-    <article className="metric-card">
+    <Card as="article" variant="metric">
       <span className="metric-label">{label}</span>
       <p className="metric-value">{value}</p>
       <span className="metric-hint">{hint}</span>
-    </article>
+    </Card>
   );
 }
 
@@ -4006,9 +4000,9 @@ function LoginView() {
             />
           </label>
           <div className="inline-actions field-span-2">
-            <button type="submit" className="primary-button" data-testid="login-submit" disabled={state.status === 'loading'}>
+            <Button type="submit" variant="primary" data-testid="login-submit" disabled={state.status === 'loading'}>
               {state.status === 'loading' ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
-            </button>
+            </Button>
           </div>
         </form>
       </section>
