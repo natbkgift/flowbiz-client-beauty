@@ -40,6 +40,11 @@ function toBoolean(value, fallback) {
   return fallback;
 }
 
+function toEnum(value, allowedValues, fallback) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return allowedValues.includes(normalized) ? normalized : fallback;
+}
+
 function loadConfig() {
   const appEnv = process.env.APP_ENV || 'development';
   const localTokenSecret = 'flowbiz_local_token_secret_change_me';
@@ -73,6 +78,10 @@ function loadConfig() {
     workerLoopBatchSize: toPositiveInt(process.env.WORKER_LOOP_BATCH_SIZE, 20),
     eventRetryMaxAttempts: toPositiveInt(process.env.EVENT_RETRY_MAX_ATTEMPTS, 3),
     publicClinicId: toPositiveInt(process.env.PUBLIC_CLINIC_ID, appEnv === 'production' ? null : 1001),
+    lineIntegrationMode: toEnum(process.env.LINE_INTEGRATION_MODE, ['simulated', 'real'], 'simulated'),
+    lineChannelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
+    lineChannelSecret: process.env.LINE_CHANNEL_SECRET || '',
+    lineRealSendEnabled: toBoolean(process.env.LINE_REAL_SEND_ENABLED, false),
     databaseUrl
   };
 }
