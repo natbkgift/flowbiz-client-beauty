@@ -9,6 +9,7 @@
     "build:web": "node scripts/build-web.js",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
+    "seed:demo": "node scripts/seed-demo-clinic.js",
     "validate": "node scripts/validate.js",
     "test": "node -r ./teardown-hook.js --test --test-force-exit --test-concurrency=2 apps/api/tests/*.test.js tests/*.test.js"
   },
