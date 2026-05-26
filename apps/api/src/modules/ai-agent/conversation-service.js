@@ -118,26 +118,93 @@ async function updateAgentRule(clinicId, agentType, systemPrompt, temperature, r
   return rule;
 }
 
+async function getOrCreateAiThread(pool, clinicId, leadId) {
+  let threadResult = await pool.query(
+    'select * from ai_chat_threads where lead_id = $1 and clinic_id = $2 limit 1',
+    [leadId, clinicId]
+  );
+
+  if (threadResult.rowCount > 0) {
+    return Number(threadResult.rows[0].id);
+  }
+
+  const newThread = await pool.query(
+    `
+      insert into ai_chat_threads (clinic_id, lead_id, status)
+      values ($1, $2, 'active')
+      returning id
+    `,
+    [clinicId, leadId]
+  );
+
+  return Number(newThread.rows[0].id);
+}
+
+async function createPendingAiApprovalMessage({
+  clinicId,
+  leadId,
+  inboundText,
+  replyText,
+  confidenceScore = 0.8,
+  agentType = 'ai_agent',
+  actorUserId = null,
+  auditActionType = 'ai.generated_requires_hitl',
+  contextJson = {}
+}) {
+  const pool = getPool();
+  const normalizedConfidence = Number.isFinite(Number(confidenceScore)) ? Number(confidenceScore) : 0.8;
+  const threadId = await getOrCreateAiThread(pool, clinicId, leadId);
+
+  const aiMessageRes = await pool.query(
+    `
+      insert into ai_chat_messages (thread_id, sender_type, message_text, confidence_score, status)
+      values ($1, 'ai_agent', $2, $3, 'pending_approval')
+      returning *
+    `,
+    [threadId, replyText, normalizedConfidence]
+  );
+
+  const messageId = aiMessageRes.rows[0].id;
+  await pool.query(
+    `insert into ai_hitl_approval_queue (clinic_id, lead_id, message_text, ai_response_text, confidence_score, status, agent_type)
+     values ($1, $2, $3, $4, $5, 'pending', $6)`,
+    [
+      clinicId,
+      leadId,
+      inboundText || 'AI-generated outbound suggestion requires staff approval before send.',
+      replyText,
+      normalizedConfidence,
+      agentType
+    ]
+  );
+
+  await recordAuditLog({
+    clinicId,
+    entityType: 'ai_message',
+    entityId: messageId,
+    actionType: auditActionType,
+    actorUserId,
+    contextJson: {
+      leadId,
+      threadId,
+      agentType,
+      confidenceScore: normalizedConfidence,
+      status: 'pending_approval',
+      hitlRequired: true,
+      autoSendBlocked: true,
+      responseMedicalSafety: classifyMedicalSafety(replyText),
+      ...contextJson
+    }
+  });
+
+  return aiMessageRes.rows[0];
+}
+
 async function handleInboundMessage(clinicId, leadId, text, options = {}) {
   const pool = getPool();
 
   // 1. Get or create the AI Chat Thread
-  let threadResult = await pool.query('select * from ai_chat_threads where lead_id = $1 limit 1', [leadId]);
-  let threadId;
-  
-  if (threadResult.rowCount === 0) {
-    const newThread = await pool.query(
-      `
-        insert into ai_chat_threads (clinic_id, lead_id, status)
-        values ($1, $2, 'active')
-        returning id
-      `,
-      [clinicId, leadId]
-    );
-    threadId = newThread.rows[0].id;
-  } else {
-    threadId = threadResult.rows[0].id;
-  }
+  const threadId = await getOrCreateAiThread(pool, clinicId, leadId);
 
   // 2. Insert Lead inbound message
   await pool.query(
@@ -241,10 +308,7 @@ async function handleInboundMessage(clinicId, leadId, text, options = {}) {
     replyText = 'ขอบคุณที่แจ้งข้อมูลค่ะ กรณีนี้เกี่ยวข้องกับความปลอดภัยทางการแพทย์ แอดมินจะส่งให้เจ้าหน้าที่หรือแพทย์ผู้ดูแลตรวจสอบก่อนตอบกลับ เพื่อความปลอดภัยของคนไข้นะคะ';
   }
 
-  let messageStatus = 'sent';
-  if (confidenceScore < 0.85) {
-    messageStatus = 'pending_approval';
-  }
+  const messageStatus = 'pending_approval';
 
   // 6. Update AI Agent Conversation State
   await pool.query(
@@ -256,55 +320,24 @@ async function handleInboundMessage(clinicId, leadId, text, options = {}) {
     [nextAgent, JSON.stringify(memoryContext), leadId, clinicId]
   );
 
-  // 7. Insert AI Chat Message
-  const aiMessageRes = await pool.query(
-    `
-      insert into ai_chat_messages (thread_id, sender_type, message_text, confidence_score, status)
-      values ($1, 'ai_agent', $2, $3, $4)
-      returning *
-    `,
-    [threadId, replyText, confidenceScore, messageStatus]
-  );
-
-  const messageId = aiMessageRes.rows[0].id;
-
-  // 8. If pending_approval, insert into HITL approval queue
-  if (messageStatus === 'pending_approval') {
-    await pool.query(
-      `insert into ai_hitl_approval_queue (clinic_id, lead_id, message_text, ai_response_text, confidence_score, status, agent_type)
-       values ($1, $2, $3, $4, $5, 'pending', $6)`,
-      [clinicId, leadId, text, replyText, confidenceScore, currentAgent]
-    );
-  }
-
-  await recordAuditLog({
+  // 7. Queue every AI reply for HITL approval before any outbound send.
+  const aiMessage = await createPendingAiApprovalMessage({
     clinicId,
-    entityType: 'ai_message',
-    entityId: messageId,
-    actionType: messageStatus === 'sent' ? 'ai.auto_reply_sent' : 'ai.auto_reply_requires_hitl',
     actorUserId: options.actorUserId || null,
+    leadId,
+    inboundText: text,
+    replyText,
+    confidenceScore,
+    agentType: currentAgent,
+    auditActionType: 'ai.auto_reply_requires_hitl',
     contextJson: {
-      leadId,
-      threadId,
-      agentType: currentAgent,
       nextAgent,
-      confidenceScore,
       status: messageStatus,
       medicalSafety: safetyClassification
     }
   });
 
-  // 9. If auto-sent, record metered SaaS billing usage
-  if (messageStatus === 'sent') {
-    await recordMeteredUsage(clinicId, 'ai_message_generated', 1, {
-      actorUserId: options.actorUserId || null,
-      source: 'ai.auto_reply',
-      relatedEntityType: 'ai_message',
-      relatedEntityId: messageId
-    });
-  }
-
-  return aiMessageRes.rows[0];
+  return aiMessage;
 }
 
 async function getApprovalQueue(clinicId) {
@@ -389,14 +422,25 @@ async function approveOrOverrideMessage(clinicId, messageId, staffOverrideText =
     [messageId, finalSenderType, finalMessageText, finalStatus]
   );
 
-  // 3. Update matching HITL queue record (where lead_id matches and status is 'pending')
+  // 3. Update the matching HITL queue record for this exact AI response.
   await pool.query(
-    `update ai_hitl_approval_queue
+    `with target_queue as (
+       select id
+       from ai_hitl_approval_queue
+       where clinic_id = $4
+         and lead_id = $5
+         and status = 'pending'
+         and ai_response_text = $6
+       order by created_at asc, id asc
+       limit 1
+     )
+     update ai_hitl_approval_queue
      set status = $1,
          ai_response_text = $2,
+         reviewed_by = $3,
          reviewed_at = now()
-     where clinic_id = $3 and lead_id = $4 and status = 'pending'`,
-    [hitlStatus, finalMessageText, clinicId, msg.lead_id]
+     where id in (select id from target_queue)`,
+    [hitlStatus, finalMessageText, options.actorUserId || null, clinicId, msg.lead_id, msg.message_text]
   );
 
   // 4. Record metered SaaS billing usage
@@ -417,7 +461,8 @@ async function approveOrOverrideMessage(clinicId, messageId, staffOverrideText =
       leadId: Number(msg.lead_id),
       threadId: Number(msg.thread_id),
       finalSenderType,
-      overrideApplied: hitlStatus === 'modified'
+      overrideApplied: hitlStatus === 'modified',
+      riskLabel: classifyMedicalSafety(finalMessageText).severity || 'unknown'
     }
   });
 
@@ -488,6 +533,7 @@ async function getAiCopilotSuggestion(clinicId, leadId, messageText, options = {
 
 module.exports = {
   handleInboundMessage,
+  createPendingAiApprovalMessage,
   getApprovalQueue,
   approveOrOverrideMessage,
   getAiCopilotSuggestion,

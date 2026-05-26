@@ -67,7 +67,7 @@ test('AI Agent Multi-Agent Orchestration, Memory Context and HITL Queue Logic', 
   // Send "สวัสดีค่ะ" -> Qualifies for default greeting, doesn't transition agent type
   const msg1 = await handleInboundMessage(clinicId, leadId, 'สวัสดีค่ะ');
   assert.ok(msg1);
-  assert.equal(msg1.status, 'sent');
+  assert.equal(msg1.status, 'pending_approval');
   assert.ok(msg1.message_text.includes('FlowBiz Beauty Clinic'));
 
   const conv1 = await fixture.pool.query('select * from ai_agent_conversations where lead_id = $1', [leadId]);
@@ -77,7 +77,7 @@ test('AI Agent Multi-Agent Orchestration, Memory Context and HITL Queue Logic', 
   // Should transition current_agent to 'consult' and store qualified status
   const msg2 = await handleInboundMessage(clinicId, leadId, 'สนใจโปรค่ะเบอร์ 0891234567');
   assert.ok(msg2);
-  assert.equal(msg2.status, 'sent');
+  assert.equal(msg2.status, 'pending_approval');
   assert.ok(msg2.message_text.includes('ขอบพระคุณสำหรับข้อมูลติดต่อ'));
 
   const conv2 = await fixture.pool.query('select * from ai_agent_conversations where lead_id = $1', [leadId]);
@@ -88,7 +88,7 @@ test('AI Agent Multi-Agent Orchestration, Memory Context and HITL Queue Logic', 
   // Should match BOTOX29 promo, keep agent as 'consult', set confidence score high
   const msg3 = await handleInboundMessage(clinicId, leadId, 'อยากจองโบท็อกซ์ริ้วรอย');
   assert.ok(msg3);
-  assert.equal(msg3.status, 'sent');
+  assert.equal(msg3.status, 'pending_approval');
   assert.equal(Number(msg3.confidence_score), 0.96);
   assert.ok(msg3.message_text.includes('โบท็อกซ์ลดริ้วรอยทั่วใบหน้า'));
 
@@ -107,13 +107,25 @@ test('AI Agent Multi-Agent Orchestration, Memory Context and HITL Queue Logic', 
     'select * from ai_hitl_approval_queue where clinic_id = $1 and lead_id = $2 and status = $3',
     [clinicId, leadId, 'pending']
   );
-  assert.equal(hitlRows.rowCount, 1);
-  assert.equal(hitlRows.rows[0].agent_type, 'retention');
+  assert.equal(hitlRows.rowCount, 4);
+  assert.ok(hitlRows.rows.some((row) => row.agent_type === 'retention'));
 
   // 6. Get Approval Queue
   const queue = await getApprovalQueue(clinicId);
-  assert.equal(queue.length, 1);
-  assert.equal(queue[0].id, Number(msg4.id));
+  assert.equal(queue.length, 4);
+  assert.ok(queue.some((row) => row.id === Number(msg4.id)));
+
+  const autoReplySentAudit = await fixture.pool.query(
+    'select count(*)::int as event_count from audit_logs where clinic_id = $1 and action_type = $2',
+    [clinicId, 'ai.auto_reply_sent']
+  );
+  assert.equal(autoReplySentAudit.rows[0].event_count, 0);
+
+  const hitlAudit = await fixture.pool.query(
+    'select count(*)::int as event_count from audit_logs where clinic_id = $1 and action_type = $2',
+    [clinicId, 'ai.auto_reply_requires_hitl']
+  );
+  assert.equal(hitlAudit.rows[0].event_count >= 4, true);
 
   // 7. Approve message with override text
   const approvedMsg = await approveOrOverrideMessage(clinicId, Number(msg4.id), 'สวัสดีค่ะสำหรับคุณลูกค้าที่มีโรคประจำตัวเป็นโรคหัวใจ หมอแนะนำให้ปรึกษาแพทย์ประจำตัวก่อน และนำใบรับรองแพทย์มาตรวจประเมินก่อนนะคะ');
@@ -124,10 +136,11 @@ test('AI Agent Multi-Agent Orchestration, Memory Context and HITL Queue Logic', 
 
   // Ensure queue status is updated
   const hitlRowsAfter = await fixture.pool.query(
-    'select * from ai_hitl_approval_queue where clinic_id = $1 and lead_id = $2',
-    [clinicId, leadId]
+    'select * from ai_hitl_approval_queue where clinic_id = $1 and lead_id = $2 and status = $3',
+    [clinicId, leadId, 'modified']
   );
-  assert.equal(hitlRowsAfter.rows[0].status, 'modified');
+  assert.equal(hitlRowsAfter.rowCount, 1);
+  assert.equal(hitlRowsAfter.rows[0].ai_response_text, approvedMsg.message_text);
 });
 
 test('AI Agent Rules and Endpoint Routing', async (t) => {

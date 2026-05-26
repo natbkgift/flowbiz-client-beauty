@@ -364,6 +364,104 @@ test('no duplicate execution occurs for the same source event', async (t) => {
   assert.equal(actionRows.rows[0].action_count, 1);
 });
 
+test('AI follow-up auto action queues HITL approval instead of outbound send', async (t) => {
+  const fixture = await createFixture(t);
+  const lead = await createLead(fixture.ownerContext, {
+    fullName: `HITL Followup Lead ${Date.now()}`,
+    source: 'manual',
+    status: 'active',
+    stage: 'qualified',
+    ownerUserId: fixture.ownerContext.currentUser.id,
+    intentScore: 40,
+    phone: `087${String(Date.now()).slice(-7)}`,
+    email: `hitl-followup-${Date.now()}@example.com`
+  });
+
+  await fixture.pool.query(
+    `
+      insert into channels (clinic_id, channel_type, name, status, is_primary, config_json)
+      select $1, 'line', $2, 'active', false, '{}'::jsonb
+      where not exists (
+        select 1 from channels where clinic_id = $1 and status = 'active'
+      )
+    `,
+    [fixture.ownerContext.currentClinic.id, `HITL LINE ${Date.now()}`]
+  );
+
+  await fixture.pool.query(
+    `
+      insert into ai_outcomes (
+        clinic_id,
+        workspace_id,
+        entity_type,
+        entity_id,
+        action_type,
+        outcome_type,
+        metadata_json,
+        idempotency_key,
+        created_at
+      )
+      values ($1, $2, 'lead', $3, 'message_sent', 'sent', '{}'::jsonb, $4, now() - interval '3 days')
+    `,
+    [
+      fixture.ownerContext.currentClinic.id,
+      fixture.ownerContext.currentWorkspace.id,
+      lead.id,
+      `phase2-hitl-followup-${lead.id}-${Date.now()}`
+    ]
+  );
+
+  const result = await executeAutoAction(fixture.ownerContext, lead.id, {
+    sourceEventId: null,
+    triggerEventType: 'manual'
+  });
+
+  const followupAction = result.actions.find((action) => action.actionKey === 'send_followup_message');
+  assert.ok(followupAction);
+  assert.equal(followupAction.status, 'pending_approval');
+  assert.ok(followupAction.approvalMessageId);
+
+  const outboundRows = await fixture.pool.query(
+    `
+      select count(*)::int as message_count
+      from outbound_messages
+      where clinic_id = $1
+        and entity_type = 'lead'
+        and entity_id = $2
+        and message_type = 'automation'
+    `,
+    [fixture.ownerContext.currentClinic.id, lead.id]
+  );
+  assert.equal(outboundRows.rows[0].message_count, 0);
+
+  const pendingMessageRows = await fixture.pool.query(
+    `
+      select m.status
+      from ai_chat_messages m
+      inner join ai_chat_threads t on t.id = m.thread_id
+      where t.clinic_id = $1
+        and t.lead_id = $2
+        and m.id = $3
+    `,
+    [fixture.ownerContext.currentClinic.id, lead.id, followupAction.approvalMessageId]
+  );
+  assert.equal(pendingMessageRows.rowCount, 1);
+  assert.equal(pendingMessageRows.rows[0].status, 'pending_approval');
+
+  const auditRows = await fixture.pool.query(
+    `
+      select count(*)::int as event_count
+      from audit_logs
+      where clinic_id = $1
+        and entity_type = 'lead'
+        and entity_id = $2
+        and action_type = 'ai.auto_action_queued_for_approval'
+    `,
+    [fixture.ownerContext.currentClinic.id, lead.id]
+  );
+  assert.equal(auditRows.rows[0].event_count, 1);
+});
+
 test('workspace isolation is enforced', async (t) => {
   const fixture = await createFixture(t);
   const alternateWorkspace = await createAlternateWorkspace(fixture.pool, fixture.ownerContext);

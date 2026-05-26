@@ -2,7 +2,7 @@ const { getPool } = require('../../db');
 const { AppError } = require('../../common/errors');
 const { validateEntityId } = require('../ai/validation');
 const { generateLeadMessage } = require('../ai/service');
-const { sendLeadOutboundMessage } = require('../messaging/service');
+const { createPendingAiApprovalMessage } = require('../ai-agent/conversation-service');
 const { recordAuditLog } = require('../audit/service');
 const { getAiPerformance } = require('../ai-feedback/service');
 
@@ -308,31 +308,58 @@ async function executeAutoAction(clinicContext, leadId, options = {}) {
                 autoAction: true
               }
             });
-            const outbound = await sendLeadOutboundMessage(
-              clinicContext,
-              normalizedLeadId,
-              {
+            const approvalMessage = await createPendingAiApprovalMessage({
+              clinicId: scope.clinicId,
+              leadId: normalizedLeadId,
+              inboundText: 'AI auto-action follow-up suggestion after no-reply window.',
+              replyText: generated.messageText,
+              confidenceScore: 0.8,
+              agentType: 'auto_action',
+              actorUserId: clinicContext.currentUser?.id || null,
+              auditActionType: 'ai.auto_action_requires_hitl',
+              contextJson: {
+                actionKey: 'send_followup_message',
+                sourceEventId: options.sourceEventId || null,
+                workspaceId: scope.workspaceId,
                 channelId,
-                content: generated.messageText
-              },
-              { messageType: 'automation' }
-            );
+                tone,
+                ignoredCount
+              }
+            });
 
             await finalizeActionExecution(client, reserved.id, 'executed', {
-              outboundMessageId: outbound.id,
+              approvalMessageId: approvalMessage.id,
               channelId,
               tone,
-              ignoredCount
+              ignoredCount,
+              hitlRequired: true
+            });
+            await recordAuditLog({
+              clinicId: scope.clinicId,
+              entityType: 'lead',
+              entityId: normalizedLeadId,
+              actionType: 'ai.auto_action_queued_for_approval',
+              actorUserId: clinicContext.currentUser?.id || null,
+              contextJson: {
+                actionKey: 'send_followup_message',
+                approvalMessageId: approvalMessage.id,
+                sourceEventId: options.sourceEventId || null,
+                workspaceId: scope.workspaceId,
+                channelId,
+                tone,
+                ignoredCount
+              }
             });
             await emitActionExecuted(clinicContext, normalizedLeadId, 'send_followup_message', {
-              outboundMessageId: outbound.id,
+              approvalMessageId: approvalMessage.id,
+              hitlRequired: true,
               tone,
               ignoredCount
             });
             actions.push({
               actionKey: 'send_followup_message',
-              status: 'executed',
-              outboundMessageId: outbound.id,
+              status: 'pending_approval',
+              approvalMessageId: approvalMessage.id,
               tone,
               ignoredCount
             });

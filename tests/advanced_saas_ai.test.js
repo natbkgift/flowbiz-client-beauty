@@ -149,9 +149,9 @@ test('Conversational AI - Two-Way messaging with Human-in-the-loop approvals', a
   );
   const leadId = leadRes.rows[0].id;
 
-  // 1. High confidence inbound text (auto-reply approved immediately)
+  // 1. High confidence inbound text (requires HITL before any outbound send)
   const highConfidenceMsg = await handleInboundMessage(context.currentClinic.id, leadId, 'อยากสอบถามราคาโปรโมชั่นด่วนค่ะ');
-  assert.equal(highConfidenceMsg.status, 'sent');
+  assert.equal(highConfidenceMsg.status, 'pending_approval');
   assert.ok(highConfidenceMsg.confidence_score >= 0.85);
 
   // 2. Low confidence inbound text (goes to approval queue)
@@ -161,6 +161,7 @@ test('Conversational AI - Two-Way messaging with Human-in-the-loop approvals', a
 
   // 3. Retrieve Approval Queue
   const queue = await getApprovalQueue(context.currentClinic.id);
+  assert.ok(queue.some((msg) => Number(msg.id) === Number(highConfidenceMsg.id)));
   assert.ok(queue.some((msg) => Number(msg.id) === Number(lowConfidenceMsg.id)));
 
   // 4. Manual confirm with staff override text
