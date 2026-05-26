@@ -1,8 +1,26 @@
 const { getOverview, getFunnel, getMessagingAnalytics, getAutomationAnalytics, getAiAnalytics } = require('./service');
 const { getExecutiveAnalyticsSummary } = require('./executive-service');
-const { authenticateAndAuthorize } = require('../rbac/service');
+const { authenticateAndAuthorize, hasPermission, normalizeRoleKey } = require('../rbac/service');
 const { getPool } = require('../../db');
 const { AppError } = require('../../common/errors');
+
+const EXECUTIVE_ANALYTICS_ROLES = new Set(['owner', 'admin']);
+
+function canAccessExecutiveAnalytics(context, requestedOrgId, isFranchiseAdmin = false) {
+  if (isFranchiseAdmin) {
+    return true;
+  }
+
+  const currentOrgId = Number(context?.currentOrganization?.id);
+  const targetOrgId = Number(requestedOrgId);
+
+  if (!Number.isFinite(currentOrgId) || !Number.isFinite(targetOrgId) || currentOrgId !== targetOrgId) {
+    return false;
+  }
+
+  const roleKey = normalizeRoleKey(context?.currentMembership?.role);
+  return EXECUTIVE_ANALYTICS_ROLES.has(roleKey) || hasPermission(context, 'analytics', 'executive');
+}
 
 async function handleAnalyticsRoutes(request, response, url, tools) {
   const { authenticateRequest, json } = tools;
@@ -18,10 +36,8 @@ async function handleAnalyticsRoutes(request, response, url, tools) {
       ? Number(searchParams.organizationId) 
       : Number(context.currentOrganization.id);
 
-    // Security check: must be a franchise admin or belong to the requested organization
-    const userBelongsToOrg = Number(context.currentOrganization.id) === requestedOrgId;
-    if (!isFranchiseAdmin && !userBelongsToOrg) {
-      throw new AppError(403, 'FORBIDDEN', 'Access to executive summary analytics is denied.');
+    if (!canAccessExecutiveAnalytics(context, requestedOrgId, isFranchiseAdmin)) {
+      throw new AppError(403, 'FORBIDDEN', 'ไม่มีสิทธิ์เข้าดูสรุปผู้บริหารขององค์กรนี้');
     }
 
     const summary = await getExecutiveAnalyticsSummary(requestedOrgId);
@@ -67,5 +83,6 @@ async function handleAnalyticsRoutes(request, response, url, tools) {
 }
 
 module.exports = {
+  canAccessExecutiveAnalytics,
   handleAnalyticsRoutes
 };

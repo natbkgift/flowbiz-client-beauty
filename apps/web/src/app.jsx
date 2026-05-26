@@ -1,5 +1,6 @@
 import React, { createContext, startTransition, useContext, useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { createRoot } from 'react-dom/client';
+import DOMPurify from 'dompurify';
 
 const STORAGE_KEY = 'flowbiz.admin.token';
 
@@ -38,6 +39,43 @@ class ApiError extends Error {
 
 function getConfig(configOverride) {
   return configOverride || window.__FLOWBIZ_WEB_CONFIG__ || { apiBaseUrl: 'http://localhost:3001' };
+}
+
+function readStoredAdminToken() {
+  try {
+    const sessionToken = window.sessionStorage.getItem(STORAGE_KEY) || '';
+    const legacyToken = window.localStorage.getItem(STORAGE_KEY) || '';
+
+    if (legacyToken) {
+      window.localStorage.removeItem(STORAGE_KEY);
+
+      if (!sessionToken) {
+        window.sessionStorage.setItem(STORAGE_KEY, legacyToken);
+      }
+    }
+
+    return sessionToken || legacyToken;
+  } catch (_) {
+    return '';
+  }
+}
+
+function storeAdminToken(token) {
+  try {
+    window.sessionStorage.setItem(STORAGE_KEY, token);
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch (_) {
+    // The in-memory React state remains the source of truth if browser storage is unavailable.
+  }
+}
+
+function clearStoredAdminToken() {
+  try {
+    window.sessionStorage.removeItem(STORAGE_KEY);
+    window.localStorage.removeItem(STORAGE_KEY);
+  } catch (_) {
+    // Ignore storage cleanup failures so logout and invalid-session handling can still proceed.
+  }
 }
 
 function parseRouteFromHash() {
@@ -123,6 +161,8 @@ const ALLOWED_RICH_ATTRS = {
   A: new Set(['href', 'target', 'rel']),
   IMG: new Set(['src', 'alt'])
 };
+const ALLOWED_RICH_TAG_NAMES = [...ALLOWED_RICH_TAGS].map((tag) => tag.toLowerCase());
+const ALLOWED_RICH_ATTR_NAMES = [...new Set(Object.values(ALLOWED_RICH_ATTRS).flatMap((attrs) => [...attrs]))];
 
 function escapeHtml(value) {
   return String(value || '')
@@ -143,8 +183,14 @@ function isSafeUrl(url) {
 }
 
 function sanitizeRichHtml(html) {
+  const sanitized = DOMPurify.sanitize(String(html || ''), {
+    ALLOWED_TAGS: ALLOWED_RICH_TAG_NAMES,
+    ALLOWED_ATTR: ALLOWED_RICH_ATTR_NAMES,
+    ALLOW_DATA_ATTR: false,
+    FORBID_ATTR: ['style', 'srcdoc']
+  });
   const doc = document.implementation.createHTMLDocument('sanitizer');
-  doc.body.innerHTML = String(html || '');
+  doc.body.innerHTML = sanitized;
 
   const walk = (node) => {
     for (const child of [...node.childNodes]) {
@@ -568,6 +614,7 @@ function Sidebar({ route, onNavigate }) {
 
 function TopBar() {
   const { session, setSession, switchWorkspaceState, switchWorkspace } = useWorkspace();
+  const { setToken } = useAuth();
   const workspaceOptions = dedupeMembershipsByWorkspace(session.memberships || []);
 
   return (
@@ -610,7 +657,8 @@ function TopBar() {
           type="button"
           className="secondary-button"
           onClick={() => {
-            window.localStorage.removeItem(STORAGE_KEY);
+            clearStoredAdminToken();
+            setToken('');
             setSession(null);
           }}
         >
@@ -3909,7 +3957,7 @@ function LoginView() {
         password: form.password,
         clinicSlug: form.clinicSlug || undefined
       });
-      window.localStorage.setItem(STORAGE_KEY, session.token);
+      storeAdminToken(session.token);
       setToken(session.token);
       setSession(session);
       navigateTo('dashboard');
@@ -3930,6 +3978,8 @@ function LoginView() {
           <label className="field field-span-2">
             <span>อีเมล</span>
             <input
+              type="email"
+              autoComplete="username"
               value={form.email}
               onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
               placeholder="owner@example.com"
@@ -3940,6 +3990,7 @@ function LoginView() {
             <span>รหัสผ่าน</span>
             <input
               type="password"
+              autoComplete="current-password"
               value={form.password}
               onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
               data-testid="login-password"
@@ -3948,6 +3999,7 @@ function LoginView() {
           <label className="field field-span-2">
             <span>Clinic slug (ไม่บังคับ)</span>
             <input
+              autoComplete="organization"
               value={form.clinicSlug}
               onChange={(event) => setForm((current) => ({ ...current, clinicSlug: event.target.value }))}
               placeholder="demo-clinic"
@@ -4053,7 +4105,7 @@ function AdminShell() {
 
 function AdminApp({ config }) {
   const api = useMemo(() => createApiClient(getConfig(config).apiBaseUrl), [config]);
-  const [token, setToken] = useState(() => window.localStorage.getItem(STORAGE_KEY) || '');
+  const [token, setToken] = useState(() => readStoredAdminToken());
   const [session, setSession] = useState(null);
   const [bootstrap, setBootstrap] = useState({ status: token ? 'loading' : 'idle', error: null });
 
@@ -4080,7 +4132,7 @@ function AdminApp({ config }) {
         }
       } catch (error) {
         if (active) {
-          window.localStorage.removeItem(STORAGE_KEY);
+          clearStoredAdminToken();
           setToken('');
           setSession(null);
           setBootstrap({ status: 'error', error });

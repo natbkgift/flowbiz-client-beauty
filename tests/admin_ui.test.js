@@ -206,7 +206,7 @@ async function loadAdminApp({ route = '', token = 'test-token', routes }) {
   dom.window.fetch = fetchMock;
   dom.window.requestAnimationFrame = (callback) => dom.window.setTimeout(() => callback(Date.now()), 16);
   dom.window.cancelAnimationFrame = (id) => dom.window.clearTimeout(id);
-  dom.window.localStorage.setItem('flowbiz.admin.token', token);
+  dom.window.sessionStorage.setItem('flowbiz.admin.token', token);
   dom.window.eval(bundleSource);
 
   await waitFor(() => dom.window.document.querySelector('[data-testid="admin-shell"]'));
@@ -231,6 +231,8 @@ test('auth bootstrap loads admin context from /auth/me', async () => {
   await waitFor(() => app.document.body.textContent.includes('FlowBiz Clinic'));
   assert.match(app.document.body.textContent, /Primary Workspace/);
   assert.equal(app.document.querySelector('[data-testid="workspace-selector"]').value, '3001');
+  assert.equal(app.window.localStorage.getItem('flowbiz.admin.token'), null);
+  assert.equal(app.window.sessionStorage.getItem('flowbiz.admin.token'), 'test-token');
 });
 
 test('workspace selector reloads tenant context with workspace header', async () => {
@@ -440,4 +442,44 @@ test('settings page updates tenant settings and sends branding payload', async (
     branding_json: { primaryColor: '#0f766e', wordmark: 'FlowBiz Admin' },
     settings_json: { plan: 'growth' }
   });
+});
+
+test('blog preview sanitizes rich content before rendering HTML', async () => {
+  const session = createSessionFixture({
+    permissions: ['blog.manage']
+  });
+  const app = await loadAdminApp({
+    route: '#/blog-manager',
+    routes: {
+      'GET /auth/me': { status: 200, body: session },
+      'GET /blog/posts?status=all': { status: 200, body: { items: [], total: 0 } }
+    }
+  });
+
+  await waitFor(() => app.document.body.textContent.includes('จัดการบทความ'));
+  const createButton = [...app.document.querySelectorAll('button')]
+    .find((button) => button.textContent.includes('สร้างบทความใหม่'));
+  click(createButton, app.window);
+
+  await waitFor(() => app.document.querySelector('.blog-editor-form'));
+  const contentTextarea = [...app.document.querySelectorAll('textarea')]
+    .find((textarea) => textarea.placeholder.includes('Markdown'));
+  setInputValue(
+    contentTextarea,
+    '<img src="javascript:alert(1)" onerror="window.__flowbizXss = true"><script>window.__flowbizXss = true</script>[อ่านต่อ](javascript:alert(1)) **ปลอดภัย**',
+    app.window
+  );
+
+  const previewButton = [...app.document.querySelectorAll('button')]
+    .find((button) => button.textContent.includes('ตัวอย่าง'));
+  click(previewButton, app.window);
+
+  const preview = await waitFor(() => app.document.querySelector('.markdown-preview-card'));
+  assert.equal(app.window.__flowbizXss, undefined);
+  assert.equal(preview.querySelector('script'), null);
+  assert.equal(preview.querySelector('[onerror]'), null);
+  for (const element of preview.querySelectorAll('a[href], img[src]')) {
+    assert.doesNotMatch(element.getAttribute('href') || element.getAttribute('src'), /^javascript:/i);
+  }
+  assert.match(preview.textContent, /ปลอดภัย/);
 });

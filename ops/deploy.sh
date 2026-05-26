@@ -92,7 +92,7 @@ echo "[Node] Installing dependencies..."
 npm install
 
 echo "[Node] Building React app..."
-npm run build:web
+NODE_ENV=production npm run build:web
 
 echo "[Database] Running migrations..."
 npm run migrate

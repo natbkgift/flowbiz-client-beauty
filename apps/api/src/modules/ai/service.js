@@ -57,6 +57,15 @@ function resolveAiScope(clinicContext) {
   };
 }
 
+async function publishAiEventSafe(input, message) {
+  try {
+    const { publishDomainEvent } = require('../event-bus/publisher');
+    await publishDomainEvent(input);
+  } catch (error) {
+    console.error(message, error.message);
+  }
+}
+
 function mapAiInsight(row) {
   return {
     id: row.id,
@@ -541,9 +550,8 @@ async function recomputeLeadInsights(clinicContext, leadId) {
     );
     await client.query('commit');
 
-    try {
-      const { publishDomainEvent } = require('../event-bus/publisher');
-      publishDomainEvent({
+    await publishAiEventSafe(
+      {
         clinicId: clinicContext.currentClinic.id,
         eventType: 'ai.lead_scored',
         entityType: 'lead',
@@ -554,17 +562,13 @@ async function recomputeLeadInsights(clinicContext, leadId) {
           actorUserId: clinicContext.currentUser?.id || null,
           workspaceId: clinicContext.currentWorkspace?.id || null
         }
-      }).catch((error) => {
-        console.error('Event bus ai.lead_scored publish failed:', error.message);
-      });
-    } catch (error) {
-      console.error('Event bus ai.lead_scored publish failed:', error.message);
-    }
+      },
+      'Event bus ai.lead_scored publish failed:'
+    );
 
     if (recommendations.length > 0) {
-      try {
-        const { publishDomainEvent } = require('../event-bus/publisher');
-        publishDomainEvent({
+      await publishAiEventSafe(
+        {
           clinicId: clinicContext.currentClinic.id,
           eventType: 'ai.recommendation_generated',
           entityType: 'lead',
@@ -575,12 +579,9 @@ async function recomputeLeadInsights(clinicContext, leadId) {
             dealProbability: score.dealProbability,
             actorUserId: clinicContext.currentUser?.id || null
           }
-        }).catch((error) => {
-          console.error('Event bus ai.recommendation_generated publish failed for lead:', error.message);
-        });
-      } catch (error) {
-        console.error('Event bus ai.recommendation_generated publish failed for lead:', error.message);
-      }
+        },
+        'Event bus ai.recommendation_generated publish failed for lead:'
+      );
     }
 
     return {
@@ -634,9 +635,8 @@ async function recomputeCustomerInsights(clinicContext, customerId) {
     await client.query('commit');
 
     if (recommendations.length > 0) {
-      try {
-        const { publishDomainEvent } = require('../event-bus/publisher');
-        publishDomainEvent({
+      await publishAiEventSafe(
+        {
           clinicId: clinicContext.currentClinic.id,
           eventType: 'ai.recommendation_generated',
           entityType: 'customer',
@@ -647,12 +647,9 @@ async function recomputeCustomerInsights(clinicContext, customerId) {
             lifetimeValueEstimate: score.lifetimeValueEstimate,
             actorUserId: clinicContext.currentUser?.id || null
           }
-        }).catch((error) => {
-          console.error('Event bus ai.recommendation_generated publish failed for customer:', error.message);
-        });
-      } catch (error) {
-        console.error('Event bus ai.recommendation_generated publish failed for customer:', error.message);
-      }
+        },
+        'Event bus ai.recommendation_generated publish failed for customer:'
+      );
     }
 
     return {
@@ -720,9 +717,8 @@ async function generateLeadMessage(clinicContext, payload) {
     );
     await client.query('commit');
 
-    try {
-      const { publishDomainEvent } = require('../event-bus/publisher');
-      publishDomainEvent({
+    await publishAiEventSafe(
+      {
         clinicId: clinicContext.currentClinic.id,
         eventType: 'ai.message_generated',
         entityType: 'lead',
@@ -732,10 +728,9 @@ async function generateLeadMessage(clinicContext, payload) {
           actorUserId: clinicContext.currentUser?.id || null,
           workspaceId: clinicContext.currentWorkspace?.id || null
         }
-      }).catch(() => {});
-    } catch (error) {
-      console.error('Event bus ai.message_generated publish failed:', error.message);
-    }
+      },
+      'Event bus ai.message_generated publish failed:'
+    );
 
     return {
       leadId: normalized.leadId,
@@ -862,9 +857,8 @@ async function getFlowInsights(clinicContext, flowId) {
     );
     await client.query('commit');
 
-    try {
-      const { publishDomainEvent } = require('../event-bus/publisher');
-      publishDomainEvent({
+    await publishAiEventSafe(
+      {
         clinicId: clinicContext.currentClinic.id,
         eventType: 'ai.flow_insight_generated',
         entityType: 'automation_flow',
@@ -874,10 +868,9 @@ async function getFlowInsights(clinicContext, flowId) {
           actorUserId: clinicContext.currentUser?.id || null,
           workspaceId: clinicContext.currentWorkspace?.id || null
         }
-      }).catch(() => {});
-    } catch (error) {
-      console.error('Event bus ai.flow_insight_generated publish failed:', error.message);
-    }
+      },
+      'Event bus ai.flow_insight_generated publish failed:'
+    );
 
     return {
       flowId: normalizedFlowId,

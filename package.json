@@ -10,9 +10,10 @@
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
     "validate": "node scripts/validate.js",
-    "test": "node -r ./teardown-hook.js --test --test-concurrency=2 apps/api/tests/*.test.js tests/*.test.js"
+    "test": "node -r ./teardown-hook.js --test --test-force-exit --test-concurrency=2 apps/api/tests/*.test.js tests/*.test.js"
   },
   "dependencies": {
+    "dompurify": "^3.4.5",
     "dotenv": "^16.4.7",
     "esbuild": "^0.27.4",
     "jsdom": "^29.0.0",

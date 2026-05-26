@@ -32,7 +32,7 @@
     <link rel="stylesheet" href="/public.css">
     
     <!-- Structured Data (JSON-LD for MedicalClinic/LocalBusiness) -->
-    <script type="application/ld+json">
+    <script type="application/ld+json" nonce="__CSP_NONCE__">
     {
       "@context": "https://schema.org",
       "@type": "MedicalClinic",
@@ -78,12 +78,12 @@
   </head>
   <body>
     <div id="app"></div>
-    <script>
+    <script nonce="__CSP_NONCE__">
       window.__FLOWBIZ_WEB_CONFIG__ = {
         apiBaseUrl: '__API_BASE_URL__',
         publicClinicId: __PUBLIC_CLINIC_ID__
       };
     </script>
-    <script src="/assets/public.bundle.js"></script>
+    <script nonce="__CSP_NONCE__" src="/assets/public.bundle.js"></script>
   </body>
 </html>

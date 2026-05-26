@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
+import DOMPurify from 'dompurify';
 
 // Config & API Helpers
 const CONFIG = window.__FLOWBIZ_WEB_CONFIG__ || { apiBaseUrl: 'http://localhost:3001' };
@@ -94,6 +95,8 @@ const ALLOWED_RICH_ATTRS = {
   A: new Set(['href', 'target', 'rel']),
   IMG: new Set(['src', 'alt'])
 };
+const ALLOWED_RICH_TAG_NAMES = [...ALLOWED_RICH_TAGS].map((tag) => tag.toLowerCase());
+const ALLOWED_RICH_ATTR_NAMES = [...new Set(Object.values(ALLOWED_RICH_ATTRS).flatMap((attrs) => [...attrs]))];
 
 function escapeHtml(value) {
   return String(value || '')
@@ -114,8 +117,14 @@ function isSafeUrl(url) {
 }
 
 function sanitizeRichHtml(html) {
+  const sanitized = DOMPurify.sanitize(String(html || ''), {
+    ALLOWED_TAGS: ALLOWED_RICH_TAG_NAMES,
+    ALLOWED_ATTR: ALLOWED_RICH_ATTR_NAMES,
+    ALLOW_DATA_ATTR: false,
+    FORBID_ATTR: ['style', 'srcdoc']
+  });
   const doc = document.implementation.createHTMLDocument('sanitizer');
-  doc.body.innerHTML = String(html || '');
+  doc.body.innerHTML = sanitized;
 
   const walk = (node) => {
     for (const child of [...node.childNodes]) {
@@ -325,7 +334,7 @@ export function App() {
             <li><a href="#/forum" className={currentRoute.startsWith('#/forum') ? 'active' : ''}>เว็บบอร์ดถามตอบ</a></li>
           </ul>
         </nav>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div className="header-actions">
           <a href="/admin" className="cta-btn secondary" target="_blank" rel="noopener noreferrer">เข้าระบบ CRM</a>
           <button className="cta-btn" onClick={() => openExternalUrl('https://line.me')}>ปรึกษาหมอฟรี</button>
         </div>

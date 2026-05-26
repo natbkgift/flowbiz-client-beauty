@@ -7,42 +7,42 @@ function buildWeb(options = {}) {
   const entryPoint = path.join(root, 'apps', 'web', 'src', 'main.js');
   const publicEntryPoint = path.join(root, 'apps', 'web', 'src', 'public-main.js');
   const outDir = path.join(root, 'apps', 'web', 'dist', 'assets');
+  const nodeEnv = options.nodeEnv || process.env.NODE_ENV || 'production';
+  const isProduction = nodeEnv === 'production';
 
   fs.mkdirSync(outDir, { recursive: true });
+
+  const commonOptions = {
+    bundle: true,
+    platform: 'browser',
+    format: 'iife',
+    target: ['es2020'],
+    minify: isProduction,
+    sourcemap: isProduction ? false : 'inline',
+    logLevel: options.silent ? 'silent' : 'info',
+    define: {
+      'process.env.NODE_ENV': JSON.stringify(nodeEnv)
+    }
+  };
 
   // 1. Build Admin Control Center
   esbuild.buildSync({
     entryPoints: [entryPoint],
     outfile: path.join(outDir, 'admin.bundle.js'),
-    bundle: true,
-    platform: 'browser',
-    format: 'iife',
-    target: ['es2020'],
-    sourcemap: 'inline',
-    logLevel: options.silent ? 'silent' : 'info',
-    define: {
-      'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
-    }
+    ...commonOptions
   });
 
   // 2. Build Public App (Landing page, Blog, Forum)
   esbuild.buildSync({
     entryPoints: [publicEntryPoint],
     outfile: path.join(outDir, 'public.bundle.js'),
-    bundle: true,
-    platform: 'browser',
-    format: 'iife',
-    target: ['es2020'],
-    sourcemap: 'inline',
-    logLevel: options.silent ? 'silent' : 'info',
-    define: {
-      'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development')
-    }
+    ...commonOptions
   });
 
   return {
     outputFile: path.join(outDir, 'admin.bundle.js'),
-    publicOutputFile: path.join(outDir, 'public.bundle.js')
+    publicOutputFile: path.join(outDir, 'public.bundle.js'),
+    nodeEnv
   };
 }
 

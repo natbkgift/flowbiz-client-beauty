@@ -12,6 +12,15 @@ const {
 } = require('./validation');
 const { sendLeadOutboundMessage } = require('../messaging/service');
 
+async function publishAutomationEventSafe(input, message) {
+  try {
+    const { publishDomainEvent } = require('../event-bus/publisher');
+    await publishDomainEvent(input);
+  } catch (error) {
+    console.error(message, error.message);
+  }
+}
+
 function normalizeFlowStatus(status) {
   return status === 'disabled' ? 'paused' : status;
 }
@@ -1671,9 +1680,8 @@ async function executeExecutionById(clinicContext, executionId) {
     await client.query('commit');
 
     if (finalStatus === 'completed' || refreshed.rows[0].status === 'completed') {
-      try {
-        const { publishDomainEvent } = require('../event-bus/publisher');
-        publishDomainEvent({
+      await publishAutomationEventSafe(
+        {
           clinicId: scope.clinicId,
           eventType: 'automation.execution_completed',
           entityType: refreshed.rows[0].entity_type,
@@ -1685,12 +1693,9 @@ async function executeExecutionById(clinicContext, executionId) {
             actorUserId: clinicContext.currentUser?.id || null,
             workspaceId: scope.workspaceId
           }
-        }).catch((error) => {
-          console.error('Event bus automation.execution_completed publish failed:', error.message);
-        });
-      } catch (error) {
-        console.error('Event bus automation.execution_completed publish failed:', error.message);
-      }
+        },
+        'Event bus automation.execution_completed publish failed:'
+      );
     }
 
     return mapExecution(refreshed.rows[0]);
@@ -1898,9 +1903,8 @@ async function handleDomainEvent(clinicContext, payload) {
           );
 
           if (completedExecution.rowCount > 0 && completedExecution.rows[0].status === 'completed') {
-            try {
-              const { publishDomainEvent } = require('../event-bus/publisher');
-              publishDomainEvent({
+            await publishAutomationEventSafe(
+              {
                 clinicId: scope.clinicId,
                 eventType: 'automation.execution_completed',
                 entityType: normalized.entityType,
@@ -1912,12 +1916,9 @@ async function handleDomainEvent(clinicContext, payload) {
                   actorUserId: clinicContext.currentUser?.id || null,
                   workspaceId
                 }
-              }).catch((error) => {
-                console.error('Event bus automation.execution_completed publish failed:', error.message);
-              });
-            } catch (error) {
-              console.error('Event bus automation.execution_completed publish failed:', error.message);
-            }
+              },
+              'Event bus automation.execution_completed publish failed:'
+            );
           }
         }
 

@@ -14,6 +14,7 @@ const { matchPath } = require('../apps/api/src/common/routing');
 const { loadConfig } = require('../apps/api/src/config');
 const { resolvePublicClinicId } = require('../apps/api/src/modules/public-content/tenant');
 const { handleAiAgentRoutes } = require('../apps/api/src/modules/ai-agent/routes');
+const { canAccessExecutiveAnalytics } = require('../apps/api/src/modules/analytics/routes');
 
 function createMockResponse() {
   return {
@@ -191,6 +192,40 @@ test('AI inbound test route is disabled in production runtime', async () => {
     if (previousAppEnv === undefined) delete process.env.APP_ENV;
     else process.env.APP_ENV = previousAppEnv;
   }
+});
+
+test('executive analytics requires owner/admin/franchise scope and blocks viewer/operator', () => {
+  const baseContext = {
+    currentOrganization: { id: 2001 },
+    currentMembership: {
+      role: 'viewer',
+      permissions: ['analytics.read']
+    }
+  };
+
+  assert.equal(canAccessExecutiveAnalytics(baseContext, 2001, false), false);
+  assert.equal(
+    canAccessExecutiveAnalytics({ ...baseContext, currentMembership: { role: 'operator', permissions: ['analytics.read'] } }, 2001, false),
+    false
+  );
+  assert.equal(
+    canAccessExecutiveAnalytics({ ...baseContext, currentMembership: { role: 'admin', permissions: ['analytics.read'] } }, 2001, false),
+    true
+  );
+  assert.equal(
+    canAccessExecutiveAnalytics({ ...baseContext, currentMembership: { role: 'owner', permissions: ['analytics.read'] } }, 2001, false),
+    true
+  );
+  assert.equal(
+    canAccessExecutiveAnalytics(
+      { ...baseContext, currentMembership: { role: 'viewer', permissions: ['analytics.read', 'analytics.executive'] } },
+      2001,
+      false
+    ),
+    true
+  );
+  assert.equal(canAccessExecutiveAnalytics(baseContext, 9999, false), false);
+  assert.equal(canAccessExecutiveAnalytics(baseContext, 9999, true), true);
 });
 
 test('http response helpers return handled marker for modular route dispatch', () => {

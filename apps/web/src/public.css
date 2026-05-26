@@ -40,7 +40,7 @@ body {
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 a {
@@ -62,6 +62,7 @@ a {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1.5rem;
   transition: var(--transition-smooth);
 }
 
@@ -75,6 +76,7 @@ a {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  white-space: nowrap;
 }
 
 .logo-icon {
@@ -85,6 +87,8 @@ a {
   display: flex;
   gap: 2rem;
   list-style: none;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .nav-links a {
@@ -96,6 +100,14 @@ a {
 .nav-links a:hover, .nav-links a.active {
   color: var(--gold-primary);
   text-shadow: 0 0 8px var(--gold-glow);
+}
+
+.header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 1rem;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .cta-btn {
@@ -166,6 +178,38 @@ a {
 }
 
 @media (max-width: 768px) {
+  .header-glass {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.85rem;
+    padding: 0.9rem 1rem;
+  }
+
+  .logo {
+    font-size: 1.15rem;
+  }
+
+  .nav-links {
+    gap: 0.75rem 1rem;
+    justify-content: flex-start;
+  }
+
+  .nav-links a {
+    font-size: 0.85rem;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: flex-start;
+  }
+
+  .header-actions .cta-btn {
+    padding: 0.5rem 0.85rem;
+    font-size: 0.82rem;
+  }
+
   .hero-title {
     font-size: 2.5rem;
   }

@@ -11,7 +11,8 @@
 - Audit event เพิ่มสำหรับ AI/HITL, broadcast lifecycle, billing simulated sync/usage, blog/forum moderation, webhook accept/reject และ patient-message send
 - Integration status matrix ถูกสะท้อนใน code path สำคัญ: messaging provider เป็น `simulated`, ad spend เป็น `mock_generated`, sandbox/test secret เป็น `sandbox_like`
 - Medical safety classifier บังคับ HITL สำหรับข้อความเสี่ยงก่อน AI auto-reply และ campaign broadcast enqueue
-- Thai API/user-facing UX และ XSS-safe rendering สำหรับ blog/forum rich content
+- Thai API/user-facing UX และ XSS-safe rendering สำหรับ blog/forum rich content ด้วย DOMPurify + allowlist
+- Web hardening เพิ่ม CSP nonce/security headers และ production bundle minify/no inline source map เป็นค่าเริ่มต้น
 - Post-review fix เพิ่มเติม: route-dispatch helper return handled marker, dev-only CORS allowlist, dev API host ตาม request host, public empty states, production config fail-closed เมื่อ secret/database ยังเป็น local default และ deploy script รับ DB secrets จาก environment เท่านั้น
 - Production webhook guard เพิ่ม HMAC/shared-secret fail-closed, raw-body verification, timestamp/replay check และ test ว่า arbitrary signature ถูกปฏิเสธใน production
 - Public blog/forum API ตัด default `clinicId=1001`; frontend inject `PUBLIC_CLINIC_ID` สำหรับ public routes และ API return Thai error เมื่อไม่มี explicit clinic context
@@ -29,11 +30,11 @@
 Validation ล่าสุดใน local stabilization gate:
 
 - Docker PostgreSQL local พร้อมใช้งานและ apply migration 036 แล้ว
-- `npm test` ผ่าน 92/92
+- `npm test` ผ่าน 136/136
 - `npm run validate` ผ่าน
 - `npm run build:web` ผ่าน
 - `npm audit --audit-level=moderate` ผ่าน 0 vulnerabilities
-- Browser smoke public landing/blog/forum และ admin ผ่านทั้ง desktop/mobile โดยไม่มี console warning/error
+- Browser smoke public landing/admin ผ่านทั้ง desktop/mobile; รอบ web-only smoke มีเฉพาะ API fallback warning เพราะไม่ได้เปิด API local เพื่อหลีกเลี่ยง data mutation ระหว่างตรวจ
 
 ## Phase Split
 
@@ -78,7 +79,7 @@ Required work:
 - Add permissions: `broadcast.read/manage/approve`, `blog.manage`, `forum.moderate`, `forum.medical_answer`, `billing.read/manage`, `consent.manage`, `patient.export`, `clinical.outcome.write`, `research.export`, `ai.approve`.
 - Replace `authenticateRequest(...)` on sensitive state-changing routes with permission guard.
 - Replace forum owner/admin string checks with permission checks.
-- Restrict executive analytics to Owner/Admin/FranchiseAdmin or new `executive_analytics.read`.
+- Restrict executive analytics to Owner/Admin/FranchiseAdmin or explicit `analytics.executive`.
 
 Tests required:
 

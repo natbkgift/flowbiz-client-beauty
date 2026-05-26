@@ -7,7 +7,8 @@ values
   ('loyalty', 'manage', 'Record purchases, referrals, and ad spend syncs.'),
   ('blog', 'manage', 'Create, update, publish, and delete blog posts.'),
   ('forum', 'moderate', 'Moderate forum topics and replies.'),
-  ('forum', 'medical_answer', 'Post or verify official medical forum answers.')
+  ('forum', 'medical_answer', 'Post or verify official medical forum answers.'),
+  ('analytics', 'executive', 'Read organization-level executive analytics summaries.')
 on conflict (resource, action)
 do update set description = excluded.description;
 
@@ -21,12 +22,14 @@ from (
     ('owner', 'blog', 'manage'),
     ('owner', 'forum', 'moderate'),
     ('owner', 'forum', 'medical_answer'),
+    ('owner', 'analytics', 'executive'),
     ('admin', 'broadcast', 'manage'),
     ('admin', 'loyalty', 'read'),
     ('admin', 'loyalty', 'manage'),
     ('admin', 'blog', 'manage'),
     ('admin', 'forum', 'moderate'),
     ('admin', 'forum', 'medical_answer'),
+    ('admin', 'analytics', 'executive'),
     ('operator', 'loyalty', 'read'),
     ('operator', 'loyalty', 'manage'),
     ('viewer', 'loyalty', 'read')
