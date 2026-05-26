@@ -1,6 +1,7 @@
 const { createLead } = require('../leads/service');
 const { resolveWorkerContext } = require('../worker-engine/worker');
 const { getPool } = require('../../db');
+const { buildErrorPayload } = require('../../common/http');
 const { verifyWebhookSecret, auditWebhookEvent } = require('./security');
 
 function parseFacebookLeadPayload(body) {
@@ -52,7 +53,7 @@ async function handleFacebookWebhook(req, res, next) {
     const workspaceId = req.query.workspaceId || req.body.workspaceId;
 
     if (!clinicId || !workspaceId) {
-      return res.status(400).json({ error: 'Bad Request', message: 'clinicId and workspaceId are required' });
+      return res.status(400).json(buildErrorPayload('BAD_REQUEST', 'clinicId and workspaceId are required'));
     }
 
     const verification = verifyWebhookSecret(req, ['x-hub-signature-256']);
@@ -64,7 +65,14 @@ async function handleFacebookWebhook(req, res, next) {
         reason: verification.reason,
         integrationStatus: verification.integrationStatus
       });
-      return res.status(401).json({ error: 'Unauthorized', message: 'ลายเซ็นหรือ secret ของ webhook ไม่ถูกต้อง' });
+      return res.status(401).json(buildErrorPayload(
+        'INVALID_WEBHOOK_SIGNATURE',
+        'Invalid webhook signature or secret.',
+        {
+          reason: verification.reason,
+          integrationStatus: verification.integrationStatus
+        }
+      ));
     }
 
     const pool = getPool();

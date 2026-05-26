@@ -435,6 +435,20 @@ test('Unified Chat API handles listing threads, thread messages, and sending man
   assert.equal(msgRows.rows.length, 1);
   assert.equal(msgRows.rows[0].message_text, overrideMessageText);
   assert.equal(msgRows.rows[0].status, 'sent');
+
+  const auditRows = await fixture.pool.query(
+    `select * from audit_logs
+     where clinic_id = $1
+       and entity_type = 'lead'
+       and entity_id = $2
+       and action_type = 'message.send'
+     order by id desc
+     limit 1`,
+    [fixture.session.currentClinic.id, leadId]
+  );
+  assert.equal(auditRows.rowCount, 1);
+  assert.equal(auditRows.rows[0].context_json.messageType, 'manual');
+  assert.equal(auditRows.rows[0].context_json.integrationStatus, 'simulated');
 });
 
 const { handleAiAgentRoutes } = require('../apps/api/src/modules/ai-agent/routes');

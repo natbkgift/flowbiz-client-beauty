@@ -2,7 +2,7 @@ const { getPool } = require('../../db');
 const { AppError } = require('../../common/errors');
 const { recordAuditLog } = require('../audit/service');
 
-async function recordMeteredUsage(clinicId, usageType, quantity = 1) {
+async function recordMeteredUsage(clinicId, usageType, quantity = 1, options = {}) {
   const pool = getPool();
   const result = await pool.query(
     `
@@ -18,10 +18,13 @@ async function recordMeteredUsage(clinicId, usageType, quantity = 1) {
     entityType: 'billing_usage',
     entityId: Number(result.rows[0].id),
     actionType: 'billing.usage_recorded',
-    actorUserId: null,
+    actorUserId: options.actorUserId || null,
     contextJson: {
       usageType,
-      quantity: Number(quantity)
+      quantity: Number(quantity),
+      source: options.source || 'system',
+      relatedEntityType: options.relatedEntityType || null,
+      relatedEntityId: options.relatedEntityId || null
     }
   });
 }

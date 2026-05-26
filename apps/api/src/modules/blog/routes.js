@@ -1,4 +1,5 @@
 const { matchPath } = require('../../common/routing');
+const { jsonError } = require('../../common/http');
 const { authenticateAndAuthorize, hasPermission } = require('../rbac/service');
 const { resolvePublicClinicId } = require('../public-content/tenant');
 const {
@@ -56,12 +57,12 @@ async function handleBlogRoutes(request, response, url, tools) {
     try {
       const post = await getPostBySlug(clinicId, slugParams.slug);
       if (!canManageBlog && post.status !== 'published') {
-        return json(response, 404, { error: 'Not Found', message: 'Blog post not found.' });
+        return jsonError(response, 404, 'POST_NOT_FOUND', 'Blog post not found.');
       }
       return json(response, 200, post);
     } catch (err) {
       if (err.code === 'POST_NOT_FOUND') {
-        return json(response, 404, { error: 'Not Found', message: err.message });
+        return jsonError(response, 404, 'POST_NOT_FOUND', err.message);
       }
       throw err;
     }
@@ -87,7 +88,7 @@ async function handleBlogRoutes(request, response, url, tools) {
       return json(response, 200, post);
     } catch (err) {
       if (err.code === 'POST_NOT_FOUND') {
-        return json(response, 404, { error: 'Not Found', message: err.message });
+        return jsonError(response, 404, 'POST_NOT_FOUND', err.message);
       }
       throw err;
     }
@@ -103,7 +104,7 @@ async function handleBlogRoutes(request, response, url, tools) {
       return json(response, 200, { success: true });
     } catch (err) {
       if (err.code === 'POST_NOT_FOUND') {
-        return json(response, 404, { error: 'Not Found', message: err.message });
+        return jsonError(response, 404, 'POST_NOT_FOUND', err.message);
       }
       throw err;
     }

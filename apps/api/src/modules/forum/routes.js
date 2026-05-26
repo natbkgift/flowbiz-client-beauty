@@ -1,5 +1,6 @@
 const { matchPath } = require('../../common/routing');
 const { AppError } = require('../../common/errors');
+const { jsonError } = require('../../common/http');
 const {
   authenticateAndAuthorize,
   hasAnyPermission,
@@ -56,13 +57,13 @@ async function handleForumRoutes(request, response, url, tools) {
     try {
       const topic = await getTopicByIdOrSlug(clinicId, idOrSlugParams.idOrSlug);
       if (!canModerate && topic.status !== 'active') {
-        return json(response, 404, { error: 'Not Found', message: 'Forum topic not found.' });
+        return jsonError(response, 404, 'TOPIC_NOT_FOUND', 'Forum topic not found.');
       }
       const replies = await listReplies(clinicId, topic.id);
       return json(response, 200, { ...topic, replies });
     } catch (err) {
       if (err.code === 'TOPIC_NOT_FOUND') {
-        return json(response, 404, { error: 'Not Found', message: err.message });
+        return jsonError(response, 404, 'TOPIC_NOT_FOUND', err.message);
       }
       throw err;
     }
@@ -111,7 +112,7 @@ async function handleForumRoutes(request, response, url, tools) {
       return json(response, 201, reply);
     } catch (err) {
       if (err.code === 'TOPIC_NOT_FOUND') {
-        return json(response, 404, { error: 'Not Found', message: err.message });
+        return jsonError(response, 404, 'TOPIC_NOT_FOUND', err.message);
       }
       throw err;
     }
@@ -131,7 +132,7 @@ async function handleForumRoutes(request, response, url, tools) {
       return json(response, 200, result);
     } catch (err) {
       if (err.code === 'REPLY_NOT_FOUND') {
-        return json(response, 404, { error: 'Not Found', message: err.message });
+        return jsonError(response, 404, 'REPLY_NOT_FOUND', err.message);
       }
       throw err;
     }
@@ -155,7 +156,7 @@ async function handleForumRoutes(request, response, url, tools) {
       return json(response, 200, topic);
     } catch (err) {
       if (err.code === 'TOPIC_NOT_FOUND') {
-        return json(response, 404, { error: 'Not Found', message: err.message });
+        return jsonError(response, 404, 'TOPIC_NOT_FOUND', err.message);
       }
       throw err;
     }

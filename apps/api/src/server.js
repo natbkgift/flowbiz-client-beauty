@@ -2,8 +2,9 @@ const http = require('node:http');
 const { loadConfig } = require('./config');
 const { testConnection, closePool } = require('./db');
 const { startWorkerLoop, stopWorkerLoop } = require('./modules/worker-engine/scheduler');
-const { json, noContent, sendError, parseJsonBody } = require('./common/http');
+const { json, jsonError, noContent, sendError, parseJsonBody } = require('./common/http');
 const { matchPath } = require('./common/routing');
+const { checkRateLimit } = require('./common/rate-limiter');
 const { AppError } = require('./common/errors');
 const { login, signup, authenticateRequest, logout } = require('./modules/auth/service');
 const { authenticateAndAuthorize } = require('./modules/rbac/service');
@@ -116,6 +117,11 @@ async function routeRequest(request, response) {
   }
 
   if (url.pathname === '/auth/signup' && request.method === 'POST') {
+    const limitCheck = checkRateLimit(request, 20, 60000);
+    if (!limitCheck.allowed) {
+      return jsonError(response, 429, 'RATE_LIMIT_EXCEEDED', limitCheck.message);
+    }
+
     if (!config.publicSignupEnabled) {
       throw new AppError(403, 'PUBLIC_SIGNUP_DISABLED', 'Public signup is disabled.');
     }
@@ -126,6 +132,11 @@ async function routeRequest(request, response) {
   }
 
   if (url.pathname === '/auth/login' && request.method === 'POST') {
+    const limitCheck = checkRateLimit(request, 20, 60000);
+    if (!limitCheck.allowed) {
+      return jsonError(response, 429, 'RATE_LIMIT_EXCEEDED', limitCheck.message);
+    }
+
     const body = await parseJsonBody(request);
     const session = await login(body);
     return json(response, 200, session);

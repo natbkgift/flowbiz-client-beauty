@@ -139,6 +139,8 @@ test('Blog & Forum System Service Integration Tests', async (t) => {
       path: `/blog/posts/${encodedDraftSlug}?clinicId=${clinicId}`
     });
     assert.equal(publicDraftLookup.statusCode, 404);
+    assert.equal(publicDraftLookup.body.error.code, 'POST_NOT_FOUND');
+    assert.equal(publicDraftLookup.body.error.message, 'ไม่พบบทความที่ต้องการ');
 
     const viewerDraftLookup = await routeJson(handleBlogRoutes, {
       path: `/blog/posts/${encodedDraftSlug}`,
@@ -148,6 +150,7 @@ test('Blog & Forum System Service Integration Tests', async (t) => {
       })
     });
     assert.equal(viewerDraftLookup.statusCode, 404);
+    assert.equal(viewerDraftLookup.body.error.code, 'POST_NOT_FOUND');
 
     const managerDraftLookup = await routeJson(handleBlogRoutes, {
       path: `/blog/posts/${encodedDraftSlug}`,
@@ -280,6 +283,8 @@ test('Blog & Forum System Service Integration Tests', async (t) => {
       path: `/forum/topics/${encodedTopicSlug}?clinicId=${clinicId}`
     });
     assert.equal(publicHiddenTopic.statusCode, 404);
+    assert.equal(publicHiddenTopic.body.error.code, 'TOPIC_NOT_FOUND');
+    assert.equal(publicHiddenTopic.body.error.message, 'ไม่พบหัวข้อถามตอบที่ต้องการ');
 
     const moderatorHiddenTopic = await routeJson(handleForumRoutes, {
       path: `/forum/topics/${encodedTopicSlug}`,

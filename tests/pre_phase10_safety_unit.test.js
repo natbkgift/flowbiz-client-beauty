@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const { classifyMedicalSafety } = require('../apps/api/src/modules/ai-agent/medical-safety');
 const {
@@ -9,7 +11,8 @@ const {
   resetWebhookReplayCacheForTests
 } = require('../apps/api/src/modules/integration-gateway/security');
 const { getThaiErrorMessage } = require('../apps/api/src/common/user-messages');
-const { json, noContent } = require('../apps/api/src/common/http');
+const { THAI_ERROR_MESSAGES } = require('../apps/api/src/common/user-messages');
+const { json, jsonError, noContent } = require('../apps/api/src/common/http');
 const { matchPath } = require('../apps/api/src/common/routing');
 const { loadConfig } = require('../apps/api/src/config');
 const { resolvePublicClinicId } = require('../apps/api/src/modules/public-content/tenant');
@@ -151,6 +154,39 @@ test('pre phase 10 user-facing API error messages are Thai while codes remain st
   assert.equal(getThaiErrorMessage('PUBLIC_SIGNUP_DISABLED'), 'ยังไม่เปิดให้สมัครใช้งานสาธารณะ กรุณาติดต่อผู้ดูแลระบบ');
   assert.equal(getThaiErrorMessage('PUBLIC_CLINIC_REQUIRED'), 'กรุณาระบุคลินิกสำหรับหน้าเว็บสาธารณะ');
   assert.equal(getThaiErrorMessage('MEDICAL_SAFETY_REVIEW_REQUIRED'), 'เนื้อหานี้เกี่ยวข้องกับความปลอดภัยทางการแพทย์ ต้องให้เจ้าหน้าที่ตรวจสอบก่อนส่ง');
+  assert.equal(getThaiErrorMessage('INVALID_WEBHOOK_SIGNATURE'), 'ลายเซ็นหรือ secret ของ webhook ไม่ถูกต้อง');
+  assert.equal(getThaiErrorMessage('RATE_LIMIT_EXCEEDED'), 'มีคำขอเข้ามามากเกินไป กรุณารอสักครู่แล้วลองใหม่');
+});
+
+test('pre phase 10 every AppError code has a Thai user-facing message mapping', () => {
+  const apiRoot = path.resolve(__dirname, '..', 'apps', 'api', 'src');
+  const files = [];
+
+  function walk(dir) {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const fullPath = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath);
+      } else if (entry.isFile() && entry.name.endsWith('.js')) {
+        files.push(fullPath);
+      }
+    }
+  }
+
+  walk(apiRoot);
+
+  const codes = new Set();
+  const appErrorRegex = /AppError\([^,\n]+,\s*['"]([A-Z0-9_]+)['"]/g;
+
+  for (const file of files) {
+    const source = fs.readFileSync(file, 'utf8');
+    for (const match of source.matchAll(appErrorRegex)) {
+      codes.add(match[1]);
+    }
+  }
+
+  const missing = [...codes].filter((code) => !THAI_ERROR_MESSAGES[code]).sort();
+  assert.deepEqual(missing, []);
 });
 
 test('public content routes require explicit clinic context instead of defaulting tenants', () => {
@@ -234,10 +270,25 @@ test('http response helpers return handled marker for modular route dispatch', (
 
   assert.equal(json(jsonResponse, 200, { ok: true }), true);
   assert.equal(jsonResponse.statusCode, 200);
+  assert.equal(jsonResponse.headers['X-Content-Type-Options'], 'nosniff');
+  assert.equal(jsonResponse.headers['X-Frame-Options'], 'DENY');
   assert.equal(JSON.parse(jsonResponse.body).ok, true);
 
   assert.equal(noContent(noContentResponse), true);
   assert.equal(noContentResponse.statusCode, 204);
+  assert.equal(noContentResponse.headers['X-Content-Type-Options'], 'nosniff');
+});
+
+test('http error helper keeps stable code and Thai user-facing message shape', () => {
+  const response = createMockResponse();
+
+  assert.equal(jsonError(response, 429, 'RATE_LIMIT_EXCEEDED', 'Rate limit exceeded.'), true);
+  assert.equal(response.statusCode, 429);
+
+  const body = JSON.parse(response.body);
+  assert.equal(body.error.code, 'RATE_LIMIT_EXCEEDED');
+  assert.equal(body.error.message, 'มีคำขอเข้ามามากเกินไป กรุณารอสักครู่แล้วลองใหม่');
+  assert.equal(body.error.details, null);
 });
 
 test('production config refuses local default secrets and database url', () => {

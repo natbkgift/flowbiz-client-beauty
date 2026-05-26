@@ -205,7 +205,12 @@ async function executeJob(job) {
         job.payload_json?.workspaceId || null
       );
       await dispatchCampaignDelivery(context, job.payload_json.deliveryId);
-      await recordMeteredUsage(job.clinic_id, 'broadcast_sent', 1);
+      await recordMeteredUsage(job.clinic_id, 'broadcast_sent', 1, {
+        actorUserId: job.payload_json?.actorUserId || null,
+        source: 'broadcast.dispatch',
+        relatedEntityType: 'campaign_delivery',
+        relatedEntityId: job.payload_json.deliveryId
+      });
       return { type: 'campaign.dispatch', deliveryId: job.payload_json.deliveryId };
     }
     case 'automation.execute': {

@@ -1,6 +1,7 @@
 const { createLead } = require('../leads/service');
 const { resolveWorkerContext } = require('../worker-engine/worker');
 const { AppError } = require('../../common/errors');
+const { buildErrorPayload } = require('../../common/http');
 const { verifyWebhookSecret, auditWebhookEvent } = require('./security');
 
 function parseWixLeadPayload(body) {
@@ -65,10 +66,14 @@ async function handleWixWebhook(req, res, next) {
         reason: verification.reason,
         integrationStatus: verification.integrationStatus
       });
-      return res.status(401).json({
-        error: 'Unauthorized: Invalid signature/secret',
-        message: 'ลายเซ็นหรือ secret ของ webhook ไม่ถูกต้อง'
-      });
+      return res.status(401).json(buildErrorPayload(
+        'INVALID_WEBHOOK_SIGNATURE',
+        'Invalid webhook signature or secret.',
+        {
+          reason: verification.reason,
+          integrationStatus: verification.integrationStatus
+        }
+      ));
     }
 
     const payload = parseWixLeadPayload(req.body);

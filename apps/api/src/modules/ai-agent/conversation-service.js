@@ -296,7 +296,12 @@ async function handleInboundMessage(clinicId, leadId, text, options = {}) {
 
   // 9. If auto-sent, record metered SaaS billing usage
   if (messageStatus === 'sent') {
-    await recordMeteredUsage(clinicId, 'ai_message_generated', 1);
+    await recordMeteredUsage(clinicId, 'ai_message_generated', 1, {
+      actorUserId: options.actorUserId || null,
+      source: 'ai.auto_reply',
+      relatedEntityType: 'ai_message',
+      relatedEntityId: messageId
+    });
   }
 
   return aiMessageRes.rows[0];
@@ -395,7 +400,12 @@ async function approveOrOverrideMessage(clinicId, messageId, staffOverrideText =
   );
 
   // 4. Record metered SaaS billing usage
-  await recordMeteredUsage(clinicId, 'ai_message_generated', 1);
+  await recordMeteredUsage(clinicId, 'ai_message_generated', 1, {
+    actorUserId: options.actorUserId || null,
+    source: 'ai.hitl_approval',
+    relatedEntityType: 'ai_message',
+    relatedEntityId: messageId
+  });
 
   await recordAuditLog({
     clinicId,

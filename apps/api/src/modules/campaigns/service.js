@@ -388,8 +388,10 @@ async function dispatchCampaignDelivery(clinicContext, deliveryId) {
     );
 
     const isFailed = outbound.status === 'failed';
-    const finalStatus = isFailed ? 'failed' : 'delivered';
+    const isDelivered = outbound.status === 'delivered';
+    const finalStatus = isFailed ? 'failed' : (isDelivered ? 'delivered' : 'sent');
     const errorMsg = isFailed ? (outbound.failureReason || 'Failed to send') : null;
+    const integrationStatus = outbound.providerMessageId?.startsWith('local-') ? 'provider_simulated' : 'provider_live_or_unknown';
 
     await pool.query(
       `
@@ -403,11 +405,15 @@ async function dispatchCampaignDelivery(clinicContext, deliveryId) {
       [deliveryId, finalStatus, outbound.id, errorMsg]
     );
 
+    const deliveryActionType = isFailed
+      ? 'broadcast.delivery_failed'
+      : (finalStatus === 'delivered' ? 'broadcast.delivery_delivered' : 'broadcast.delivery_sent');
+
     await recordAuditLog({
       clinicId: Number(delivery.clinic_id),
       entityType: 'campaign_delivery',
       entityId: Number(deliveryId),
-      actionType: isFailed ? 'broadcast.delivery_failed' : 'broadcast.delivery_delivered',
+      actionType: deliveryActionType,
       actorUserId: clinicContext.currentUser?.id || null,
       contextJson: {
         campaignId: Number(delivery.campaign_id),
@@ -415,7 +421,7 @@ async function dispatchCampaignDelivery(clinicContext, deliveryId) {
         outboundMessageId: Number(outbound.id),
         status: finalStatus,
         providerStatus: outbound.status,
-        integrationStatus: 'provider_simulated'
+        integrationStatus
       }
     });
 

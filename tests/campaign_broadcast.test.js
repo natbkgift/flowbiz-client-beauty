@@ -156,7 +156,8 @@ test('campaign broadcast system - creation, segmentation, enqueuing, worker proc
   const finishedCampaign = await getCampaign(context, campaign.id);
 
   assert.equal(finishedCampaign.status, 'completed');
-  assert.ok(finishedCampaign.statsJson.deliveredCount >= 1);
+  assert.ok(finishedCampaign.statsJson.sentCount >= 1);
+  assert.equal(finishedCampaign.statsJson.deliveredCount, 0);
 
   await pool.end();
 });

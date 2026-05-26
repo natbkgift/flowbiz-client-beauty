@@ -597,6 +597,26 @@ async function sendLeadOutboundMessage(clinicContext, leadId, payload, options =
       ]
     );
 
+    const { recordAuditLog } = require('../audit/service');
+    await recordAuditLog(
+      {
+        clinicId: clinicContext.currentClinic.id,
+        entityType: 'lead',
+        entityId: leadId,
+        actionType: 'message.send',
+        actorUserId: clinicContext.currentUser.id,
+        contextJson: {
+          channelId: channel.id,
+          channelType: channel.channel_type,
+          messageType,
+          outboundMessageId: result.rows[0].id,
+          status: result.rows[0].status,
+          integrationStatus: providerResult.integrationStatus || (normalized.scheduledAt ? 'scheduled_internal' : 'unknown')
+        }
+      },
+      client
+    );
+
     await client.query('commit');
     const outbound = mapOutboundMessage({ ...result.rows[0], channel_type: channel.channel_type });
 
