@@ -73,6 +73,11 @@ test('SEO Landing Page, Robots.txt, and Sitemap.xml Routing', async (t) => {
   assert.equal(resRobots.statusCode, 200);
   assert.match(resRobots.body, /User-agent: \*/);
   assert.match(resRobots.body, /Disallow: \/admin/);
+
+  // 5. Verify browser default favicon probe does not create a console-visible 404.
+  const resFavicon = await get(`${baseUrl}/favicon.ico`);
+  assert.equal(resFavicon.statusCode, 204);
+  assert.equal(resFavicon.headers['x-content-type-options'], 'nosniff');
 });
 
 test('Production web bundles do not ship inline source maps', () => {

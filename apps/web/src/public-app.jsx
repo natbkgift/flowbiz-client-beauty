@@ -724,6 +724,7 @@ function ForumListPage({ topics, onTopicAdded }) {
           </div>
 
           <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>หัวข้อคำถาม</label>
             <input 
               type="text" 
               placeholder="หัวข้อคำถาม (เช่น ฉีดโบท็อกซ์แล้วยิ้มแข็งแก้ยังไงคะ?)" 
@@ -736,6 +737,7 @@ function ForumListPage({ topics, onTopicAdded }) {
           </div>
 
           <div style={{ marginBottom: '1rem' }}>
+            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem' }}>รายละเอียดคำถาม</label>
             <textarea 
               placeholder="อธิบายรายละเอียดปัญหาของคุณอย่างละเอียด..." 
               value={newContent} 
@@ -757,14 +759,17 @@ function ForumListPage({ topics, onTopicAdded }) {
               </label>
               
               {!isAnon && (
-                <input 
-                  type="text" 
-                  placeholder="ชื่อผู้ตั้งกระทู้" 
-                  value={newAuthor} 
-                  onChange={(e) => setNewAuthor(e.target.value)}
-                  className="reply-textarea"
-                  style={{ minHeight: 'auto', padding: '0.5rem', width: '200px', margin: 0 }}
-                />
+                <label style={{ display: 'grid', gap: '0.35rem', fontSize: '0.9rem' }}>
+                  ชื่อผู้ตั้งกระทู้
+                  <input
+                    type="text"
+                    placeholder="ชื่อผู้ตั้งกระทู้"
+                    value={newAuthor}
+                    onChange={(e) => setNewAuthor(e.target.value)}
+                    className="reply-textarea"
+                    style={{ minHeight: 'auto', padding: '0.5rem', width: '200px', margin: 0 }}
+                  />
+                </label>
               )}
             </div>
             

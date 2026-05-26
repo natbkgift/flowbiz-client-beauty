@@ -97,7 +97,6 @@ test('lifecycle flow pack is seeded for demo clinic', async () => {
 test('new lead welcome creates execution, task, and outbound log', async () => {
   const pool = new Pool({ connectionString: loadConfig().databaseUrl });
   const context = await buildContext(pool);
-  const startedAt = new Date().toISOString();
   const lead = await createLead(context, {
     fullName: `Lifecycle Test Lead ${Date.now()}`,
     source: 'manual',
@@ -108,54 +107,55 @@ test('new lead welcome creates execution, task, and outbound log', async () => {
     lineUserId: `line-lifecycle-${Date.now()}`,
     email: `lifecycle-${Date.now()}@example.com`
   });
+  let welcomeExecutionId = null;
 
   await waitForAssertion(async () => {
-    await runDueJobs(20, {
-      clinicId: context.currentClinic.id,
-      jobType: 'automation.execute',
-      createdAfter: startedAt
-    });
-
     const executionResult = await pool.query(
       `
-        select count(*)::int as execution_count
+        select ae.id
         from automation_executions ae
         inner join automation_flows af on af.id = ae.flow_id
         where ae.clinic_id = $1
           and ae.entity_type = 'lead'
           and ae.entity_id = $2
           and af.entry_rule_json->>'presetKey' = 'new_lead_welcome'
-      `,
-      [context.currentClinic.id, lead.id]
-    );
-    const taskResult = await pool.query(
-      `
-        select count(*)::int as task_count
-        from automation_tasks at
-        inner join automation_executions ae on ae.id = at.execution_id
-        inner join automation_flows af on af.id = ae.flow_id
-        where ae.clinic_id = $1
-          and ae.entity_id = $2
-          and af.entry_rule_json->>'presetKey' = 'new_lead_welcome'
-      `,
-      [context.currentClinic.id, lead.id]
-    );
-    const outboundResult = await pool.query(
-      `
-        select count(*)::int as outbound_count
-        from outbound_messages om
-        inner join automation_executions ae on ae.id = om.automation_execution_id
-        inner join automation_flows af on af.id = ae.flow_id
-        where om.clinic_id = $1
-          and om.entity_type = 'lead'
-          and om.entity_id = $2
-          and om.message_type = 'automation'
-          and af.entry_rule_json->>'presetKey' = 'new_lead_welcome'
+        order by ae.id desc
+        limit 1
       `,
       [context.currentClinic.id, lead.id]
     );
 
-    assert.equal(executionResult.rows[0].execution_count, 1);
+    assert.equal(executionResult.rowCount, 1);
+    welcomeExecutionId = executionResult.rows[0].id;
+
+    await runDueJobs(5, {
+      clinicId: context.currentClinic.id,
+      jobType: 'automation.execute',
+      payloadJsonContains: { executionId: welcomeExecutionId }
+    });
+
+    const taskResult = await pool.query(
+      `
+        select count(*)::int as task_count
+        from automation_tasks
+        where clinic_id = $1
+          and execution_id = $2
+      `,
+      [context.currentClinic.id, welcomeExecutionId]
+    );
+    const outboundResult = await pool.query(
+      `
+        select count(*)::int as outbound_count
+        from outbound_messages
+        where clinic_id = $1
+          and automation_execution_id = $2
+          and entity_type = 'lead'
+          and entity_id = $3
+          and message_type = 'automation'
+      `,
+      [context.currentClinic.id, welcomeExecutionId, lead.id]
+    );
+
     assert.equal(taskResult.rows[0].task_count, 1);
     assert.equal(outboundResult.rows[0].outbound_count, 1);
   });

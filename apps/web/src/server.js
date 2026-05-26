@@ -141,6 +141,12 @@ const server = http.createServer((request, response) => {
     return;
   }
 
+  if (pathname === '/favicon.ico') {
+    response.writeHead(204, buildResponseHeaders('image/x-icon'));
+    response.end();
+    return;
+  }
+
   const filePath = getFilePath(pathname);
 
   if (!filePath) {
