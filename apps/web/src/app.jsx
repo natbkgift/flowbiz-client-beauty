@@ -3376,8 +3376,8 @@ function BlogManagerPage() {
       
       {isEditing ? (
         <form onSubmit={handleFormSubmit} className="blog-editor-form">
-          <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '24px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div className="blog-editor-layout">
+            <div className="blog-editor-main">
               <label className="field">
                 <span>หัวข้อ *</span>
                 <input 
@@ -3400,7 +3400,7 @@ function BlogManagerPage() {
               </label>
 
               <div>
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', borderBottom: '1px solid var(--border)', paddingBottom: '4px' }}>
+                <div className="blog-editor-tabs">
                   <button 
                     type="button" 
                     className={`secondary-button compact-inline-actions ${activeTab === 'edit' ? 'active' : ''}`}
@@ -3448,7 +3448,7 @@ function BlogManagerPage() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', background: 'rgba(0,0,0,0.02)', padding: '16px', borderRadius: '14px', border: '1px solid var(--border)' }}>
+            <div className="blog-settings-panel">
               <h3>ตั้งค่าบทความ</h3>
               
               <label className="field">
@@ -3473,7 +3473,7 @@ function BlogManagerPage() {
               </label>
 
               <label className="field">
-                <span>Cover Image URL</span>
+                <span>URL รูปหน้าปก</span>
                 <input 
                   type="text" 
                   value={form.coverImageUrl} 
@@ -3483,24 +3483,24 @@ function BlogManagerPage() {
               </label>
 
               <label className="field">
-                <span>Tags (comma separated)</span>
+                <span>แท็ก (คั่นด้วยเครื่องหมายจุลภาค)</span>
                 <input 
                   type="text" 
                   value={form.tags} 
                   onChange={e => setForm(f => ({ ...f, tags: e.target.value }))} 
-                  placeholder="Skincare, Treatment, Botox"
+                  placeholder="ดูแลผิว, หัตถการ, โบท็อกซ์"
                 />
               </label>
 
-              <h3 style={{ marginTop: '12px' }}>SEO Tags (Optional)</h3>
+              <h3 className="blog-settings-subheading">ตั้งค่า SEO (ไม่บังคับ)</h3>
 
               <label className="field">
-                <span>SEO Title</span>
+                <span>หัวข้อ SEO</span>
                 <input 
                   type="text" 
                   value={form.seoTitle} 
                   onChange={e => setForm(f => ({ ...f, seoTitle: e.target.value }))} 
-                  placeholder="Falls back to title if empty"
+                  placeholder="ถ้าเว้นว่าง ระบบจะใช้หัวข้อบทความ"
                 />
               </label>
 
@@ -3515,18 +3515,18 @@ function BlogManagerPage() {
               </label>
 
               <label className="field">
-                <span>OG Image URL</span>
+                <span>URL รูปแชร์โซเชียล</span>
                 <input 
                   type="text" 
                   value={form.ogImageUrl} 
                   onChange={e => setForm(f => ({ ...f, ogImageUrl: e.target.value }))} 
-                  placeholder="Falls back to cover image if empty"
+                  placeholder="ถ้าเว้นว่าง ระบบจะใช้รูปหน้าปก"
                 />
               </label>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end', borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+          <div className="blog-editor-actions">
             <button type="button" className="secondary-button" onClick={() => setIsEditing(false)}>
               ยกเลิก
             </button>
@@ -3550,8 +3550,8 @@ function BlogManagerPage() {
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Title</th>
-                        <th>Author</th>
+                        <th>หัวข้อ</th>
+                        <th>ผู้เขียน</th>
                         <th>สถานะ</th>
                         <th>เผยแพร่เมื่อ</th>
                         <th>อัปเดตเมื่อ</th>
@@ -3574,7 +3574,7 @@ function BlogManagerPage() {
                                 color: post.status === 'published' ? 'var(--accent-strong)' : 'var(--text-muted)'
                               }}
                             >
-                              {post.status.toUpperCase()}
+                              {post.status === 'published' ? 'เผยแพร่' : 'แบบร่าง'}
                             </span>
                           </td>
                           <td>{formatDateTime(post.published_at)}</td>
@@ -3719,18 +3719,18 @@ function ForumModeratorPage() {
     >
       <StatusBanner state={flash} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: selectedTopic ? '1fr 1fr' : '1fr', gap: '20px' }}>
+      <div className={`forum-moderator-layout ${selectedTopic ? 'with-detail' : ''}`}>
         <div>
-          <div className="card" style={{ padding: '16px', marginBottom: '20px', display: 'flex', gap: '16px', alignItems: 'center' }}>
-            <div>
-              <label style={{ marginRight: '8px', fontSize: '14px', fontWeight: 'bold' }}>หมวดหมู่:</label>
-              <select value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setSelectedTopic(null); }} className="input" style={{ width: '160px', padding: '6px' }}>
+          <div className="card forum-filter-card">
+            <div className="forum-filter-control">
+              <label>หมวดหมู่</label>
+              <select value={selectedCategory} onChange={e => { setSelectedCategory(e.target.value); setSelectedTopic(null); }} className="input">
                 {categories.map(c => <option key={c.key} value={c.key}>{c.label}</option>)}
               </select>
             </div>
-            <div>
-              <label style={{ marginRight: '8px', fontSize: '14px', fontWeight: 'bold' }}>สถานะ:</label>
-              <select value={selectedStatus} onChange={e => { setSelectedStatus(e.target.value); setSelectedTopic(null); }} className="input" style={{ width: '120px', padding: '6px' }}>
+            <div className="forum-filter-control">
+              <label>สถานะ</label>
+              <select value={selectedStatus} onChange={e => { setSelectedStatus(e.target.value); setSelectedTopic(null); }} className="input">
                 {statuses.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
               </select>
             </div>
@@ -3808,8 +3808,8 @@ function ForumModeratorPage() {
         </div>
 
         {selectedTopic && (
-          <div className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '1px solid var(--border)', paddingBottom: '12px' }}>
+          <div className="card forum-topic-detail-card">
+            <div className="forum-detail-header">
               <div>
                 <span className="pill" style={{ background: 'rgba(0,0,0,0.06)', marginBottom: '8px', display: 'inline-block' }}>{selectedTopic.category.toUpperCase()}</span>
                 <h2 style={{ margin: '0 0 6px 0', fontSize: '1.4rem' }}>{selectedTopic.title}</h2>
@@ -3829,7 +3829,7 @@ function ForumModeratorPage() {
             {loadingReplies ? (
               <p style={{ color: 'var(--text-muted)' }}>กำลังโหลดคำตอบ...</p>
             ) : (
-              <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '350px', paddingRight: '4px' }}>
+              <div className="forum-replies-scroll">
                 {topicReplies.length === 0 ? (
                   <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '20px' }}>ยังไม่มีคำตอบ</p>
                 ) : (
@@ -3854,7 +3854,7 @@ function ForumModeratorPage() {
                       </div>
                       <p style={{ margin: '0 0 8px 0', fontSize: '13px', whiteSpace: 'pre-wrap' }}>{reply.content}</p>
                       
-                      <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                      <div className="forum-reply-toolbar">
                         {reply.is_verified_answer ? (
                           <button 
                             type="button" 
@@ -3881,7 +3881,7 @@ function ForumModeratorPage() {
               </div>
             )}
 
-            <form onSubmit={handlePostReply} style={{ borderTop: '1px solid var(--border)', paddingTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <form onSubmit={handlePostReply} className="forum-answer-form">
               <label style={{ fontSize: '13px', fontWeight: 'bold' }}>โพสต์คำตอบแพทย์อย่างเป็นทางการ</label>
               <textarea
                 value={replyText}

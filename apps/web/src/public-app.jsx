@@ -395,9 +395,9 @@ function LandingPage() {
   ];
 
   const promotions = [
-    { tag: 'Hot Deal', title: 'โบต็อกลดกราม + ลิฟต์กรอบหน้า (ไม่จำกัดยูนิต)', original: '9,900', price: '4,990', desc: 'ดูแลโดยแพทย์ผู้เชี่ยวชาญ แกะกล่องดึงยาต่อหน้า' },
-    { tag: 'Best Seller', title: 'ฟิลเลอร์ใต้ตาเติมเต็มผิวฟู (Premium Brand 1cc)', original: '18,000', price: '11,900', desc: 'แก้ปัญหาร่องลึกใต้ตาคล้ำ ดูโทรม ให้กลับมาสดใสทันที' },
-    { tag: 'Rejuvenate', title: 'Meso Glow หน้ากระจ่างใสสะกดสายตา 3 ครั้ง', original: '7,500', price: '2,900', desc: 'สูตรพิเศษเติมวิตามินเข้มข้น ผิวเด้งฉ่ำออร่าแบบเร่งด่วน' }
+    { tag: 'โปรยอดนิยม', title: 'โบต็อกลดกราม + ลิฟต์กรอบหน้า (ไม่จำกัดยูนิต)', original: '9,900', price: '4,990', desc: 'ดูแลโดยแพทย์ผู้เชี่ยวชาญ แกะกล่องดึงยาต่อหน้า' },
+    { tag: 'ขายดีที่สุด', title: 'ฟิลเลอร์ใต้ตาเติมเต็มผิวฟู (Premium Brand 1cc)', original: '18,000', price: '11,900', desc: 'แก้ปัญหาร่องลึกใต้ตาคล้ำ ดูโทรม ให้กลับมาสดใสทันที' },
+    { tag: 'ฟื้นฟูผิว', title: 'Meso Glow หน้ากระจ่างใสสะกดสายตา 3 ครั้ง', original: '7,500', price: '2,900', desc: 'สูตรพิเศษเติมวิตามินเข้มข้น ผิวเด้งฉ่ำออร่าแบบเร่งด่วน' }
   ];
 
   return (
@@ -420,7 +420,7 @@ function LandingPage() {
       {/* Services Section */}
       <section className="section" style={{ borderTop: '1px solid rgba(255,255,255,0.03)' }}>
         <div className="section-header">
-          <div className="section-subtitle">Our Specialist Services</div>
+          <div className="section-subtitle">บริการดูแลเฉพาะทาง</div>
           <h2 className="section-title">หัตถการความงามที่เชี่ยวชาญ</h2>
         </div>
         <div className="grid-cards">
@@ -437,7 +437,7 @@ function LandingPage() {
       {/* Promotions Section */}
       <section className="section" style={{ borderTop: '1px solid rgba(255,255,255,0.03)', background: 'rgba(212, 175, 55, 0.01)' }}>
         <div className="section-header">
-          <div className="section-subtitle">Exclusive Offers</div>
+          <div className="section-subtitle">ข้อเสนอเฉพาะเดือนนี้</div>
           <h2 className="section-title">โปรโมชั่นพิเศษประจำเดือนนี้</h2>
         </div>
         <div className="grid-cards">
