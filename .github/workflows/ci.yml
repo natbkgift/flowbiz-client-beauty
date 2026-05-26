@@ -1,4 +1,4 @@
-name: FlowBiz Beauty CI/CD validation Pipeline
+name: FlowBiz Beauty CI
 
 on:
   push:
@@ -7,46 +7,87 @@ on:
     branches: [ main ]
 
 jobs:
-  validate-and-test:
+  validate-test-and-smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      APP_ENV: test
+      API_PORT: 3001
+      WEB_PORT: 4173
+      PUBLIC_APP_URL: http://localhost:4173
+      API_BASE_URL: http://localhost:3001
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/flowbiz_beauty_test
+      AUTH_TOKEN_SECRET: ci-auth-token-secret
+      INVITE_TOKEN_SECRET: ci-invite-token-secret
+      PUBLIC_SIGNUP_ENABLED: "true"
+      WORKER_LOOP_ENABLED: "true"
+      LINE_INTEGRATION_MODE: simulated
+      LINE_CHANNEL_ACCESS_TOKEN: ""
+      LINE_CHANNEL_SECRET: ""
+      LINE_REAL_SEND_ENABLED: "false"
+      AI_PROVIDER: mock
+      AI_REAL_GENERATION_ENABLED: "false"
+      GEMINI_API_KEY: ""
+      OPENAI_API_KEY: ""
+      POSTGRES_DB: flowbiz_beauty_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_PORT: 5432
+      DATA_ROOT: /tmp/flowbiz-beauty-ci
+      SMOKE_DRY_RUN: "true"
 
     services:
       postgres:
         image: postgres:16-alpine
         env:
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: password
+          POSTGRES_PASSWORD: postgres
           POSTGRES_DB: flowbiz_beauty_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d flowbiz_beauty_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
 
     steps:
-      - name: Checkout repository code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js environment
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Run esbuild validate compile check
-        run: npm run validate
+      - name: Wait for PostgreSQL readiness
+        run: |
+          for i in {1..30}; do
+            node -e "const { Client } = require('pg'); const client = new Client({ connectionString: process.env.DATABASE_URL }); client.connect().then(() => client.query('select 1')).then(() => client.end()).then(() => process.exit(0)).catch(() => process.exit(1));" && exit 0
+            sleep 2
+          done
+          echo "PostgreSQL did not become ready in time"
+          exit 1
 
-      - name: Run SQL Schema migrations verification
-        env:
-          DATABASE_URL: postgres://postgres:password@localhost:5432/flowbiz_beauty_test
+      - name: Run migrations
         run: npm run migrate
 
-      - name: Run Phase 5 and Phase 6 Automated Test Suites
-        env:
-          DATABASE_URL: postgres://postgres:password@localhost:5432/flowbiz_beauty_test
-        run: node -r ./teardown-hook.js --test tests/phase5_social_inbound.test.js tests/phase6_loyalty_roas.test.js tests/phase9_seo_web.test.js
+      - name: Validate source and web build
+        run: npm run validate
+
+      - name: Build web assets
+        run: npm run build:web
+
+      - name: Run full test suite
+        run: npm test
+
+      - name: Validate staging compose config
+        run: docker compose --env-file .env.example -f infra/docker/docker-compose.staging.yml config
+
+      - name: Run staging smoke dry-run
+        run: npm run smoke:staging
