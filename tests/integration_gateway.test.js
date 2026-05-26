@@ -157,7 +157,9 @@ test('integration gateway - wix unauthorized secret rejection', async () => {
   });
 
   assert.equal(responseStatus, 401);
-  assert.equal(responseData.error, 'Unauthorized: Invalid signature/secret');
+  assert.equal(responseData.error.code, 'INVALID_WEBHOOK_SIGNATURE');
+  assert.equal(responseData.error.message, 'ลายเซ็นหรือ secret ของ webhook ไม่ถูกต้อง');
+  assert.equal(responseData.error.details.reason, 'invalid_secret');
 
   await pool.end();
 });

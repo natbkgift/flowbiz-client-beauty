@@ -2,8 +2,9 @@ const http = require('node:http');
 const { loadConfig } = require('./config');
 const { testConnection, closePool } = require('./db');
 const { startWorkerLoop, stopWorkerLoop } = require('./modules/worker-engine/scheduler');
-const { json, noContent, sendError, parseJsonBody } = require('./common/http');
+const { json, jsonError, noContent, sendError, parseJsonBody } = require('./common/http');
 const { matchPath } = require('./common/routing');
+const { checkRateLimit } = require('./common/rate-limiter');
 const { AppError } = require('./common/errors');
 const { login, signup, authenticateRequest, logout } = require('./modules/auth/service');
 const { authenticateAndAuthorize } = require('./modules/rbac/service');
@@ -45,8 +46,33 @@ const { handleSettingsRoutes } = require('./modules/settings/routes');
 const { handleOpsRoutes } = require('./modules/ops/routes');
 const { handleUnifiedChatRoutes } = require('./modules/unified-chat/routes');
 const { handleLoyaltyRoutes } = require('./modules/loyalty-mgm/routes');
+const { handleBlogRoutes } = require('./modules/blog/routes');
+const { handleForumRoutes } = require('./modules/forum/routes');
+
 
 const config = loadConfig();
+
+function applyDevelopmentCors(request, response) {
+  if (config.appEnv !== 'development') {
+    return false;
+  }
+
+  const origin = request.headers.origin;
+  const allowedOrigins = new Set([
+    `http://localhost:${config.webPort}`,
+    `http://127.0.0.1:${config.webPort}`
+  ]);
+
+  if (!origin || !allowedOrigins.has(origin)) {
+    return false;
+  }
+
+  response.setHeader('Access-Control-Allow-Origin', origin);
+  response.setHeader('Vary', 'Origin');
+  response.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-clinic-slug, x-workspace-slug');
+  return true;
+}
 
 async function routeRequest(request, response) {
   const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`);
@@ -78,19 +104,39 @@ async function routeRequest(request, response) {
   if (url.pathname === '/' && request.method === 'GET') {
     return json(response, 200, {
       name: 'flowbiz-api',
-      message: 'Sprint 1 tenant and auth foundation is running.',
+      message: 'FlowBiz Beauty API พร้อมให้บริการ',
       healthEndpoint: '/health',
-      authEndpoints: ['/auth/signup', '/auth/login', '/auth/me', '/tenant-context', '/auth/logout']
+      authEndpoints: [
+        config.publicSignupEnabled ? '/auth/signup' : null,
+        '/auth/login',
+        '/auth/me',
+        '/tenant-context',
+        '/auth/logout'
+      ].filter(Boolean)
     });
   }
 
   if (url.pathname === '/auth/signup' && request.method === 'POST') {
+    const limitCheck = checkRateLimit(request, 20, 60000);
+    if (!limitCheck.allowed) {
+      return jsonError(response, 429, 'RATE_LIMIT_EXCEEDED', limitCheck.message);
+    }
+
+    if (!config.publicSignupEnabled) {
+      throw new AppError(403, 'PUBLIC_SIGNUP_DISABLED', 'Public signup is disabled.');
+    }
+
     const body = await parseJsonBody(request);
     const session = await signup(body);
     return json(response, 201, session);
   }
 
   if (url.pathname === '/auth/login' && request.method === 'POST') {
+    const limitCheck = checkRateLimit(request, 20, 60000);
+    if (!limitCheck.allowed) {
+      return jsonError(response, 429, 'RATE_LIMIT_EXCEEDED', limitCheck.message);
+    }
+
     const body = await parseJsonBody(request);
     const session = await login(body);
     return json(response, 200, session);
@@ -153,6 +199,14 @@ async function routeRequest(request, response) {
   }
 
   if (await handleLoyaltyRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
+    return;
+  }
+
+  if (await handleBlogRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
+    return;
+  }
+
+  if (await handleForumRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
     return;
   }
 
@@ -339,6 +393,13 @@ async function routeRequest(request, response) {
 
 const server = http.createServer(async (request, response) => {
   try {
+    const corsApplied = applyDevelopmentCors(request, response);
+    if (request.method === 'OPTIONS' && corsApplied) {
+      response.writeHead(204);
+      response.end();
+      return;
+    }
+
     await routeRequest(request, response);
   } catch (error) {
     sendError(response, error);

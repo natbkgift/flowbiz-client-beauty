@@ -4,6 +4,7 @@ const { handleZonepangWebhook } = require('./zonepang-handler');
 const { handleTikTokWebhook } = require('./tiktok-handler');
 const { handleFacebookWebhook } = require('./facebook-handler');
 const { checkRateLimit } = require('../../common/rate-limiter');
+const { jsonError } = require('../../common/http');
 
 async function handleIntegrationGatewayRoutes(request, response, url, tools) {
   const { parseJsonBody, json } = tools;
@@ -19,7 +20,7 @@ async function handleIntegrationGatewayRoutes(request, response, url, tools) {
     // API Security Rate Limiter (60 Req / 1 Min window)
     const limitCheck = checkRateLimit(request, 60, 60000);
     if (!limitCheck.allowed) {
-      return json(response, 429, { error: 'Too Many Requests', message: limitCheck.message });
+      return jsonError(response, 429, 'RATE_LIMIT_EXCEEDED', limitCheck.message);
     }
 
     request.body = await parseJsonBody(request);
@@ -52,7 +53,7 @@ async function handleIntegrationGatewayRoutes(request, response, url, tools) {
     // API Security Rate Limiter (60 Req / 1 Min window)
     const limitCheck = checkRateLimit(request, 60, 60000);
     if (!limitCheck.allowed) {
-      return json(response, 429, { error: 'Too Many Requests', message: limitCheck.message });
+      return jsonError(response, 429, 'RATE_LIMIT_EXCEEDED', limitCheck.message);
     }
 
     request.body = await parseJsonBody(request);
@@ -84,7 +85,7 @@ async function handleIntegrationGatewayRoutes(request, response, url, tools) {
 
     const limitCheck = checkRateLimit(request, 60, 60000);
     if (!limitCheck.allowed) {
-      return json(response, 429, { error: 'Too Many Requests', message: limitCheck.message });
+      return jsonError(response, 429, 'RATE_LIMIT_EXCEEDED', limitCheck.message);
     }
 
     request.body = await parseJsonBody(request);
@@ -116,7 +117,7 @@ async function handleIntegrationGatewayRoutes(request, response, url, tools) {
 
     const limitCheck = checkRateLimit(request, 60, 60000);
     if (!limitCheck.allowed) {
-      return json(response, 429, { error: 'Too Many Requests', message: limitCheck.message });
+      return jsonError(response, 429, 'RATE_LIMIT_EXCEEDED', limitCheck.message);
     }
 
     request.body = await parseJsonBody(request);

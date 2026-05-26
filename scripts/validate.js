@@ -46,6 +46,10 @@ const requiredPaths = [
   'apps/api/src/modules/ai/validation.js',
   'apps/api/src/modules/ai/service.js',
   'apps/api/src/modules/ai/routes.js',
+  'apps/api/src/modules/blog/service.js',
+  'apps/api/src/modules/blog/routes.js',
+  'apps/api/src/modules/forum/service.js',
+  'apps/api/src/modules/forum/routes.js',
   'apps/api/src/modules/analytics/validation.js',
   'apps/api/src/modules/analytics/service.js',
   'apps/api/src/modules/analytics/routes.js',
@@ -82,6 +86,7 @@ const requiredPaths = [
   'database/migrations/015_ai_decision_engine.sql',
   'database/migrations/020_crm_lead_pipeline_engine.sql',
   'database/migrations/021_automation_event_driven_lifecycle_engine.sql',
+  'database/migrations/035_phase9_blog_forum.sql',
   'database/seeds/001_runtime_seed.sql',
   'database/seeds/002_multi_tenant_seed.sql',
   'database/seeds/003_lead_crm_seed.sql',
@@ -112,7 +117,8 @@ const requiredPaths = [
   'tests/ai_engine.test.js',
   'tests/admin_ui.test.js',
   'tests/crm_lead_pipeline.test.js',
-  'tests/phase9_seo_web.test.js'
+  'tests/phase9_seo_web.test.js',
+  'tests/phase9_blog_forum.test.js'
 ];
 
 function checkFiles() {
@@ -167,6 +173,10 @@ function checkSyntax() {
     'apps/api/src/modules/ai/validation.js',
     'apps/api/src/modules/ai/service.js',
     'apps/api/src/modules/ai/routes.js',
+    'apps/api/src/modules/blog/service.js',
+    'apps/api/src/modules/blog/routes.js',
+    'apps/api/src/modules/forum/service.js',
+    'apps/api/src/modules/forum/routes.js',
     'apps/api/src/modules/analytics/validation.js',
     'apps/api/src/modules/analytics/service.js',
     'apps/api/src/modules/analytics/routes.js',
@@ -195,7 +205,8 @@ function checkSyntax() {
     'tests/ai_engine.test.js',
     'tests/admin_ui.test.js',
     'tests/crm_lead_pipeline.test.js',
-    'tests/phase9_seo_web.test.js'
+    'tests/phase9_seo_web.test.js',
+    'tests/phase9_blog_forum.test.js'
   ];
 
   for (const file of jsFiles) {

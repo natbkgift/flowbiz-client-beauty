@@ -1,8 +1,7 @@
 const { after } = require('node:test');
 const pg = require('pg');
 
-// Recurring unref'd diagnostics to print active handles while the process is kept alive by other resources
-const diagTimer = setInterval(() => {
+function printActiveHandles() {
   const handles = process._getActiveHandles() || [];
   console.error(`\n[DIAGNOSTICS] Active event loop handles: ${handles.length}`);
   handles.forEach((h, i) => {
@@ -18,8 +17,13 @@ const diagTimer = setInterval(() => {
       console.error(`  - Error getting handle info for index ${i}`);
     }
   });
-}, 5000);
-diagTimer.unref();
+}
+
+// Keep diagnostics opt-in so successful test runs stay readable.
+if (process.env.FLOWBIZ_TEST_DIAGNOSTICS === '1') {
+  const diagTimer = setInterval(printActiveHandles, 5000);
+  diagTimer.unref();
+}
 
 const activePools = new Set();
 const OriginalPool = pg.Pool;
@@ -28,10 +32,16 @@ const OriginalPool = pg.Pool;
 pg.Pool = class WrappedPool extends OriginalPool {
   constructor(config) {
     super(config);
+    this.__flowbizClosed = false;
     activePools.add(this);
   }
 
   async end() {
+    if (this.__flowbizClosed) {
+      return undefined;
+    }
+
+    this.__flowbizClosed = true;
     activePools.delete(this);
     return super.end();
   }
@@ -99,7 +109,6 @@ after(async () => {
     // Ignore cleanup errors
   }
   console.error('[TEARDOWN] After hook completed.');
-  process.exit(0);
 });
 
 

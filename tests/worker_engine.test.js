@@ -121,7 +121,11 @@ test('worker engine polls queued automation jobs and executes them', async () =>
   const executionId = executionLookup.rows[0].id;
 
   const jobsBefore = await pool.query(`select * from worker_jobs where job_type = 'automation.execute' and payload_json->>'executionId' = $1`, [String(executionId)]);
-  const workerResult = await scheduler.runDueJobs(20);
+  const workerResult = await scheduler.runDueJobs(20, {
+    clinicId: context.currentClinic.id,
+    jobType: 'automation.execute',
+    payloadJsonContains: { executionId }
+  });
   const executionResult = await pool.query(`select status from automation_executions where id = $1`, [executionId]);
   const taskResult = await pool.query(
     `select count(*)::int as task_count from automation_tasks at inner join automation_executions ae on ae.id = at.execution_id where ae.flow_id = $1 and ae.entity_id = $2`,
@@ -146,7 +150,7 @@ test('worker engine retries failed jobs by moving run_at forward', async () => {
     maxAttempts: 2
   });
 
-  const firstRun = await scheduler.runDueJobs(20);
+  const firstRun = await scheduler.runDueJobs(20, { clinicId: context.currentClinic.id, jobIds: [job.id] });
   const reloaded = await pool.query(`select status, attempts, run_at, last_error from worker_jobs where id = $1`, [job.id]);
 
   assert.ok(firstRun.results.some((item) => item.jobId === job.id && item.status === 'retried'));
@@ -168,7 +172,7 @@ test('worker scheduler respects delayed run_at timestamps', async () => {
     maxAttempts: 1
   });
 
-  const workerResult = await scheduler.runDueJobs(20);
+  const workerResult = await scheduler.runDueJobs(20, { clinicId: context.currentClinic.id, jobIds: [job.id] });
   const reloaded = await pool.query(`select status, run_at from worker_jobs where id = $1`, [job.id]);
 
   assert.equal(workerResult.results.some((item) => item.jobId === job.id), false);
@@ -188,7 +192,7 @@ test('worker loop executes due jobs without requiring a new event', async () => 
     maxAttempts: 1
   });
 
-  scheduler.startWorkerLoop({ intervalMs: 25, batchSize: 200, runOnStart: true });
+  scheduler.startWorkerLoop({ intervalMs: 25, batchSize: 200, runOnStart: true, clinicId: context.currentClinic.id, jobIds: [job.id] });
 
   try {
     await waitForAssertion(async () => {

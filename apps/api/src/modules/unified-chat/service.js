@@ -113,7 +113,7 @@ async function getUnifiedChatMessages(clinicContext, threadId) {
   const messagesResult = await pool.query(
     `select * from ai_chat_messages
      where thread_id = $1
-     order by created_at asc`,
+     order by created_at asc, id asc`,
     [Number(threadId)]
   );
 

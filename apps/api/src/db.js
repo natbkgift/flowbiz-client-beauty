@@ -26,8 +26,9 @@ async function testConnection() {
 
 async function closePool() {
   if (pool) {
-    await pool.end();
+    const currentPool = pool;
     pool = undefined;
+    await currentPool.end();
   }
 }
 

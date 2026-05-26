@@ -1,9 +1,10 @@
 async function sendMessage(message) {
   return {
     providerMessageId: `local-${Date.now()}-${message.channelType}`,
-    status: 'delivered',
+    integrationStatus: 'simulated',
+    status: 'sent',
     sentAt: new Date().toISOString(),
-    deliveredAt: new Date().toISOString(),
+    deliveredAt: null,
     failureReason: null
   };
 }

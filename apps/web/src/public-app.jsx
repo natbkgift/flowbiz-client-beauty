@@ -1,23 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
+import DOMPurify from 'dompurify';
 
 // Config & API Helpers
-const CONFIG = window.__FLOWBIZ_WEB_CONFIG__ || { apiBaseUrl: 'http://localhost:8103' };
-const API_BASE = '/api'; // proxied by Nginx
+const CONFIG = window.__FLOWBIZ_WEB_CONFIG__ || { apiBaseUrl: 'http://localhost:3001' };
+const API_BASE = CONFIG.apiBaseUrl || '/api';
+const PUBLIC_CLINIC_ID = Number.isInteger(Number(CONFIG.publicClinicId)) && Number(CONFIG.publicClinicId) > 0
+  ? Number(CONFIG.publicClinicId)
+  : null;
+
+function withPublicClinicContext(path) {
+  if (!PUBLIC_CLINIC_ID) {
+    return path;
+  }
+
+  const parsed = new URL(path, window.location.origin);
+  if ((parsed.pathname.startsWith('/blog/') || parsed.pathname.startsWith('/forum/')) && !parsed.searchParams.has('clinicId')) {
+    parsed.searchParams.set('clinicId', String(PUBLIC_CLINIC_ID));
+  }
+
+  return `${parsed.pathname}${parsed.search}`;
+}
 
 async function apiFetch(path, options = {}) {
+  const pathWithContext = withPublicClinicContext(path);
   try {
-    const response = await fetch(`${API_BASE}${path}`, {
+    const response = await fetch(`${API_BASE}${pathWithContext}`, {
       headers: {
         'Content-Type': 'application/json',
         ...options.headers
       },
       ...options
     });
-    if (!response.ok) throw new Error('API request failed');
+    if (!response.ok) throw new Error('เรียก API ไม่สำเร็จ');
     return await response.json();
   } catch (err) {
-    console.warn(`API call to ${path} failed, using local fallback state:`, err.message);
+    console.warn(`API call to ${pathWithContext} failed, using local fallback state:`, err.message);
     return null;
   }
 }
@@ -71,6 +89,97 @@ const MOCK_BLOG_POSTS = [
     tags: ['โบท็อกซ์', 'ลดริ้วรอย', 'ความงาม']
   }
 ];
+
+const ALLOWED_RICH_TAGS = new Set(['P', 'BR', 'STRONG', 'EM', 'UL', 'OL', 'LI', 'H1', 'H2', 'H3', 'A', 'IMG', 'BLOCKQUOTE']);
+const ALLOWED_RICH_ATTRS = {
+  A: new Set(['href', 'target', 'rel']),
+  IMG: new Set(['src', 'alt'])
+};
+const ALLOWED_RICH_TAG_NAMES = [...ALLOWED_RICH_TAGS].map((tag) => tag.toLowerCase());
+const ALLOWED_RICH_ATTR_NAMES = [...new Set(Object.values(ALLOWED_RICH_ATTRS).flatMap((attrs) => [...attrs]))];
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function isSafeUrl(url) {
+  try {
+    const parsed = new URL(String(url || ''), window.location.origin);
+    return ['http:', 'https:'].includes(parsed.protocol);
+  } catch (_) {
+    return false;
+  }
+}
+
+function sanitizeRichHtml(html) {
+  const sanitized = DOMPurify.sanitize(String(html || ''), {
+    ALLOWED_TAGS: ALLOWED_RICH_TAG_NAMES,
+    ALLOWED_ATTR: ALLOWED_RICH_ATTR_NAMES,
+    ALLOW_DATA_ATTR: false,
+    FORBID_ATTR: ['style', 'srcdoc']
+  });
+  const doc = document.implementation.createHTMLDocument('sanitizer');
+  doc.body.innerHTML = sanitized;
+
+  const walk = (node) => {
+    for (const child of [...node.childNodes]) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        continue;
+      }
+
+      if (child.nodeType !== Node.ELEMENT_NODE || !ALLOWED_RICH_TAGS.has(child.tagName)) {
+        child.replaceWith(doc.createTextNode(child.textContent || ''));
+        continue;
+      }
+
+      for (const attr of [...child.attributes]) {
+        const allowedAttrs = ALLOWED_RICH_ATTRS[child.tagName] || new Set();
+        if (!allowedAttrs.has(attr.name)) {
+          child.removeAttribute(attr.name);
+        }
+      }
+
+      if (child.tagName === 'A') {
+        const href = child.getAttribute('href') || '';
+        if (!isSafeUrl(href)) {
+          child.removeAttribute('href');
+        } else {
+          child.setAttribute('target', '_blank');
+          child.setAttribute('rel', 'noopener noreferrer');
+        }
+      }
+
+      if (child.tagName === 'IMG') {
+        const src = child.getAttribute('src') || '';
+        if (!isSafeUrl(src)) {
+          child.remove();
+          continue;
+        }
+      }
+
+      walk(child);
+    }
+  };
+
+  walk(doc.body);
+  return doc.body.innerHTML;
+}
+
+function openExternalUrl(url) {
+  if (!isSafeUrl(url)) {
+    return;
+  }
+
+  const popup = window.open(url, '_blank', 'noopener,noreferrer');
+  if (popup) {
+    popup.opener = null;
+  }
+}
 
 const MOCK_FORUM_TOPICS = [
   {
@@ -178,7 +287,7 @@ export function App() {
     if (hash.startsWith('/blog/')) {
       const slug = hash.replace('/blog/', '');
       const post = blogPosts.find(p => p.slug === slug);
-      return <BlogDetailPage post={post} />;
+      return <BlogDetailPage slug={slug} initialPost={post} />;
     }
     
     if (hash === '/forum') {
@@ -191,22 +300,12 @@ export function App() {
     }
     
     if (hash.startsWith('/forum/')) {
-      const topicId = Number(hash.replace('/forum/', ''));
-      const topic = forumTopics.find(t => t.id === topicId);
+      const topicIdOrSlug = hash.replace('/forum/', '');
       return (
         <ForumDetailPage 
-          topic={topic}
-          onReplyAdded={(topicId, newReply) => {
-            setForumTopics(forumTopics.map(t => {
-              if (t.id === topicId) {
-                return {
-                  ...t,
-                  reply_count: t.reply_count + 1,
-                  replies: [...(t.replies || []), newReply]
-                };
-              }
-              return t;
-            }));
+          topicIdOrSlug={topicIdOrSlug}
+          onReplyAdded={() => {
+            loadData();
           }}
         />
       );
@@ -215,7 +314,7 @@ export function App() {
     return (
       <div className="public-container" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
         <h1 style={{ fontSize: '3rem', marginBottom: '1.5rem', color: 'var(--gold-primary)' }}>404</h1>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>Page Not Found. ขออภัย ไม่พบหน้าที่ท่านต้องการ</p>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>ขออภัย ไม่พบหน้าที่ท่านต้องการ</p>
         <a href="#/" className="cta-btn">กลับหน้าแรก</a>
       </div>
     );
@@ -235,9 +334,9 @@ export function App() {
             <li><a href="#/forum" className={currentRoute.startsWith('#/forum') ? 'active' : ''}>เว็บบอร์ดถามตอบ</a></li>
           </ul>
         </nav>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <a href="/admin" className="cta-btn secondary" target="_blank">เข้าระบบ CRM</a>
-          <button className="cta-btn" onClick={() => window.open('https://line.me', '_blank')}>ปรึกษาหมอฟรี</button>
+        <div className="header-actions">
+          <a href="/admin" className="cta-btn secondary" target="_blank" rel="noopener noreferrer">เข้าระบบ CRM</a>
+          <button className="cta-btn" onClick={() => openExternalUrl('https://line.me')}>ปรึกษาหมอฟรี</button>
         </div>
       </header>
 
@@ -296,9 +395,9 @@ function LandingPage() {
   ];
 
   const promotions = [
-    { tag: 'Hot Deal', title: 'โบต็อกลดกราม + ลิฟต์กรอบหน้า (ไม่จำกัดยูนิต)', original: '9,900', price: '4,990', desc: 'ดูแลโดยแพทย์ผู้เชี่ยวชาญ แกะกล่องดึงยาต่อหน้า' },
-    { tag: 'Best Seller', title: 'ฟิลเลอร์ใต้ตาเติมเต็มผิวฟู (Premium Brand 1cc)', original: '18,000', price: '11,900', desc: 'แก้ปัญหาร่องลึกใต้ตาคล้ำ ดูโทรม ให้กลับมาสดใสทันที' },
-    { tag: 'Rejuvenate', title: 'Meso Glow หน้ากระจ่างใสสะกดสายตา 3 ครั้ง', original: '7,500', price: '2,900', desc: 'สูตรพิเศษเติมวิตามินเข้มข้น ผิวเด้งฉ่ำออร่าแบบเร่งด่วน' }
+    { tag: 'โปรยอดนิยม', title: 'โบต็อกลดกราม + ลิฟต์กรอบหน้า (ไม่จำกัดยูนิต)', original: '9,900', price: '4,990', desc: 'ดูแลโดยแพทย์ผู้เชี่ยวชาญ แกะกล่องดึงยาต่อหน้า' },
+    { tag: 'ขายดีที่สุด', title: 'ฟิลเลอร์ใต้ตาเติมเต็มผิวฟู (Premium Brand 1cc)', original: '18,000', price: '11,900', desc: 'แก้ปัญหาร่องลึกใต้ตาคล้ำ ดูโทรม ให้กลับมาสดใสทันที' },
+    { tag: 'ฟื้นฟูผิว', title: 'Meso Glow หน้ากระจ่างใสสะกดสายตา 3 ครั้ง', original: '7,500', price: '2,900', desc: 'สูตรพิเศษเติมวิตามินเข้มข้น ผิวเด้งฉ่ำออร่าแบบเร่งด่วน' }
   ];
 
   return (
@@ -306,13 +405,13 @@ function LandingPage() {
       {/* Hero Section */}
       <section className="hero">
         <div className="hero-content">
-          <div className="hero-subtitle">Premium Aesthetic & Skincare Clinic</div>
+          <div className="hero-subtitle">คลินิกความงามและดูแลผิวระดับพรีเมียม</div>
           <h1 className="hero-title">ที่สุดแห่งการดูแลผิวพรรณ<br/>และปรับรูปหน้าอย่างมีระดับ</h1>
           <p className="hero-desc">
             ยกระดับความสวยงามของผิวพรรณคุณอย่างปลอดภัย ด้วยเทคโนโลยีทางการแพทย์ที่ทันสมัยและทีมแพทย์ผู้ชำนาญการด้านหัตถการปรับรูปหน้า
           </p>
           <div className="hero-actions">
-            <button className="cta-btn" onClick={() => window.open('https://line.me', '_blank')}>จองคิวรับสิทธิ์พิเศษ</button>
+            <button className="cta-btn" onClick={() => openExternalUrl('https://line.me')}>จองคิวรับสิทธิ์พิเศษ</button>
             <a href="#/blog" className="cta-btn secondary">อ่านสาระความรู้ผิว</a>
           </div>
         </div>
@@ -321,7 +420,7 @@ function LandingPage() {
       {/* Services Section */}
       <section className="section" style={{ borderTop: '1px solid rgba(255,255,255,0.03)' }}>
         <div className="section-header">
-          <div className="section-subtitle">Our Specialist Services</div>
+          <div className="section-subtitle">บริการดูแลเฉพาะทาง</div>
           <h2 className="section-title">หัตถการความงามที่เชี่ยวชาญ</h2>
         </div>
         <div className="grid-cards">
@@ -338,7 +437,7 @@ function LandingPage() {
       {/* Promotions Section */}
       <section className="section" style={{ borderTop: '1px solid rgba(255,255,255,0.03)', background: 'rgba(212, 175, 55, 0.01)' }}>
         <div className="section-header">
-          <div className="section-subtitle">Exclusive Offers</div>
+          <div className="section-subtitle">ข้อเสนอเฉพาะเดือนนี้</div>
           <h2 className="section-title">โปรโมชั่นพิเศษประจำเดือนนี้</h2>
         </div>
         <div className="grid-cards">
@@ -352,7 +451,7 @@ function LandingPage() {
                 <span className="promo-currency">THB</span>
                 <span className="promo-original">{promo.original}.-</span>
               </div>
-              <button className="cta-btn" style={{ width: '100%' }} onClick={() => window.open('https://line.me', '_blank')}>
+              <button className="cta-btn" style={{ width: '100%' }} onClick={() => openExternalUrl('https://line.me')}>
                 จองสิทธิ์โปรนี้ทาง LINE
               </button>
             </div>
@@ -367,6 +466,8 @@ function LandingPage() {
 // Page Component: Blog List Page
 // ----------------------------------------------------
 function BlogListPage({ posts }) {
+  const visiblePosts = Array.isArray(posts) ? posts : [];
+
   return (
     <div className="public-container">
       <div className="blog-header">
@@ -376,10 +477,15 @@ function BlogListPage({ posts }) {
         </div>
       </div>
       <div className="blog-grid">
-        {posts.map((post) => (
+        {visiblePosts.length === 0 ? (
+          <div className="empty-state" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '3rem 1rem' }}>
+            <h2>ยังไม่มีบทความเผยแพร่</h2>
+            <p style={{ color: 'var(--text-secondary)' }}>ทีมคลินิกกำลังเตรียมบทความความรู้ด้านผิวพรรณและหัตถการความงาม</p>
+          </div>
+        ) : visiblePosts.map((post) => (
           <article key={post.id} className="blog-card">
             <div className="blog-cover">
-              {post.cover_image_url ? (
+              {post.cover_image_url && isSafeUrl(post.cover_image_url) ? (
                 <img src={post.cover_image_url} alt={post.title} className="blog-cover-img" />
               ) : (
                 <span className="blog-cover-placeholder">🧬</span>
@@ -387,7 +493,7 @@ function BlogListPage({ posts }) {
             </div>
             <div className="blog-card-content">
               <div className="blog-meta">
-                <span>By {post.author_name}</span>
+                <span>โดย {post.author_name}</span>
                 <span>•</span>
                 <span>{new Date(post.published_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
               </div>
@@ -407,11 +513,67 @@ function BlogListPage({ posts }) {
 // ----------------------------------------------------
 // Page Component: Blog Detail Page
 // ----------------------------------------------------
-function BlogDetailPage({ post }) {
-  if (!post) {
+function renderContent(text) {
+  if (!text) return '';
+  // If it looks like HTML, sanitize it before rendering.
+  if (text.includes('</p>') || text.includes('</h2>') || text.includes('</ul>') || text.includes('</strong>')) {
+    return sanitizeRichHtml(text);
+  }
+  // Otherwise, parse simple Markdown:
+  let html = escapeHtml(text)
+    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+    .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+    .replace(/\*(.*)\*/gim, '<em>$1</em>')
+    .replace(/!\[(.*?)\]\((.*?)\)/gim, (_, alt, src) => (
+      isSafeUrl(src) ? `<img alt="${escapeHtml(alt)}" src="${escapeHtml(src)}" />` : ''
+    ))
+    .replace(/\[(.*?)\]\((.*?)\)/gim, (_, label, href) => (
+      isSafeUrl(href) ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${label}</a>` : label
+    ))
+    .replace(/\n\n/g, '</p><p>');
+  return sanitizeRichHtml('<p>' + html.replace(/\n/g, '<br/>') + '</p>');
+}
+
+function BlogDetailPage({ slug, initialPost }) {
+  const [post, setPost] = useState(initialPost);
+  const [loading, setLoading] = useState(!initialPost);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function fetchPost() {
+      try {
+        const fetched = await apiFetch(`/blog/posts/${slug}`);
+        if (fetched) {
+          setPost(fetched);
+          setError(null);
+        } else if (!post) {
+          setError('ไม่พบบทความชิ้นนี้');
+        }
+      } catch (err) {
+        if (!post) {
+          setError('ไม่สามารถโหลดบทความได้');
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPost();
+  }, [slug]);
+
+  if (loading) {
     return (
       <div className="public-container" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
-        <h2>ขออภัย ไม่พบบทความชิ้นนี้</h2>
+        <p style={{ color: 'var(--text-secondary)' }}>กำลังโหลดบทความ...</p>
+      </div>
+    );
+  }
+
+  if (error || !post) {
+    return (
+      <div className="public-container" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
+        <h2>ขออภัย {error || 'ไม่พบบทความชิ้นนี้'}</h2>
         <a href="#/blog" className="cta-btn" style={{ marginTop: '1.5rem' }}>กลับหน้าบทความ</a>
       </div>
     );
@@ -427,7 +589,7 @@ function BlogDetailPage({ post }) {
           <h1 className="blog-post-title">{post.title}</h1>
           <div className="blog-post-meta">
             <span>✍️ ผู้เขียน: {post.author_name}</span>
-            <span>📅 เผยแพร่เมื่อ: {new Date(post.published_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+            <span>📅 เผยแพร่เมื่อ: {new Date(post.published_at || post.created_at).toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
             {post.tags?.map((t, idx) => (
@@ -437,7 +599,7 @@ function BlogDetailPage({ post }) {
         </header>
 
         <div className="blog-post-cover">
-          {post.cover_image_url ? (
+          {post.cover_image_url && isSafeUrl(post.cover_image_url) ? (
             <img src={post.cover_image_url} alt={post.title} />
           ) : (
             <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, var(--bg-tertiary) 0%, rgba(212,175,55,0.08) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--gold-primary)', fontSize: '5rem' }}>
@@ -446,14 +608,17 @@ function BlogDetailPage({ post }) {
           )}
         </div>
 
-        <div className="blog-post-content" dangerouslySetInnerHTML={{ __html: post.content }} />
+        <div className="blog-post-content" dangerouslySetInnerHTML={{ __html: renderContent(post.content) }} />
         
         <footer className="blog-post-footer">
           <div>
             <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>แชร์ความรู้นี้ให้กับเพื่อนของคุณ</p>
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-              <button className="forum-cat-btn" onClick={() => alert('Link copied!')}>คัดลอกลิงก์</button>
-              <button className="forum-cat-btn" onClick={() => window.open('https://facebook.com', '_blank')}>Facebook</button>
+              <button className="forum-cat-btn" onClick={() => {
+                navigator.clipboard.writeText(window.location.href);
+                alert('คัดลอกลิงก์บทความเรียบร้อยแล้ว!');
+              }}>คัดลอกลิงก์</button>
+              <button className="forum-cat-btn" onClick={() => openExternalUrl(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`)}>Facebook</button>
             </div>
           </div>
           <a href="#/blog" className="cta-btn secondary">บทความอื่นๆ</a>
@@ -487,43 +652,46 @@ function ForumListPage({ topics, onTopicAdded }) {
     ? topics 
     : topics.filter(t => t.category === selectedCategory);
 
-  const handleCreateTopic = (e) => {
+  const handleCreateTopic = async (e) => {
     e.preventDefault();
     if (!newTitle.trim() || !newContent.trim()) {
       alert('กรุณากรอกหัวข้อและเนื้อหา');
       return;
     }
 
-    const topic = {
-      id: Date.now(),
-      title: newTitle,
-      slug: newTitle.toLowerCase().replace(/ /g, '-').replace(/[^\w\u0e00-\u0e7f-]/g, ''),
-      content: newContent,
-      author_display_name: isAnon ? 'คนไข้นิรนาม' : (newAuthor.trim() || 'สมาชิกทั่วไป'),
-      is_anonymous: isAnon,
-      category: newCategory,
-      reply_count: 0,
-      created_at: new Date().toISOString(),
-      replies: []
-    };
+    const authorDisplayName = isAnon ? 'คนไข้นิรนาม' : (newAuthor.trim() || 'สมาชิกทั่วไป');
 
-    onTopicAdded(topic);
+    const created = await apiFetch('/forum/topics', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: newTitle,
+        content: newContent,
+        authorDisplayName,
+        isAnonymous: isAnon,
+        category: newCategory
+      })
+    });
+
+    if (created) {
+      onTopicAdded(created);
+    } else {
+      onTopicAdded({
+        id: Date.now(),
+        title: newTitle,
+        slug: newTitle.toLowerCase().replace(/ /g, '-').replace(/[^\w\u0e00-\u0e7f-]/g, ''),
+        content: newContent,
+        author_display_name: authorDisplayName,
+        is_anonymous: isAnon,
+        category: newCategory,
+        reply_count: 0,
+        created_at: new Date().toISOString()
+      });
+    }
+
     setNewTitle('');
     setNewContent('');
     setNewAuthor('');
     setShowEditor(false);
-    
-    // Attempt back-end API post
-    apiFetch('/forum/topics', {
-      method: 'POST',
-      body: JSON.stringify({
-        title: topic.title,
-        content: topic.content,
-        authorDisplayName: topic.author_display_name,
-        isAnonymous: topic.is_anonymous,
-        category: topic.category
-      })
-    });
   };
 
   return (
@@ -585,7 +753,7 @@ function ForumListPage({ topics, onTopicAdded }) {
                   checked={isAnon} 
                   onChange={(e) => setIsAnon(e.target.checked)} 
                 />
-                ตั้งคำถามโดยไม่ระบุตัวตน (Anonymous)
+                ตั้งคำถามโดยไม่ระบุตัวตน
               </label>
               
               {!isAnon && (
@@ -623,18 +791,23 @@ function ForumListPage({ topics, onTopicAdded }) {
 
       {/* Forum List */}
       <div className="forum-list">
-        {filteredTopics.map((topic) => (
+        {filteredTopics.length === 0 ? (
+          <div className="empty-state" style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+            <h2>ยังไม่มีกระทู้ในหมวดนี้</h2>
+            <p style={{ color: 'var(--text-secondary)' }}>เริ่มตั้งคำถามแรกเพื่อให้ทีมคลินิกเข้ามาดูแลและตอบกลับ</p>
+          </div>
+        ) : filteredTopics.map((topic) => (
           <a key={topic.id} href={`#/forum/${topic.id}`} className="forum-card">
             <div className="forum-card-main">
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <span className="forum-tag">{topic.category}</span>
-                {topic.replies?.some(r => r.is_doctor_reply) && (
-                  <span className="verified-badge">✅ แพทย์ตอบแล้ว</span>
+                {topic.is_doctor_verified && (
+                  <span className="verified-badge" style={{ marginLeft: '0.5rem' }}>✅ แพทย์ตอบแล้ว</span>
                 )}
               </div>
               <h2 className="forum-card-title">{topic.title}</h2>
               <div className="forum-card-meta">
-                <span>By {topic.author_display_name}</span>
+                <span>โดย {topic.author_display_name}</span>
                 <span>•</span>
                 <span>{new Date(topic.created_at).toLocaleDateString('th-TH')}</span>
               </div>
@@ -653,48 +826,87 @@ function ForumListPage({ topics, onTopicAdded }) {
 // ----------------------------------------------------
 // Page Component: Forum Detail Page
 // ----------------------------------------------------
-function ForumDetailPage({ topic, onReplyAdded }) {
+function ForumDetailPage({ topicIdOrSlug, onReplyAdded }) {
+  const [topic, setTopic] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [isAnon, setIsAnon] = useState(true);
   const [authorName, setAuthorName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  if (!topic) {
+  useEffect(() => {
+    async function fetchTopic() {
+      setLoading(true);
+      try {
+        const fetched = await apiFetch(`/forum/topics/${topicIdOrSlug}`);
+        if (fetched) {
+          setTopic(fetched);
+          setError(null);
+        } else {
+          setError('ไม่พบกระทู้ดังกล่าว');
+        }
+      } catch (err) {
+        setError('ไม่สามารถเชื่อมต่อข้อมูลได้');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchTopic();
+  }, [topicIdOrSlug]);
+
+  const handlePostReply = async (e) => {
+    e.preventDefault();
+    if (!replyText.trim() || submitting || !topic) return;
+
+    setSubmitting(true);
+    const authorDisplayName = isAnon ? 'คนไข้นิรนาม' : (authorName.trim() || 'สมาชิกเว็บบอร์ด');
+    
+    try {
+      const response = await apiFetch(`/forum/topics/${topic.id}/replies`, {
+        method: 'POST',
+        body: JSON.stringify({
+          content: replyText,
+          authorDisplayName,
+          isAnonymous: isAnon
+        })
+      });
+
+      if (response) {
+        setTopic(prev => ({
+          ...prev,
+          reply_count: (prev.reply_count || 0) + 1,
+          replies: [...(prev.replies || []), response]
+        }));
+        setReplyText('');
+        setAuthorName('');
+        if (onReplyAdded) onReplyAdded();
+      } else {
+        alert('เกิดข้อผิดพลาดในการส่งคำตอบ กรุณาลองใหม่อีกครั้ง');
+      }
+    } catch (err) {
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
     return (
       <div className="public-container" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
-        <h2>ขออภัย ไม่พบกระทู้ดังกล่าว</h2>
-        <a href="#/forum" className="cta-btn" style={{ marginTop: '1.5rem' }}>กลับหน้าบอร์ด</a>
+        <p style={{ color: 'var(--text-secondary)' }}>กำลังโหลดเนื้อหา...</p>
       </div>
     );
   }
 
-  const handlePostReply = (e) => {
-    e.preventDefault();
-    if (!replyText.trim()) return;
-
-    const newReply = {
-      id: Date.now(),
-      content: replyText,
-      author_display_name: isAnon ? 'ผู้ใช้ทั่วไป' : (authorName.trim() || 'สมาชิกเว็บบอร์ด'),
-      is_anonymous: isAnon,
-      is_doctor_reply: false,
-      is_verified_answer: false,
-      created_at: new Date().toISOString()
-    };
-
-    onReplyAdded(topic.id, newReply);
-    setReplyText('');
-    setAuthorName('');
-
-    // Attempt back-end API post
-    apiFetch(`/forum/topics/${topic.id}/replies`, {
-      method: 'POST',
-      body: JSON.stringify({
-        content: newReply.content,
-        authorDisplayName: newReply.author_display_name,
-        isAnonymous: newReply.is_anonymous
-      })
-    });
-  };
+  if (error || !topic) {
+    return (
+      <div className="public-container" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
+        <h2>ขออภัย {error || 'ไม่พบกระทู้ดังกล่าว'}</h2>
+        <a href="#/forum" className="cta-btn" style={{ marginTop: '1.5rem' }}>กลับหน้าบอร์ด</a>
+      </div>
+    );
+  }
 
   return (
     <div className="public-container">
@@ -751,7 +963,8 @@ function ForumDetailPage({ topic, onReplyAdded }) {
                   <div>
                     <div className="forum-author-name" style={{ fontSize: '0.95rem' }}>
                       {reply.author_display_name}
-                      {reply.is_doctor_reply && <span className="verified-badge">✅ แพทย์ผู้เชี่ยวชาญ</span>}
+                      {reply.is_doctor_reply && <span className="verified-badge" style={{ marginLeft: '0.5rem' }}>✅ แพทย์ผู้เชี่ยวชาญ</span>}
+                      {reply.is_verified_answer && <span className="verified-badge" style={{ backgroundColor: '#b45309', color: '#fff', marginLeft: '0.5rem', padding: '0.2rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem' }}>🏆 คำตอบแนะนำโดยแพทย์</span>}
                     </div>
                     <div className="forum-post-date" style={{ fontSize: '0.75rem' }}>{new Date(reply.created_at).toLocaleString('th-TH')}</div>
                   </div>
@@ -794,7 +1007,9 @@ function ForumDetailPage({ topic, onReplyAdded }) {
                 />
               )}
             </div>
-            <button type="submit" className="cta-btn">ส่งความคิดเห็น</button>
+            <button type="submit" className="cta-btn" disabled={submitting}>
+              {submitting ? 'กำลังส่ง...' : 'ส่งความคิดเห็น'}
+            </button>
           </div>
         </form>
       </div>

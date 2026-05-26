@@ -259,7 +259,9 @@ test('Facebook Page Comment Webhook scans intent, triggers auto-reply and create
   assert.equal(responseData.event, 'comment');
   assert.equal(responseData.processed, true);
   assert.ok(responseData.leadId);
-  assert.equal(responseData.autoReplySent, true);
+  assert.equal(responseData.autoReplySent, false);
+  assert.equal(responseData.autoReplyMode, 'simulated_pending_provider');
+  assert.equal(responseData.privateMessageSent, false);
   assert.ok(responseData.autoReplyText.includes('ขอบคุณที่สนใจ'));
 
   // Verify created lead in database
@@ -433,6 +435,20 @@ test('Unified Chat API handles listing threads, thread messages, and sending man
   assert.equal(msgRows.rows.length, 1);
   assert.equal(msgRows.rows[0].message_text, overrideMessageText);
   assert.equal(msgRows.rows[0].status, 'sent');
+
+  const auditRows = await fixture.pool.query(
+    `select * from audit_logs
+     where clinic_id = $1
+       and entity_type = 'lead'
+       and entity_id = $2
+       and action_type = 'message.send'
+     order by id desc
+     limit 1`,
+    [fixture.session.currentClinic.id, leadId]
+  );
+  assert.equal(auditRows.rowCount, 1);
+  assert.equal(auditRows.rows[0].context_json.messageType, 'manual');
+  assert.equal(auditRows.rows[0].context_json.integrationStatus, 'simulated');
 });
 
 const { handleAiAgentRoutes } = require('../apps/api/src/modules/ai-agent/routes');

@@ -41,11 +41,11 @@ async function buildContext(pool) {
   };
 }
 
-async function waitForWorkerJob(pool, jobId, attempts = 12, batchSize = 50) {
+async function waitForWorkerJob(pool, jobId, clinicId, attempts = 12, batchSize = 50) {
   let lastResult = { results: [] };
 
   for (let index = 0; index < attempts; index += 1) {
-    lastResult = await runDueJobs(batchSize);
+    lastResult = await runDueJobs(batchSize, { clinicId, jobIds: [jobId] });
     const reloaded = await pool.query('select status from worker_jobs where id = $1', [jobId]);
 
     if (reloaded.rows[0]?.status === 'completed') {
@@ -91,7 +91,7 @@ test('event bus stores lead events and triggers subscribers', async () => {
   let executionCount = 0;
   let scoreCount = 0;
   for (let i = 0; i < 20; i++) {
-    await runDueJobs(10);
+    await runDueJobs(10, { clinicId: context.currentClinic.id });
     const execRes = await pool.query(
       `select count(*)::int as execution_count from automation_executions where clinic_id = $1 and entity_type = 'lead' and entity_id = $2`,
       [context.currentClinic.id, lead.id]
@@ -165,7 +165,7 @@ test('event bus queues failed subscribers for retry and replays them through wor
   assert.ok(publishResult.subscriberResults.some((item) => item.name === subscriberName && item.status === 'failed'));
   assert.equal(retryJobs.rowCount, 1);
 
-  await waitForWorkerJob(pool, retryJobs.rows[0].id);
+  await waitForWorkerJob(pool, retryJobs.rows[0].id, context.currentClinic.id);
   const reloaded = await pool.query('select status from worker_jobs where id = $1', [retryJobs.rows[0].id]);
 
   assert.equal(reloaded.rows[0].status, 'completed');

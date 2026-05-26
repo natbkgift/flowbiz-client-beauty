@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const http = require('node:http');
+const path = require('node:path');
 const { server } = require('../apps/web/src/server');
 
 function get(url) {
@@ -19,6 +21,15 @@ function get(url) {
   });
 }
 
+function assertHtmlSecurityHeaders(response) {
+  assert.match(response.headers['content-security-policy'], /default-src 'self'/);
+  assert.match(response.headers['content-security-policy'], /script-src 'self' 'nonce-[^']+'/);
+  assert.match(response.headers['content-security-policy'], /object-src 'none'/);
+  assert.equal(response.headers['x-content-type-options'], 'nosniff');
+  assert.equal(response.headers['x-frame-options'], 'SAMEORIGIN');
+  assert.equal(response.headers['referrer-policy'], 'strict-origin-when-cross-origin');
+}
+
 test('SEO Landing Page, Robots.txt, and Sitemap.xml Routing', async (t) => {
   // Start server on a random free port
   await new Promise((resolve) => {
@@ -35,15 +46,20 @@ test('SEO Landing Page, Robots.txt, and Sitemap.xml Routing', async (t) => {
   // 1. Verify Public Landing Page (/)
   const resHome = await get(`${baseUrl}/`);
   assert.equal(resHome.statusCode, 200);
-  assert.match(resHome.body, /<html lang="en">/);
+  assert.match(resHome.body, /<html lang="th">/);
   assert.match(resHome.body, /FlowBiz Beauty Clinic/);
   assert.match(resHome.body, /public.bundle.js/);
+  assertHtmlSecurityHeaders(resHome);
+  assert.match(resHome.body, /nonce="[^"]+"/);
+  assert.doesNotMatch(resHome.body, /__CSP_NONCE__/);
 
   // 2. Verify Admin Routing (/admin)
   const resAdmin = await get(`${baseUrl}/admin`);
   assert.equal(resAdmin.statusCode, 200);
-  assert.match(resAdmin.body, /FlowBiz Admin Control Center/);
+  assert.match(resAdmin.body, /FlowBiz Beauty CRM \| ศูนย์ควบคุมคลินิก/);
   assert.match(resAdmin.body, /admin.bundle.js/);
+  assertHtmlSecurityHeaders(resAdmin);
+  assert.doesNotMatch(resAdmin.body, /__CSP_NONCE__/);
 
   // 3. Verify Sitemap.xml
   const resSitemap = await get(`${baseUrl}/sitemap.xml`);
@@ -57,4 +73,13 @@ test('SEO Landing Page, Robots.txt, and Sitemap.xml Routing', async (t) => {
   assert.equal(resRobots.statusCode, 200);
   assert.match(resRobots.body, /User-agent: \*/);
   assert.match(resRobots.body, /Disallow: \/admin/);
+});
+
+test('Production web bundles do not ship inline source maps', () => {
+  const distRoot = path.resolve(__dirname, '..', 'apps', 'web', 'dist', 'assets');
+  const adminBundle = fs.readFileSync(path.join(distRoot, 'admin.bundle.js'), 'utf8');
+  const publicBundle = fs.readFileSync(path.join(distRoot, 'public.bundle.js'), 'utf8');
+
+  assert.doesNotMatch(adminBundle, /sourceMappingURL=data:/);
+  assert.doesNotMatch(publicBundle, /sourceMappingURL=data:/);
 });

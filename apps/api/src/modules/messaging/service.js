@@ -226,6 +226,24 @@ async function createContactIdentity(clinicContext, payload) {
       ]
     );
 
+    const { recordAuditLog } = require('../audit/service');
+    await recordAuditLog(
+      {
+        clinicId: clinicContext.currentClinic.id,
+        entityType: normalized.entityType,
+        entityId: normalized.entityId,
+        actionType: 'contact_identity.create',
+        actorUserId: clinicContext.currentUser.id,
+        contextJson: {
+          contactIdentityId: result.rows[0].id,
+          channelType: result.rows[0].channel_type,
+          externalId: result.rows[0].external_id,
+          isPrimary: result.rows[0].is_primary
+        }
+      },
+      client
+    );
+
     await client.query('commit');
     return mapContactIdentity(result.rows[0]);
   } catch (error) {
@@ -579,12 +597,32 @@ async function sendLeadOutboundMessage(clinicContext, leadId, payload, options =
       ]
     );
 
+    const { recordAuditLog } = require('../audit/service');
+    await recordAuditLog(
+      {
+        clinicId: clinicContext.currentClinic.id,
+        entityType: 'lead',
+        entityId: leadId,
+        actionType: 'message.send',
+        actorUserId: clinicContext.currentUser.id,
+        contextJson: {
+          channelId: channel.id,
+          channelType: channel.channel_type,
+          messageType,
+          outboundMessageId: result.rows[0].id,
+          status: result.rows[0].status,
+          integrationStatus: providerResult.integrationStatus || (normalized.scheduledAt ? 'scheduled_internal' : 'unknown')
+        }
+      },
+      client
+    );
+
     await client.query('commit');
     const outbound = mapOutboundMessage({ ...result.rows[0], channel_type: channel.channel_type });
 
     try {
       const { publishDomainEvent } = require('../event-bus/publisher');
-      publishDomainEvent({
+      await publishDomainEvent({
         clinicId: clinicContext.currentClinic.id,
         eventType: 'message.sent',
         entityType: 'lead',
@@ -597,8 +635,6 @@ async function sendLeadOutboundMessage(clinicContext, leadId, payload, options =
           workspaceId: lead.workspace_id,
           actorUserId: clinicContext.currentUser.id
         }
-      }).catch((error) => {
-        console.error('Event bus message.sent publish failed for lead:', error.message);
       });
     } catch (error) {
       console.error('Event bus message.sent publish failed for lead:', error.message);
@@ -752,7 +788,8 @@ async function sendCustomerOutboundMessage(clinicContext, customerId, payload, o
           channelType: channel.channel_type,
           messageType,
           outboundMessageId: result.rows[0].id,
-          status: result.rows[0].status
+          status: result.rows[0].status,
+          integrationStatus: providerResult.integrationStatus || 'unknown'
         }
       },
       client
@@ -763,7 +800,7 @@ async function sendCustomerOutboundMessage(clinicContext, customerId, payload, o
 
     try {
       const { publishDomainEvent } = require('../event-bus/publisher');
-      publishDomainEvent({
+      await publishDomainEvent({
         clinicId: clinicContext.currentClinic.id,
         eventType: 'message.sent',
         entityType: 'customer',
@@ -775,8 +812,6 @@ async function sendCustomerOutboundMessage(clinicContext, customerId, payload, o
           status: outbound.status,
           actorUserId: clinicContext.currentUser.id
         }
-      }).catch((error) => {
-        console.error('Event bus message.sent publish failed for customer:', error.message);
       });
     } catch (error) {
       console.error('Event bus message.sent publish failed for customer:', error.message);

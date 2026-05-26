@@ -56,6 +56,7 @@ test('campaign broadcast system - creation, segmentation, enqueuing, worker proc
 
   // 2. Create clean mock target leads
   const timeSuffix = Date.now();
+  const segmentTagName = `campaign-smoke-${timeSuffix}`;
   const lead1 = await createLead(context, {
     fullName: `Campaign Target A ${timeSuffix}`,
     source: 'manual',
@@ -65,6 +66,7 @@ test('campaign broadcast system - creation, segmentation, enqueuing, worker proc
     phone: `081${String(timeSuffix).slice(-7)}`,
     email: `campa-a-${timeSuffix}@example.com`,
     lineUserId: `mock-line-a-${timeSuffix}`,
+    tagNames: [segmentTagName],
     intentScore: 85
   });
 
@@ -110,7 +112,8 @@ test('campaign broadcast system - creation, segmentation, enqueuing, worker proc
     segmentQueryJson: {
       intentScoreMin: 80,
       stage: 'inquiry',
-      status: 'active'
+      status: 'active',
+      tagNames: [segmentTagName]
     }
   });
 
@@ -132,30 +135,29 @@ test('campaign broadcast system - creation, segmentation, enqueuing, worker proc
 
   // 7. Verify worker jobs were enqueued
   const workerJobs = await pool.query(
-    `select * from worker_jobs where clinic_id = $1 and job_type = 'campaign.dispatch' and status = 'pending'`,
-    [context.currentClinic.id]
+    `select * from worker_jobs where clinic_id = $1 and job_type = 'campaign.dispatch' and status = 'pending' and payload_json->>'campaignId' = $2`,
+    [context.currentClinic.id, String(campaign.id)]
   );
   assert.ok(workerJobs.rowCount >= 1);
 
   // 8. Run worker to process the jobs
-  await pool.query("update worker_jobs set run_at = now() - interval '10 seconds' where clinic_id = $1 and job_type = 'campaign.dispatch'", [context.currentClinic.id]);
-  const runResult = await runDueJobs(10);
-  console.log('runResult:', JSON.stringify(runResult, null, 2));
-
-  const afterDeliveries = await pool.query('select * from campaign_deliveries where campaign_id = $1', [campaign.id]);
-  console.log('afterDeliveries:', JSON.stringify(afterDeliveries.rows, null, 2));
-
-  const reloadedJobs = await pool.query('select * from worker_jobs where clinic_id = $1 and job_type = \'campaign.dispatch\'', [context.currentClinic.id]);
-  console.log('reloadedJobs:', JSON.stringify(reloadedJobs.rows, null, 2));
-
+  await pool.query(
+    "update worker_jobs set run_at = now() - interval '10 seconds' where clinic_id = $1 and job_type = 'campaign.dispatch' and payload_json->>'campaignId' = $2",
+    [context.currentClinic.id, String(campaign.id)]
+  );
+  const runResult = await runDueJobs(Math.max(10, enqueuedCampaign.statsJson.targetCount + 2), {
+    clinicId: context.currentClinic.id,
+    jobType: 'campaign.dispatch',
+    payloadJsonContains: { campaignId: campaign.id }
+  });
   assert.ok(runResult.claimedJobs >= 1);
 
   // 9. Reload campaign and verify stats and status
   const finishedCampaign = await getCampaign(context, campaign.id);
-  console.log('finishedCampaign:', JSON.stringify(finishedCampaign, null, 2));
 
   assert.equal(finishedCampaign.status, 'completed');
-  assert.ok(finishedCampaign.statsJson.deliveredCount >= 1);
+  assert.ok(finishedCampaign.statsJson.sentCount >= 1);
+  assert.equal(finishedCampaign.statsJson.deliveredCount, 0);
 
   await pool.end();
 });

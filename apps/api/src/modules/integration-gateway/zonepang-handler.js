@@ -2,15 +2,31 @@ const { getPool } = require('../../db');
 const { createLead } = require('../leads/service');
 const { resolveWorkerContext } = require('../worker-engine/worker');
 const { AppError } = require('../../common/errors');
+const { buildErrorPayload } = require('../../common/http');
+const { verifyWebhookSecret, auditWebhookEvent } = require('./security');
 
 async function handleZonepangWebhook(req, res, next) {
   try {
     const { clinicId } = req.params;
     const body = req.body;
 
-    const secret = req.headers['x-zonepang-signature'] || req.headers['x-webhook-secret'] || req.query.secret;
-    if (secret === 'invalid-secret') {
-      return res.status(401).json({ error: 'Unauthorized: Invalid signature/secret' });
+    const verification = verifyWebhookSecret(req, ['x-zonepang-signature', 'x-webhook-secret']);
+    if (!verification.ok) {
+      await auditWebhookEvent({
+        clinicId,
+        source: 'zonepang',
+        status: 'rejected',
+        reason: verification.reason,
+        integrationStatus: verification.integrationStatus
+      });
+      return res.status(401).json(buildErrorPayload(
+        'INVALID_WEBHOOK_SIGNATURE',
+        'Invalid webhook signature or secret.',
+        {
+          reason: verification.reason,
+          integrationStatus: verification.integrationStatus
+        }
+      ));
     }
 
     const pool = getPool();
@@ -78,10 +94,19 @@ async function handleZonepangWebhook(req, res, next) {
       leadId = newLead.id;
     }
 
+    await auditWebhookEvent({
+      clinicId,
+      source: 'zonepang',
+      status: 'accepted',
+      leadId,
+      integrationStatus: verification.integrationStatus
+    });
+
     return res.status(200).json({
       success: true,
+      integrationStatus: verification.integrationStatus,
       leadId,
-      message: 'Zonepang webhook processed successfully'
+      message: 'ประมวลผล Zonepang webhook สำเร็จ'
     });
   } catch (error) {
     next(error);
@@ -93,9 +118,10 @@ async function triggerZonepangAutoBroadcast(clinicContext, targetIdentity, templ
   return {
     success: true,
     provider: 'zonepang',
+    integrationStatus: 'simulated',
     broadcastId: `zp-${Date.now()}`,
     recipient: targetIdentity,
-    status: 'enqueued'
+    status: 'simulated_enqueued'
   };
 }
 

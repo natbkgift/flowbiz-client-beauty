@@ -2,6 +2,8 @@ const { AppError } = require('../../common/errors');
 const { getPool } = require('../../db');
 const { enqueueJob } = require('../worker-engine/scheduler');
 const { sendLeadOutboundMessage } = require('../messaging/service');
+const { recordAuditLog } = require('../audit/service');
+const { classifyMedicalSafety } = require('../ai-agent/medical-safety');
 
 function validateCampaignPayload(payload) {
   if (!payload.name) {
@@ -117,7 +119,21 @@ async function createCampaign(clinicContext, payload) {
     ]
   );
 
-  return mapCampaign(result.rows[0]);
+  const campaign = mapCampaign(result.rows[0]);
+  await recordAuditLog({
+    clinicId,
+    entityType: 'campaign',
+    entityId: campaign.id,
+    actionType: 'broadcast.campaign_created',
+    actorUserId: userId,
+    contextJson: {
+      channelType: campaign.channelType,
+      hasCustomMessage: Boolean(campaign.customMessageText),
+      integrationStatus: 'queued_internal'
+    }
+  });
+
+  return campaign;
 }
 
 async function getCampaign(clinicContext, id) {
@@ -171,6 +187,13 @@ async function enqueueCampaignBroadcast(clinicContext, campaignId) {
     const campaign = campaignResult.rows[0];
     if (campaign.status !== 'draft') {
       throw new AppError(400, 'CAMPAIGN_NOT_DRAFT', 'Only draft campaigns can be broadcast.');
+    }
+
+    const safetyClassification = classifyMedicalSafety(campaign.custom_message_text || '');
+    if (safetyClassification.requiresHitl) {
+      throw new AppError(400, 'MEDICAL_SAFETY_REVIEW_REQUIRED', 'Broadcast content requires medical safety review before sending.', {
+        medicalSafety: safetyClassification
+      });
     }
 
     const { clauses, values } = buildTargetQuery(clinicId, workspaceId, campaign.segment_query_json || {});
@@ -229,6 +252,19 @@ async function enqueueCampaignBroadcast(clinicContext, campaignId) {
         client
       );
     }
+
+    await recordAuditLog({
+      clinicId,
+      entityType: 'campaign',
+      entityId: campaignId,
+      actionType: 'broadcast.enqueued',
+      actorUserId: userId,
+      contextJson: {
+        targetCount: targetIds.length,
+        channelType: campaign.channel_type,
+        integrationStatus: 'queued_internal'
+      }
+    }, client);
 
     await client.query('commit');
     
@@ -352,8 +388,10 @@ async function dispatchCampaignDelivery(clinicContext, deliveryId) {
     );
 
     const isFailed = outbound.status === 'failed';
-    const finalStatus = isFailed ? 'failed' : 'delivered';
+    const isDelivered = outbound.status === 'delivered';
+    const finalStatus = isFailed ? 'failed' : (isDelivered ? 'delivered' : 'sent');
     const errorMsg = isFailed ? (outbound.failureReason || 'Failed to send') : null;
+    const integrationStatus = outbound.providerMessageId?.startsWith('local-') ? 'provider_simulated' : 'provider_live_or_unknown';
 
     await pool.query(
       `
@@ -367,6 +405,26 @@ async function dispatchCampaignDelivery(clinicContext, deliveryId) {
       [deliveryId, finalStatus, outbound.id, errorMsg]
     );
 
+    const deliveryActionType = isFailed
+      ? 'broadcast.delivery_failed'
+      : (finalStatus === 'delivered' ? 'broadcast.delivery_delivered' : 'broadcast.delivery_sent');
+
+    await recordAuditLog({
+      clinicId: Number(delivery.clinic_id),
+      entityType: 'campaign_delivery',
+      entityId: Number(deliveryId),
+      actionType: deliveryActionType,
+      actorUserId: clinicContext.currentUser?.id || null,
+      contextJson: {
+        campaignId: Number(delivery.campaign_id),
+        leadId: Number(delivery.entity_id),
+        outboundMessageId: Number(outbound.id),
+        status: finalStatus,
+        providerStatus: outbound.status,
+        integrationStatus
+      }
+    });
+
     await updateCampaignStats(delivery.campaign_id);
 
   } catch (error) {
@@ -379,6 +437,20 @@ async function dispatchCampaignDelivery(clinicContext, deliveryId) {
       `,
       [deliveryId, error.message]
     );
+
+    await recordAuditLog({
+      clinicId: Number(delivery.clinic_id),
+      entityType: 'campaign_delivery',
+      entityId: Number(deliveryId),
+      actionType: 'broadcast.delivery_failed',
+      actorUserId: clinicContext.currentUser?.id || null,
+      contextJson: {
+        campaignId: Number(delivery.campaign_id),
+        leadId: Number(delivery.entity_id),
+        error: error.message,
+        integrationStatus: 'provider_simulated'
+      }
+    });
 
     await updateCampaignStats(delivery.campaign_id);
     throw error;
