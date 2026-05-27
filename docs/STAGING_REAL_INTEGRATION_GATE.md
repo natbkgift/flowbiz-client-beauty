@@ -155,22 +155,24 @@ Populate this record before any key load or real mode enablement. The window sta
 
 | Field | Recorded value | Status |
 | --- | --- | --- |
-| QA owner | `Senior Integration QA Lead` | assigned |
-| Rollback owner | `Staging Rollback Owner` | assigned |
-| Safety reviewer | `SaaS Safety Operator` | assigned |
-| HITL reviewer | `Clinic QA HITL Reviewer` | assigned |
+| QA owner | `Nat Jitpakdee` | confirmed for current window |
+| Rollback owner | `Nat Jitpakdee` | confirmed for current window |
+| Safety reviewer | `Nat Jitpakdee` | confirmed for current window |
+| HITL reviewer | `Nat Jitpakdee` | confirmed for current window |
 | Technical operator | `GitHub Copilot in supervised staging session` | assigned |
 | Clinic or test workspace | `flowbiz-beauty-demo` | fixed |
 | Test LINE OA | `flowbiz-beauty-staging-test-oa` | fixed |
 | Test LINE user | `qa-line-user-01` | fixed |
 | Provider scope | `Gemini and LINE only` | fixed |
 | Data scope | `demo/fake/approved pilot-safe only` | fixed |
-| QA window start | `Record at window open in Asia/Bangkok time` | required before start |
-| QA window end | `Record at window close in Asia/Bangkok time` | required before start |
+| QA window start | `2026-05-27T19:33:01+07:00` | recorded |
+| QA window end | `2026-05-27T22:48:29+07:00` | recorded |
 | Rollback deadline | `No later than 15 minutes after the last provider-backed step` | fixed |
 | Max LINE live send | `1` | fixed |
 | Gemini output policy | `HITL only, no outbound send, no outbound auto-queue` | fixed |
-| Window status | `CLOSED until all required-before-start fields are recorded and owners approve` | active gate |
+| Window status | `CLOSED after controlled staging QA window 2026-05-27T19:33:01+07:00 to 2026-05-27T22:48:29+07:00; rollback to safe defaults verified` | active gate |
+
+Execution-time confirmation for this window was provided by the supervising human requestor on 2026-05-27 before any provider activation step.
 
 ## Evidence Checklist
 
