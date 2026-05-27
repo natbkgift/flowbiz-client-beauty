@@ -1,4 +1,4 @@
-# Clinic Alpha — Demo Friction Log (PR-13 Preflight Re-Check)
+# Clinic Alpha — Demo Friction Log (PR-14 Network Recovery)
 
 Document type: Live preflight friction and closure tracking
 Pilot clinic: Clinic Alpha (pseudonym)
@@ -9,83 +9,79 @@ Operator: FlowBiz-Ops
 
 ## Friction Summary
 
-Total friction items: 10
-- High: 6
-- Medium: 4
-- Low: 0
+Total friction items tracked: 11
+- Closed: 10
+- Open: 1 (minor, non-blocking)
 
-Current top blockers:
-1. Staging DNS does not resolve from execution environment.
-2. `/api/live` and `/api/ready` cannot be reached.
-3. Live smoke remains FAIL.
-4. Login, HITL queue, and audit proof cannot be verified live.
-5. Required readiness payload assertions are blocked.
+Current top note:
+1. Canonical staging URL confirmed and all major live blockers closed.
+2. One minor API payload limitation remains for explicit workflow-name visibility in HITL queue response.
 
-Current operational recommendation: NO_GO
+Current operational recommendation: GO_FOR_REAL_DAY_0_DEMO
 
 ---
 
 ## Detailed Friction Log
 
-| ID | Area | Severity | Symptom | Evidence (PR-13) | Probable Cause | Immediate Mitigation | Owner | Status |
+| ID | Area | Severity | Symptom | Evidence (PR-14) | Probable Cause | Immediate Mitigation | Owner | Status |
 |---|---|---|---|---|---|---|---|---|
-| FR-01 | Staging DNS | High | Staging hostname unresolved | `Resolve-DnsName: DNS name does not exist` | DNS record missing/hidden from this network | Fix DNS visibility from operator network | FlowBiz-Tech | Open |
-| FR-02 | Staging network | High | TCP 443 unavailable | `TcpTestSucceeded=False` | Routing/firewall/network path issue | Validate route/firewall from operator location | FlowBiz-Tech | Open |
-| FR-03 | API live endpoint | High | `/api/live` check failed | `No such host is known` | Blocked by FR-01/FR-02 | Re-check endpoint after network fix | FlowBiz-Tech | Open |
-| FR-04 | API ready endpoint | High | `/api/ready` check failed | `No such host is known` | Blocked by FR-01/FR-02 | Re-check endpoint after network fix | FlowBiz-Tech | Open |
-| FR-05 | Smoke live mode | High | `npm run smoke:staging` failed | `Smoke summary: FAIL - fetch failed` | Upstream staging unreachable | Re-run smoke live after network restoration | FlowBiz-Tech | Open |
-| FR-06 | Demo login verification | Medium | Login cannot be validated | `POST /api/auth/login -> No such host is known` | Blocked by FR-01/FR-02 | Re-run demo login when host reachable | FlowBiz-Ops | Open |
-| FR-07 | HITL queue visibility | Medium | Queue not verifiable | `GET /api/hitl/queue -> No such host is known` | Blocked by FR-01/FR-02 | Capture queue evidence after host recovery | FlowBiz-Ops | Open |
-| FR-08 | Audit log visibility | Medium | Audit proof not verifiable | `GET /api/audit/logs -> No such host is known` | Blocked by FR-01/FR-02 | Capture audit evidence after host recovery | FlowBiz-Ops | Open |
-| FR-09 | Readiness payload assertions | Medium | Cannot confirm `appEnv` and DB name | `/api/ready` unreachable | Blocked by FR-04 | Re-check payload fields after API ready pass | FlowBiz-Tech | Open |
-| FR-10 | Go/no-go threshold breach | High | Decision cannot remain go-with-fixes | PR-13 rule: staging/network fail => NO_GO | Dependency on unresolved P1 blockers | Set decision to NO_GO and reschedule | FlowBiz-Ops + FlowBiz-Tech | Closed (Applied) |
+| FR-01 | Canonical URL ambiguity | High | Two candidate hosts were in use | `beauty.flowbiz.cloud` resolved; `staging.flowbiz.io` did not | Historical command drift | Pin canonical URL in pilot runbook | FlowBiz-Tech | Closed |
+| FR-02 | Staging DNS (wrong host) | High | `staging.flowbiz.io` unresolved | `Resolve-DnsName` failed | Wrong/deprecated host for this flow | Use canonical host only | FlowBiz-Tech | Closed |
+| FR-03 | Staging network (wrong host) | High | TCP check failed on wrong host | `TcpTestSucceeded=False` | Non-resolving host | Use canonical host only | FlowBiz-Tech | Closed |
+| FR-04 | API live endpoint | High | Previously unreachable | Canonical `/api/live` is HTTP 200 | Wrong host used in PR-13 | Recheck on canonical host | FlowBiz-Tech | Closed |
+| FR-05 | API ready endpoint | High | Previously unreachable | Canonical `/api/ready` is HTTP 200 | Wrong host used in PR-13 | Recheck on canonical host | FlowBiz-Tech | Closed |
+| FR-06 | Smoke live mode | High | Previously fetch-failed | `npm run smoke:staging` PASS (8 checks) on canonical host | Wrong host used in PR-13 | Keep canonical env vars pinned | FlowBiz-Tech | Closed |
+| FR-07 | Demo login verification | Medium | Previously blocked | Login on canonical host is HTTP 200 with token | Wrong host used in PR-13 | Keep canonical env vars pinned | FlowBiz-Ops | Closed |
+| FR-08 | HITL queue visibility | Medium | Previously blocked | Authenticated queue endpoint is HTTP 200 with pending records | Wrong host used in PR-13 | Keep canonical env vars pinned | FlowBiz-Ops | Closed |
+| FR-09 | Audit log visibility | Medium | Previously blocked | Authenticated audit endpoint is HTTP 200 with records | Wrong host used in PR-13 | Keep canonical env vars pinned | FlowBiz-Ops | Closed |
+| FR-10 | Readiness payload assertions | Medium | Previously blocked | `appEnv=staging`, DB `flowbiz_beauty_staging` confirmed | Wrong host used in PR-13 | Keep readiness assertion in preflight checklist | FlowBiz-Tech | Closed |
+| FR-11 | Workflow-name payload visibility | Low | Queue API payload does not expose explicit workflow-name field | Queue item schema lacks workflow label field | API shape limitation | Verify workflow labels in UI during Day 0 run-through | FlowBiz-Ops | Open (Non-blocking) |
 
 ---
 
-## Missing Evidence Assets (PR-13)
+## Evidence Assets Status (PR-14)
 
 | Asset ID | Required Asset | Current State | Blocking? | Owner |
 |---|---|---|---|---|
-| MA-01 | DNS resolve success evidence for staging host | Missing | Yes | FlowBiz-Tech |
-| MA-02 | `/api/live` HTTP 200 proof | Missing | Yes | FlowBiz-Tech |
-| MA-03 | `/api/ready` HTTP 200 proof | Missing | Yes | FlowBiz-Tech |
-| MA-04 | readiness payload: `appEnv=staging` | Missing | Yes | FlowBiz-Tech |
-| MA-05 | readiness payload: DB `flowbiz_beauty_staging` | Missing | Yes | FlowBiz-Tech |
-| MA-06 | `npm run smoke:staging` live PASS proof | Missing | Yes | FlowBiz-Tech |
-| MA-07 | demo login PASS proof | Missing | Yes | FlowBiz-Ops |
-| MA-08 | HITL queue visible proof | Missing | Yes | FlowBiz-Ops |
-| MA-09 | audit log visible proof | Missing | Yes | FlowBiz-Ops |
-| MA-10 | selected workflows visible proof (5 workflows) | Missing | Yes | FlowBiz-Ops |
+| MA-01 | DNS resolve success evidence for canonical host | Present | No | FlowBiz-Tech |
+| MA-02 | `/api/live` HTTP 200 proof | Present | No | FlowBiz-Tech |
+| MA-03 | `/api/ready` HTTP 200 proof | Present | No | FlowBiz-Tech |
+| MA-04 | readiness payload: `appEnv=staging` | Present | No | FlowBiz-Tech |
+| MA-05 | readiness payload: DB `flowbiz_beauty_staging` | Present | No | FlowBiz-Tech |
+| MA-06 | `npm run smoke:staging` live PASS proof | Present | No | FlowBiz-Tech |
+| MA-07 | demo login PASS proof | Present | No | FlowBiz-Ops |
+| MA-08 | HITL queue visible proof | Present | No | FlowBiz-Ops |
+| MA-09 | audit log visible proof | Present | No | FlowBiz-Ops |
+| MA-10 | selected workflows visible proof (5 workflows) | Partial (limitation noted) | No | FlowBiz-Ops |
 
 ---
 
 ## Resolution Criteria
 
-All blocking friction is considered closed only when:
-1. DNS and TCP checks pass from operator network.
-2. `/api/live` and `/api/ready` return HTTP 200.
-3. Readiness payload confirms `appEnv=staging` and DB `flowbiz_beauty_staging`.
-4. `npm run smoke:staging` live mode passes.
-5. Demo login, HITL queue, and audit visibility are verified and recorded.
+Primary blocking friction closure criteria status:
+1. DNS and TCP checks on canonical host: PASS.
+2. `/api/live` and `/api/ready` on canonical host: PASS.
+3. Readiness payload assertions: PASS.
+4. `npm run smoke:staging` live mode: PASS.
+5. Demo login, HITL queue, and audit visibility: PASS.
 
 ---
 
 ## Fix Plan (Operational Only)
 
-1. Fix staging DNS/routing for operator execution network.
-2. Re-run endpoint checks and capture raw output.
-3. Re-run live smoke and archive PASS output.
-4. Validate login, HITL queue, and audit trail on staging UI/API.
-5. Re-open go/no-go only after all required assets are present.
+1. Keep canonical URL pinned to `https://beauty.flowbiz.cloud` for pilot preflight.
+2. Mark `https://staging.flowbiz.io` as wrong/deprecated in pilot docs.
+3. During live Day 0 run-through, capture one UI proof for selected workflow labels.
+4. Continue to keep real LINE and real AI generation disabled in Day 0 demo mode.
 
 Note:
-- No runtime code changes were performed in PR-13.
-- If network is healthy but product behavior still fails, raise separate PR Summary for runtime blocker handling.
+- No runtime code changes were performed in PR-14.
+- If a runtime defect appears in Day 0 execution, raise separate PR Summary for runtime blocker handling.
 
 ---
 
 ## Sign-off
 
 Prepared by: FlowBiz-Ops (pseudonym role)
-Reviewed with: FlowBiz-Tech (pending)
-Current recommendation: NO_GO
+Reviewed with: FlowBiz-Tech (preflight evidence complete)
+Current recommendation: GO_FOR_REAL_DAY_0_DEMO
