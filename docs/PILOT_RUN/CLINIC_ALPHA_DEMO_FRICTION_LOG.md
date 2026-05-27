@@ -1,6 +1,6 @@
-# Clinic Alpha — Demo Friction Log (PR-14 Network Recovery)
+# Clinic Alpha — Demo Friction Log (PR-15 Day 0 Live Session)
 
-Document type: Live preflight friction and closure tracking
+Document type: Live session friction and closure tracking
 Pilot clinic: Clinic Alpha (pseudonym)
 Date: 2026-05-28
 Operator: FlowBiz-Ops
@@ -9,21 +9,22 @@ Operator: FlowBiz-Ops
 
 ## Friction Summary
 
-Total friction items tracked: 11
-- Closed: 10
-- Open: 1 (minor, non-blocking)
+Total friction items tracked: 14
+- Closed: 11
+- Open: 3 (business/operational)
 
 Current top note:
-1. Canonical staging URL confirmed and all major live blockers closed.
-2. One minor API payload limitation remains for explicit workflow-name visibility in HITL queue response.
+1. Technical staging blockers are closed.
+2. Session execution blockers are closed.
+3. Remaining open items are agreement/access/consent prerequisites before limited pilot start.
 
-Current operational recommendation: GO_FOR_REAL_DAY_0_DEMO
+Current operational recommendation: DEMO_FOLLOW_UP_NEEDED
 
 ---
 
 ## Detailed Friction Log
 
-| ID | Area | Severity | Symptom | Evidence (PR-14) | Probable Cause | Immediate Mitigation | Owner | Status |
+| ID | Area | Severity | Symptom | Evidence (PR-15) | Probable Cause | Immediate Mitigation | Owner | Status |
 |---|---|---|---|---|---|---|---|---|
 | FR-01 | Canonical URL ambiguity | High | Two candidate hosts were in use | `beauty.flowbiz.cloud` resolved; `staging.flowbiz.io` did not | Historical command drift | Pin canonical URL in pilot runbook | FlowBiz-Tech | Closed |
 | FR-02 | Staging DNS (wrong host) | High | `staging.flowbiz.io` unresolved | `Resolve-DnsName` failed | Wrong/deprecated host for this flow | Use canonical host only | FlowBiz-Tech | Closed |
@@ -36,10 +37,13 @@ Current operational recommendation: GO_FOR_REAL_DAY_0_DEMO
 | FR-09 | Audit log visibility | Medium | Previously blocked | Authenticated audit endpoint is HTTP 200 with records | Wrong host used in PR-13 | Keep canonical env vars pinned | FlowBiz-Ops | Closed |
 | FR-10 | Readiness payload assertions | Medium | Previously blocked | `appEnv=staging`, DB `flowbiz_beauty_staging` confirmed | Wrong host used in PR-13 | Keep readiness assertion in preflight checklist | FlowBiz-Tech | Closed |
 | FR-11 | Workflow-name payload visibility | Low | Queue API payload does not expose explicit workflow-name field | Queue item schema lacks workflow label field | API shape limitation | Verify workflow labels in UI during Day 0 run-through | FlowBiz-Ops | Open (Non-blocking) |
+| FR-12 | Written agreement pending | Medium | Owner-A has conditional proceed but no signed agreement yet | Day 0 decision outcome in live report | Commercial/legal prerequisite not closed | Send agreement pack and secure sign date | FlowBiz-Ops + Owner-A | Open (Blocking limited pilot start) |
+| FR-13 | LINE OA access handover pending | Medium | Admin access timeline not finalized | Owner Q&A follow-up item | External dependency on owner-side setup | Confirm handover owner and date | FlowBiz-Ops + Owner-A | Open (Blocking limited pilot start) |
+| FR-14 | Consent/data intake gate pending | Medium | Consent checkpoint tied to agreement flow not yet closed | Readiness gate matrix G10 | Sequence dependency | Close consent form after agreement confirmation | FlowBiz-Ops | Open (Blocking limited pilot start) |
 
 ---
 
-## Evidence Assets Status (PR-14)
+## Evidence Assets Status (PR-15)
 
 | Asset ID | Required Asset | Current State | Blocking? | Owner |
 |---|---|---|---|---|
@@ -52,30 +56,40 @@ Current operational recommendation: GO_FOR_REAL_DAY_0_DEMO
 | MA-07 | demo login PASS proof | Present | No | FlowBiz-Ops |
 | MA-08 | HITL queue visible proof | Present | No | FlowBiz-Ops |
 | MA-09 | audit log visible proof | Present | No | FlowBiz-Ops |
-| MA-10 | selected workflows visible proof (5 workflows) | Partial (limitation noted) | No | FlowBiz-Ops |
+| MA-10 | selected workflows visible proof (5 workflows) | Partial (operator note + queue evidence; no explicit workflow-name field) | No | FlowBiz-Ops |
+| MA-11 | Written pilot agreement signed | Missing | Yes | Owner-A + FlowBiz-Ops |
+| MA-12 | LINE OA admin access handover confirmed | Missing | Yes | Owner-A + FlowBiz-Ops |
+| MA-13 | Consent/data handling gate closed | Missing | Yes | FlowBiz-Ops |
 
 ---
 
 ## Resolution Criteria
 
-Primary blocking friction closure criteria status:
+Technical/session closure criteria status:
 1. DNS and TCP checks on canonical host: PASS.
 2. `/api/live` and `/api/ready` on canonical host: PASS.
 3. Readiness payload assertions: PASS.
 4. `npm run smoke:staging` live mode: PASS.
 5. Demo login, HITL queue, and audit visibility: PASS.
+6. HITL approve/modify/reject proof: PASS.
+
+Limited pilot start closure criteria status:
+1. Agreement signed: PENDING.
+2. LINE OA access handover: PENDING.
+3. Consent/data handling gate: PENDING.
 
 ---
 
 ## Fix Plan (Operational Only)
 
 1. Keep canonical URL pinned to `https://beauty.flowbiz.cloud` for pilot preflight.
-2. Mark `https://staging.flowbiz.io` as wrong/deprecated in pilot docs.
-3. During live Day 0 run-through, capture one UI proof for selected workflow labels.
-4. Continue to keep real LINE and real AI generation disabled in Day 0 demo mode.
+2. Continue to keep real LINE and real AI generation disabled in Day 0 demo mode.
+3. Close agreement signing and capture owner-confirmed sign date.
+4. Close LINE OA admin handover checkpoint.
+5. Close consent/data intake gate before limited pilot start.
 
 Note:
-- No runtime code changes were performed in PR-14.
+- No runtime code changes were performed in PR-15.
 - If a runtime defect appears in Day 0 execution, raise separate PR Summary for runtime blocker handling.
 
 ---
@@ -84,4 +98,4 @@ Note:
 
 Prepared by: FlowBiz-Ops (pseudonym role)
 Reviewed with: FlowBiz-Tech (preflight evidence complete)
-Current recommendation: GO_FOR_REAL_DAY_0_DEMO
+Current recommendation: DEMO_FOLLOW_UP_NEEDED
