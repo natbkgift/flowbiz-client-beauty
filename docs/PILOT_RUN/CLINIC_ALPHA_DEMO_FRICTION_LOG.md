@@ -1,6 +1,6 @@
-# Clinic Alpha — Demo Friction Log (PR-15 Day 0 Live Session)
+# Clinic Alpha — Demo Friction Log (PR-16 Follow-Up Closure)
 
-Document type: Live session friction and closure tracking
+Document type: Follow-up friction and closure tracking
 Pilot clinic: Clinic Alpha (pseudonym)
 Date: 2026-05-28
 Operator: FlowBiz-Ops
@@ -18,7 +18,7 @@ Current top note:
 2. Session execution blockers are closed.
 3. Remaining open items are agreement/access/consent prerequisites before limited pilot start.
 
-Current operational recommendation: DEMO_FOLLOW_UP_NEEDED
+Current operational recommendation: PENDING_OWNER_ACTION
 
 ---
 
@@ -37,9 +37,9 @@ Current operational recommendation: DEMO_FOLLOW_UP_NEEDED
 | FR-09 | Audit log visibility | Medium | Previously blocked | Authenticated audit endpoint is HTTP 200 with records | Wrong host used in PR-13 | Keep canonical env vars pinned | FlowBiz-Ops | Closed |
 | FR-10 | Readiness payload assertions | Medium | Previously blocked | `appEnv=staging`, DB `flowbiz_beauty_staging` confirmed | Wrong host used in PR-13 | Keep readiness assertion in preflight checklist | FlowBiz-Tech | Closed |
 | FR-11 | Workflow-name payload visibility | Low | Queue API payload does not expose explicit workflow-name field | Queue item schema lacks workflow label field | API shape limitation | Verify workflow labels in UI during Day 0 run-through | FlowBiz-Ops | Open (Non-blocking) |
-| FR-12 | Written agreement pending | Medium | Owner-A has conditional proceed but no signed agreement yet | Day 0 decision outcome in live report | Commercial/legal prerequisite not closed | Send agreement pack and secure sign date | FlowBiz-Ops + Owner-A | Open (Blocking limited pilot start) |
-| FR-13 | LINE OA access handover pending | Medium | Admin access timeline not finalized | Owner Q&A follow-up item | External dependency on owner-side setup | Confirm handover owner and date | FlowBiz-Ops + Owner-A | Open (Blocking limited pilot start) |
-| FR-14 | Consent/data intake gate pending | Medium | Consent checkpoint tied to agreement flow not yet closed | Readiness gate matrix G10 | Sequence dependency | Close consent form after agreement confirmation | FlowBiz-Ops | Open (Blocking limited pilot start) |
+| FR-12 | Written agreement pending | Medium | Owner-A has conditional proceed but no signed agreement yet | PR-16 closure checklist BL-01 | Commercial/legal prerequisite not closed | Send agreement pack and secure sign date | FlowBiz-Ops + Owner-A | Open (Blocking limited pilot start) |
+| FR-13 | LINE OA access handover pending | Medium | Admin access timeline not finalized | PR-16 LINE OA checklist pending items | External dependency on owner-side setup | Confirm handover owner and date | FlowBiz-Ops + Owner-A | Open (Blocking limited pilot start) |
+| FR-14 | Consent/data intake gate pending | Medium | Consent checkpoint tied to agreement flow not yet closed | PR-16 consent/data confirmation checklist | Sequence dependency | Close consent form after agreement confirmation | FlowBiz-Ops | Open (Blocking limited pilot start) |
 
 ---
 
@@ -78,6 +78,13 @@ Limited pilot start closure criteria status:
 2. LINE OA access handover: PENDING.
 3. Consent/data handling gate: PENDING.
 
+PR-16 closure pack criteria status:
+1. Follow-up closure checklist created: COMPLETE.
+2. Owner sign-off summary created: COMPLETE (owner action still pending).
+3. LINE OA access checklist created: COMPLETE (required approvals pending).
+4. Consent/data handling confirmation created: COMPLETE (required approvals pending).
+5. Decision gate created: COMPLETE (current outcome `PENDING_OWNER_ACTION`).
+
 ---
 
 ## Fix Plan (Operational Only)
@@ -90,6 +97,7 @@ Limited pilot start closure criteria status:
 
 Note:
 - No runtime code changes were performed in PR-15.
+- No runtime code changes were performed in PR-16.
 - If a runtime defect appears in Day 0 execution, raise separate PR Summary for runtime blocker handling.
 
 ---
@@ -99,3 +107,4 @@ Note:
 Prepared by: FlowBiz-Ops (pseudonym role)
 Reviewed with: FlowBiz-Tech (preflight evidence complete)
 Current recommendation: DEMO_FOLLOW_UP_NEEDED
+Current recommendation: PENDING_OWNER_ACTION
