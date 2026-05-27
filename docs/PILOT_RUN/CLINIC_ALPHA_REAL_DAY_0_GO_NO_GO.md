@@ -1,10 +1,10 @@
 # Clinic Alpha — Real Day 0 Go/No-Go Decision
 
-Document type: PR-12 decision memo for real Day 0 session
+Document type: PR-13 decision memo for real Day 0 session
 Pilot clinic: Clinic Alpha (pseudonym)
 Decision date: 2026-05-28
 Decision owner: FlowBiz-Ops + FlowBiz-Tech
-Current decision: GO_WITH_FIXES
+Current decision: NO_GO
 
 ---
 
@@ -14,24 +14,41 @@ Current decision: GO_WITH_FIXES
 - GO_WITH_FIXES
 - NO_GO
 
-Selected: GO_WITH_FIXES
+Selected: NO_GO
 
 ---
 
-## Decision Basis
+## Rule Applied
+
+PR-13 decision rules define:
+- If all required evidence passes: GO_FOR_REAL_DAY_0_DEMO
+- If staging/network still fails: NO_GO
+- If only minor non-blocking issues: GO_WITH_FIXES
+
+Applied outcome:
+- Staging/network checks failed in live preflight.
+- Therefore decision is NO_GO.
+
+---
+
+## Decision Basis (PR-13 Live Evidence)
 
 ### A) Technical and Safety Status
 
 | Gate | Expected | Current | Result |
 |---|---|---|---|
-| `/api/live` | 200 | Host unresolved from runner environment | FAIL |
-| `/api/ready` | 200 | Host unresolved from runner environment | FAIL |
-| smoke live mode | PASS | `fetch failed` | FAIL |
-| smoke dry-run safety guard | PASS | PASS | PASS |
-| Real send disabled | must be disabled | PASS (`LINE_REAL_SEND_ENABLED=false`) | PASS |
-| Real AI generation disabled | must be disabled | PASS (`AI_REAL_GENERATION_ENABLED=false`) | PASS |
-| No real data usage | required | PASS | PASS |
-| No secrets exposed | required | PASS | PASS |
+| DNS resolve for `staging.flowbiz.io` | Success | DNS name does not exist | FAIL |
+| Network to `staging.flowbiz.io:443` | Reachable | `TcpTestSucceeded=False` | FAIL |
+| `/api/live` | HTTP 200 | Host not found | FAIL |
+| `/api/ready` | HTTP 200 | Host not found | FAIL |
+| readiness `appEnv=staging` | Confirmed from payload | Payload unavailable | BLOCKED |
+| readiness DB `flowbiz_beauty_staging` | Confirmed from payload | Payload unavailable | BLOCKED |
+| `npm run smoke:staging` (live) | PASS | FAIL (`fetch failed`) | FAIL |
+| Demo login | PASS | FAIL (host not found) | FAIL |
+| HITL queue visibility | PASS | FAIL (host not found) | FAIL |
+| Audit log visibility | PASS | FAIL (host not found) | FAIL |
+| External send flags disabled | PASS | PASS | PASS |
+| No real data / no secrets in artifacts | PASS | PASS | PASS |
 
 ### B) Session/Content Readiness
 
@@ -39,74 +56,45 @@ Selected: GO_WITH_FIXES
 |---|---|---|
 | Day 0 agenda | Complete | PASS |
 | Demo checklist | Complete | PASS |
-| Staff training script | Complete | PASS |
-| Owner decision checklist | Complete | PASS |
-| Post-demo feedback form | Complete | PASS |
 | Day 0 report template | Complete | PASS |
-| Workflow script coverage (5 workflows) | Complete | PASS |
-| Live UI evidence (login/HITL/audit) | Missing | FAIL |
+| Dry-run report and preflight evidence pack | Complete | PASS |
+| Live staging evidence completeness | Incomplete | FAIL |
 
 ---
 
-## Why Not GO_FOR_REAL_DAY_0_DEMO Yet
+## Why NO_GO
 
-Real session should not start until the following are proven on reachable staging:
-1. `/api/live` returns 200.
-2. `/api/ready` returns 200.
-3. `npm run smoke:staging` passes in live mode.
-4. Demo login works for Owner-A and Staff-A1 roles.
-5. HITL queue is visible with demo drafts.
-6. Audit trail proof is visible after approve/modify/reject walk-through.
+NO_GO is selected because required live technical evidence did not pass.
+The blocker is not minor; it prevents all core live verifications needed before a real owner/staff demo.
 
----
-
-## Why Not NO_GO
-
-NO_GO is not selected because:
-- No structural blocker found in process design, safety model, or operating pack.
-- Failures are currently operational/network verification gaps.
-- Safety controls and documentation readiness are strong.
+Specific blockers:
+1. Staging DNS failure.
+2. Endpoint failure (`/api/live`, `/api/ready`).
+3. Smoke live failure.
+4. Login/HITL/audit evidence unavailable.
 
 ---
 
-## Required Fixes Before Real Day 0
+## Required Actions Before Reconsidering Decision
 
-| Priority | Fix | Owner | Acceptance Criteria |
+| Priority | Action | Owner | Acceptance Criteria |
 |---|---|---|---|
-| P1 | Restore/confirm staging reachability from operator network | FlowBiz-Tech | `/api/live` and `/api/ready` both 200 |
-| P1 | Re-run staging smoke in live mode | FlowBiz-Tech | Smoke summary PASS |
-| P1 | Validate demo logins (Owner-A + Staff-A1) | FlowBiz-Ops | Both accounts login successfully |
-| P1 | Validate HITL queue with demo drafts | FlowBiz-Ops | Queue visible with expected pending items |
-| P1 | Validate audit trail evidence | FlowBiz-Ops | At least 1 approve, 1 modify, 1 reject record visible |
-| P2 | Attach proof bundle in ops record | FlowBiz-Ops | Links/screenshots archived |
+| P1 | Restore staging DNS/network reachability from operator network | FlowBiz-Tech | DNS resolve success + TCP 443 reachable |
+| P1 | Re-run `/api/live` and `/api/ready` checks | FlowBiz-Tech | Both return HTTP 200 |
+| P1 | Confirm readiness payload fields | FlowBiz-Tech | `appEnv=staging` and DB `flowbiz_beauty_staging` present |
+| P1 | Re-run smoke test live | FlowBiz-Tech | `npm run smoke:staging` PASS |
+| P1 | Verify demo login, HITL queue, audit visibility | FlowBiz-Ops | All evidence captured and attached |
+| P2 | Re-issue decision memo | FlowBiz-Ops + FlowBiz-Tech | Decision updated from NO_GO based on full evidence |
 
 ---
 
 ## Re-Decision Trigger
 
-Re-open this decision and upgrade to GO_FOR_REAL_DAY_0_DEMO only when all P1 items are PASS.
-
-If any P1 item remains FAIL within planned Day 0 window:
-- Keep GO_WITH_FIXES if timeline still feasible, or
-- Downgrade to NO_GO and reschedule.
+Decision can only be upgraded from NO_GO when all P1 items are PASS with recorded proof.
 
 ---
 
-## Placeholder Questions to Capture in Real Session
-
-Owner-A placeholders:
-- <Owner question 1>
-- <Owner question 2>
-- <Owner question 3>
-
-Staff-A1 placeholders:
-- <Staff question 1>
-- <Staff question 2>
-- <Staff question 3>
-
----
-
-## Safety Attestation (PR-12)
+## Safety Attestation (PR-13)
 
 This decision document confirms:
 - Pseudonym-only usage (Clinic Alpha, Owner-A, Staff-A1)
@@ -121,7 +109,7 @@ This decision document confirms:
 
 ## References
 
-- CLINIC_ALPHA_DAY_0_DRY_RUN_REPORT.md
+- CLINIC_ALPHA_DAY_0_PREFLIGHT_EVIDENCE.md
 - CLINIC_ALPHA_DEMO_FRICTION_LOG.md
+- CLINIC_ALPHA_DAY_0_DRY_RUN_REPORT.md
 - CLINIC_ALPHA_DAY_0_DEMO_CHECKLIST.md
-- CLINIC_ALPHA_DAY_0_AGENDA.md
