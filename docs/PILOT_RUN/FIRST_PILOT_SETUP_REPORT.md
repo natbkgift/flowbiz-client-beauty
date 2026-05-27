@@ -2,7 +2,7 @@
 
 Report type: POST-PHASE 10 PR-09 — First Friendly Pilot Setup
 Date: 2026-05-28
-Status: **READY_FOR_DISCOVERY**
+Status: **DISCOVERY_COMPLETE** _(updated in PR-10 — see FIRST_PILOT_DISCOVERY_REPORT.md)_
 Prepared by: FlowBiz Engineering (AI-assisted)
 Environment: Documentation only — staging, no production changes
 
@@ -11,20 +11,29 @@ Environment: Documentation only — staging, no production changes
 ## Executive Summary
 
 All 12 pilot setup documents have been created under `docs/PILOT_RUN/`.
-No runtime code changes were made.
-No real clinic has been confirmed yet.
-The system is in `READY_FOR_DISCOVERY` state — ready to begin the discovery call and clinic onboarding process.
+Discovery has been completed for Clinic Alpha (first friendly pilot clinic, pseudonym).
+Status is now `DISCOVERY_COMPLETE` — clinic identified, discovery findings documented, Day 0 demo session being scheduled.
+No runtime code changes were made. No real clinic data in repository.
 
 ---
 
-## Status: READY_FOR_DISCOVERY
+## Status History
 
-This status means:
-- Pilot framework is complete and ready to use
-- No clinic has been confirmed yet
-- All placeholders must be filled in during discovery call
-- No real data, no real LINE send, no real Gemini generation until conditions are met
-- System is staging-only
+| PR | Status | Date | Notes |
+|---|---|---|---|
+| PR-09 | READY_FOR_DISCOVERY | 2026-05-28 | Pilot framework complete, no clinic yet |
+| **PR-10** | **DISCOVERY_COMPLETE** | **2026-05-28** | **Clinic Alpha identified, fit confirmed, demo approved** |
+
+### Current Status: DISCOVERY_COMPLETE
+
+- Clinic identified (Clinic Alpha — pseudonym; real name in ops system only)
+- Discovery call completed — readiness score 15/21 → DEMO_ONLY_FIRST
+- All 5 workflows confirmed as strong fit
+- Owner verbal approval for demo received
+- Written agreement pending — **no real data until signed**
+- LINE OA admin access for staging — pending
+- Staging accounts for clinic staff — pending
+- System is staging-only. No real LINE send. No real Gemini. No real data.
 
 ---
 
@@ -44,6 +53,14 @@ This status means:
 | 10 | [PILOT_EXIT_AND_CONVERSION_CRITERIA.md](PILOT_EXIT_AND_CONVERSION_CRITERIA.md) | Exit scorecard, success/failure/extend/convert/no-go criteria | Created |
 | 11 | [PILOT_ROLLBACK_AND_DISABLE_PLAN.md](PILOT_ROLLBACK_AND_DISABLE_PLAN.md) | Step-by-step rollback: disable LINE, disable AI, disable users, incident response | Created |
 | 12 | [FIRST_PILOT_SETUP_REPORT.md](FIRST_PILOT_SETUP_REPORT.md) | This report | Created |
+| 13 | [PILOT_CHECKLIST_INDEX.md](PILOT_CHECKLIST_INDEX.md) | Stage-ordered navigation index for all pilot docs | Created |
+
+**PR-10 additions:**
+
+| # | File | Purpose | Status |
+|---|---|---|
+| 14 | [PILOT_CLINIC_PROFILE_ALPHA.md](PILOT_CLINIC_PROFILE_ALPHA.md) | Pseudonymized discovery profile for Clinic Alpha | Created (PR-10) |
+| 15 | [FIRST_PILOT_DISCOVERY_REPORT.md](FIRST_PILOT_DISCOVERY_REPORT.md) | Discovery findings, fit assessment, next actions | Created (PR-10) |
 
 ---
 
@@ -83,15 +100,15 @@ This status means:
 | Pilot documentation | Complete |
 | Code safety gates | In place (from prior PRs) |
 | Staging environment | Available |
-| Clinic identified | **Pending discovery** |
-| Clinic owner consent | **Pending** |
-| Staff accounts created | **Pending** |
-| Data intake complete | **Pending** |
-| Baseline metrics collected | **Pending** |
-| Day 0 session scheduled | **Pending** |
+| Clinic identified | **Clinic Alpha — confirmed** |
+| Clinic owner consent | **Verbal yes — written pending** |
+| Staff accounts created | **Pending — pre-Day 0** |
+| Data intake complete | **Demo mode approved — real data pending written consent** |
+| Baseline metrics collected | **Discovery estimates available — formal baseline pending** |
+| Day 0 session scheduled | **Pending scheduling** |
 
-**Overall readiness: READY_FOR_DISCOVERY**
-No blocking technical issues found.
+**Overall readiness: DISCOVERY_COMPLETE → proceed to schedule Day 0**
+No blocking technical issues found. Written agreement is the main prerequisite before real data or real send.
 
 ---
 
@@ -99,13 +116,16 @@ No blocking technical issues found.
 
 | # | Question | Owner | Target |
 |---|---|---|---|
-| 1 | Which clinic is the first friendly pilot? | Business owner | Discovery call |
-| 2 | What data mode will the clinic use? (demo / pseudonymized / limited real) | FlowBiz + clinic owner | Discovery call |
-| 3 | Is clinic ready for real LINE on Day 1 or demo-only? | FlowBiz technical owner | Day 0 |
-| 4 | How many staff accounts are needed? | Clinic owner | Discovery call |
-| 5 | What is the clinic's current no-show rate? | Clinic staff | Baseline collection |
-| 6 | What is the weekly lead volume? | Clinic staff | Baseline collection |
-| 7 | Is the clinic willing to share any real operational data? | Clinic owner | Discovery call |
+| 1 | Which clinic is the first friendly pilot? | ~~Business owner~~ | **RESOLVED — Clinic Alpha** |
+| 2 | What data mode? | ~~FlowBiz + clinic owner~~ | **RESOLVED — Demo mode confirmed; pseudonymized requires written consent** |
+| 3 | Is clinic ready for real LINE on Day 1? | ~~FlowBiz technical owner~~ | **RESOLVED — Demo only; real LINE pending written agreement** |
+| 4 | How many staff accounts? | ~~Clinic owner~~ | **RESOLVED — 2 (Owner-A approver, Staff-A1 operator)** |
+| 5 | Current no-show rate? | ~~Clinic staff~~ | **IN PROGRESS — estimate 20–30% from discovery** |
+| 6 | Weekly lead volume? | ~~Clinic staff~~ | **IN PROGRESS — estimate 15–20/week from discovery** |
+| 7 | Willing to share real data? | ~~Clinic owner~~ | **IN PROGRESS — pending written consent** |
+| 8 | When can written pilot agreement be signed? | Owner-A | Within 7 days of Day 0 |
+| 9 | Does Owner-A have LINE OA admin access for staging? | Owner-A | Pre-Day 0 |
+| 10 | Demo language preference (Thai / English)? | FlowBiz operator | Pre-Day 0 |
 
 ---
 
@@ -142,23 +162,30 @@ No runtime code was changed. Validation applies to documentation only.
 
 | Priority | Action | Owner | When |
 |---|---|---|---|
-| 1 | Schedule discovery call with first friendly clinic | Business owner | ASAP |
-| 2 | Fill in PILOT_CLINIC_PROFILE.md during discovery | FlowBiz operator | Discovery call |
-| 3 | Collect baseline metrics from clinic | FlowBiz operator | Discovery / Week 0 |
-| 4 | Create clinic staff accounts on staging | FlowBiz technical owner | Pre-Day 0 |
-| 5 | Confirm data mode with clinic owner | FlowBiz operator | Discovery call |
-| 6 | Schedule Day 0 session | FlowBiz operator + clinic owner | After profile complete |
-| 7 | Run preflight checklist (PILOT_DAY_0_RUNBOOK.md) | FlowBiz technical owner | Day before Day 0 |
+| ~~1~~ | ~~Schedule discovery call~~ | ~~Business owner~~ | **DONE** |
+| ~~2~~ | ~~Fill in PILOT_CLINIC_PROFILE.md~~ | ~~FlowBiz operator~~ | **DONE → PILOT_CLINIC_PROFILE_ALPHA.md** |
+| 3 | Send written pilot agreement to Owner-A | FlowBiz operator | Today |
+| 4 | Schedule Day 0 demo session | FlowBiz operator + Owner-A | This week |
+| 5 | Confirm LINE OA admin access for staging | Owner-A | Pre-Day 0 |
+| 6 | Create staging accounts (Staff-A1, Owner-A viewer) | FlowBiz technical owner | Pre-Day 0 |
+| 7 | Run `npm run seed:demo` on staging | FlowBiz technical owner | Day before Day 0 |
+| 8 | Update PILOT_BASELINE_METRICS.md with discovery estimates | FlowBiz operator | This week |
+| 9 | Run preflight checklist (PILOT_DAY_0_RUNBOOK.md) | FlowBiz technical owner | Day before Day 0 |
 
 ---
 
 ## Git Summary
 
+### PR-09 commit
 - Branch: `main`
-- Changes: Documentation only (`docs/PILOT_RUN/` — 12 new files)
-- No source code changes
-- No migration changes
-- No configuration changes
+- Commit: `7686c7b` — "docs(beauty): add pilot run setup framework for first friendly pilot"
+- Changes: Documentation only (`docs/PILOT_RUN/` — 13 new files)
+- No source code changes, no migration changes, no configuration changes
+
+### PR-10 commit
+- Branch: `main`
+- Changes: Documentation only (`docs/PILOT_RUN/` — 2 new files + 1 updated file)
+- No source code changes, no migration changes, no configuration changes
 
 ---
 
@@ -171,3 +198,5 @@ No runtime code was changed. Validation applies to documentation only.
 - [../HITL_APPROVAL_CONTRACT.md](../HITL_APPROVAL_CONTRACT.md)
 - [../PDPA_CONSENT_FOUNDATION.md](../PDPA_CONSENT_FOUNDATION.md)
 - [../AI_MEDICAL_SAFETY_POLICY.md](../AI_MEDICAL_SAFETY_POLICY.md)
+- [PILOT_CLINIC_PROFILE_ALPHA.md](PILOT_CLINIC_PROFILE_ALPHA.md) _(PR-10)_
+- [FIRST_PILOT_DISCOVERY_REPORT.md](FIRST_PILOT_DISCOVERY_REPORT.md) _(PR-10)_
