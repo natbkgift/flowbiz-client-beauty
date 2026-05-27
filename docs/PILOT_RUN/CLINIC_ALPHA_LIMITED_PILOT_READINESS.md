@@ -1,6 +1,6 @@
-# Clinic Alpha — Limited Pilot Readiness Assessment (PR-16 Update)
+# Clinic Alpha — Limited Pilot Readiness Assessment (PR-17 Update)
 
-Document type: POST-PHASE 10 PR-16 readiness update after Day 0 follow-up closure pack
+Document type: POST-PHASE 10 PR-17 readiness update after owner approval execution
 Pilot clinic: Clinic Alpha (pseudonym only)
 Assessment date: 2026-05-28
 Assessed by: FlowBiz-Ops + FlowBiz-Tech
@@ -20,6 +20,7 @@ Source inputs:
 - CLINIC_ALPHA_LINE_OA_ACCESS_CHECKLIST.md
 - CLINIC_ALPHA_CONSENT_DATA_HANDLING_CONFIRMATION.md
 - CLINIC_ALPHA_LIMITED_PILOT_DECISION_GATE.md
+- CLINIC_ALPHA_OWNER_APPROVAL_EVIDENCE.md
 
 Day 0 execution result:
 - Technical execution: PASS
@@ -39,9 +40,9 @@ Day 0 execution result:
 | G5 | Day 0 flow delivered end-to-end | PASS | All agenda blocks completed | No |
 | G6 | Staff HITL handling confidence | PASS_WITH_NOTE | Staff-A1 can execute approve/modify/reject with light coaching | No |
 | G7 | Owner approves moving forward | PASS_CONDITIONAL | Owner-A positive, conditional proceed | No |
-| G8 | Written pilot agreement signed | PENDING_OWNER_ACTION | Sign-off pending | Yes |
-| G9 | LINE OA admin access handover confirmed | PENDING_OWNER_ACTION | Access confirmation pending | Yes |
-| G10 | Consent/data handling preconditions complete | PENDING_OWNER_ACTION | Consent/data confirmation pending | Yes |
+| G8 | Written pilot agreement signed | PENDING_OWNER_ACTION | PR-17 evidence: `agreement_received=no` | Yes |
+| G9 | LINE OA admin access handover confirmed | PENDING_OWNER_ACTION | PR-17 evidence: `access_confirmed=no` | Yes |
+| G10 | Consent/data handling preconditions complete | PENDING_OWNER_ACTION | PR-17 evidence: `confirmation_received=no` | Yes |
 
 ---
 
@@ -59,7 +60,7 @@ Why:
 - Owner and staff signals are positive.
 - Business/operational prerequisites (agreement + access + consent) are still open blockers.
 
-PR-16 rule alignment:
+PR-17 rule alignment:
 - Limited pilot status is only upgraded when all decision-gate criteria are complete.
 - Since business approvals are pending and no new safety breach is found, the correct status is `PENDING_OWNER_ACTION`.
 
@@ -100,6 +101,7 @@ Do not upgrade readiness while any required owner sign-off remains pending.
 2. Close agreement and access prerequisites.
 3. Publish limited-pilot start checklist with named owners and due dates.
 4. Re-issue readiness memo with upgraded status only after all gate items are complete.
+5. Update PR-17 evidence register immediately after any owner action closes BL-01/BL-02/BL-03.
 
 ---
 

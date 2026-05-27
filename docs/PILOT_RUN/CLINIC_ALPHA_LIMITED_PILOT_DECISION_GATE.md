@@ -1,8 +1,9 @@
-# Clinic Alpha — Limited Pilot Decision Gate (PR-16)
+# Clinic Alpha — Limited Pilot Decision Gate (PR-17)
 
-Document type: Formal decision gate for limited pilot preparation
+Document type: Formal decision gate for limited pilot preparation after owner approval execution
 Pilot clinic: Clinic Alpha (pseudonym only)
 Date: 2026-05-28
+Evidence baseline: CLINIC_ALPHA_OWNER_APPROVAL_EVIDENCE.md
 
 Allowed gate outcomes:
 - READY_FOR_LIMITED_PILOT_PREP
@@ -17,9 +18,9 @@ Current gate outcome: PENDING_OWNER_ACTION
 
 | Gate ID | Gate Criterion | Current Status | Evidence Source | Blocking Class |
 |---|---|---|---|---|
-| GATE-01 | Written agreement complete | PENDING | CLINIC_ALPHA_FOLLOW_UP_CLOSURE_CHECKLIST.md (BL-01) | Business approval |
-| GATE-02 | LINE OA access confirmed | PENDING | CLINIC_ALPHA_LINE_OA_ACCESS_CHECKLIST.md | Access |
-| GATE-03 | Data handling confirmation complete | PENDING | CLINIC_ALPHA_CONSENT_DATA_HANDLING_CONFIRMATION.md | Data safety |
+| GATE-01 | Written agreement complete | PENDING_OWNER_ACTION | CLINIC_ALPHA_OWNER_APPROVAL_EVIDENCE.md (BL-01: agreement_received=no) | Business approval |
+| GATE-02 | LINE OA access confirmed | PENDING_OWNER_ACTION | CLINIC_ALPHA_OWNER_APPROVAL_EVIDENCE.md (BL-02: access_confirmed=no) | Access |
+| GATE-03 | Data handling confirmation complete | PENDING_OWNER_ACTION | CLINIC_ALPHA_OWNER_APPROVAL_EVIDENCE.md (BL-03: confirmation_received=no) | Data safety |
 | GATE-04 | Staff approvers identified | PASS | Day 0 report + training records (Owner-A, Staff-A1 roles) | Non-blocking |
 | GATE-05 | Selected workflows confirmed | PASS_WITH_NOTE | Day 0 live report workflow walkthrough | Non-blocking |
 | GATE-06 | Safe operating mode confirmed | PASS | Safe flags and simulated mode requirement | Safety critical |
@@ -47,7 +48,7 @@ Applied rule (current): Rule B
 
 1. Technical and safety checks from PR-15 are passing.
 2. Staff operator and support ownership are defined.
-3. Three business closure items are pending owner action:
+3. PR-17 sanitized evidence register still shows all three closure items pending owner action:
 - written agreement
 - LINE OA access confirmation
 - consent/data handling confirmation
