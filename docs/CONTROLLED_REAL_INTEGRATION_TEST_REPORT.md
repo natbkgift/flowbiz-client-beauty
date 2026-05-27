@@ -124,3 +124,96 @@ Real-provider execution decision:
 ## Next recommended PR
 
 Provider Wiring Fixes
+
+---
+
+# PR 8C Attempt — Post-Phase 10 Controlled Real Provider Activation
+
+## Status
+
+BLOCKED — Gate not open. No execution proceeded.
+
+## Attempt timestamp
+
+`2026-05-27` Asia/Bangkok time
+Operator: GitHub Copilot in supervised staging session
+
+## Gate check result
+
+All seven required documents were read before any execution step:
+
+- `docs/STAGING_REAL_INTEGRATION_GATE.md`
+- `docs/REAL_GEMINI_QA_PLAN.md`
+- `docs/REAL_LINE_QA_PLAN.md`
+- `docs/REAL_GEMINI_TEST_CASES.md`
+- `docs/REAL_LINE_TEST_CASES.md`
+- `docs/REAL_GEMINI_ROLLBACK_CHECKLIST.md`
+- `docs/REAL_LINE_ROLLBACK_CHECKLIST.md`
+
+Gate check found the following blocking conditions:
+
+### Block 1 — QA window start and end are unfilled
+
+The approval record in `STAGING_REAL_INTEGRATION_GATE.md` still has:
+
+| Field | Recorded value | Status |
+| --- | --- | --- |
+| QA window start | `Record at window open in Asia/Bangkok time` | required before start — not filled |
+| QA window end | `Record at window close in Asia/Bangkok time` | required before start — not filled |
+| Window status | `CLOSED until all required-before-start fields are recorded and owners approve` | CLOSED |
+
+The gate document states: *"The window stays closed until every required before start item is filled by human owners."*
+
+### Block 2 — Owner names are role titles, not named humans
+
+The gate document states: *"They are role-level assignments for PR 8B and must map to actual human owners at execution time."*
+
+Current approval record roles:
+
+- QA owner: `Senior Integration QA Lead` — role, not a named human
+- Rollback owner: `Staging Rollback Owner` — role, not a named human
+- Safety reviewer: `SaaS Safety Operator` — role, not a named human
+- HITL reviewer: `Clinic QA HITL Reviewer` — role, not a named human
+
+### Applicable No-Go conditions
+
+From `STAGING_REAL_INTEGRATION_GATE.md` section **No-Go Conditions**:
+
+- `the approval record is incomplete` ✓
+- `required owners or reviewers are not assigned` ✓
+
+## Phases A–D result
+
+| Phase | Status |
+| --- | --- |
+| Phase A — Gemini Controlled QA | NOT STARTED |
+| Phase B — Gemini Rollback | NOT STARTED |
+| Phase C — LINE Controlled QA | NOT STARTED |
+| Phase D — LINE Rollback | NOT STARTED |
+
+No Gemini key was loaded. No LINE token or secret was loaded. No env variable was changed. No real provider mode was enabled. No service was restarted.
+
+Live LINE send count: `0` (unchanged from previous retry).
+
+## Safety confirmation
+
+- customer data used: no
+- secrets exposed: no
+- real mode left enabled: no
+- HITL bypass: no
+- any staging env variable changed: no
+
+## What must happen before PR 8C can execute
+
+1. A human owner must open `docs/STAGING_REAL_INTEGRATION_GATE.md` and fill in `QA window start` and `QA window end` with actual Asia/Bangkok timestamps at the moment the window opens.
+2. Owners listed as role titles must be mapped to named individuals or the team must explicitly confirm that role-level assignment is sufficient for this team's governance.
+3. All `required before start` fields in the approval record must be filled and the `Window status` row must be updated to `OPEN`.
+4. The precondition checklist must be re-verified at that moment (disk, readiness, smoke, safety suite).
+5. Only after those steps may Phase A begin with loading the Gemini key outside the repo.
+
+## Residual risks
+
+- Gate remains CLOSED. Real provider behavior on staging remains unproven.
+- Real Gemini generation has not run on staging.
+- The single controlled LINE live send has not been performed.
+- All other residual risks from the previous retry remain unchanged.
