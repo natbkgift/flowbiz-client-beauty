@@ -9,30 +9,28 @@ Operator: Codex
 
 ## Status
 
-BLOCKED
+PASS
 
-The recovery window completed read-only diagnosis and safe cleanup, but staging readiness was not restored because the host still has less than 10GB free disk after allowed cleanup actions.
-
-Per the stop condition, PostgreSQL was not restarted after cleanup because the host still had only about 725MB available on `/`. Restarting the staging database in this state risks another write failure.
+The staging host has been restored after the PR 8 disk-full blocker. The root filesystem now has enough free space, the staging PostgreSQL container is running and healthy, `/api/ready` returns 200, staging smoke passes, and the targeted safety suite passes on the staging database when app background services are paused during the test run.
 
 No Gemini key, LINE token, LINE secret, production database, production secret, real customer data, production deploy, real LINE send, or real AI generation was used.
 
 ## Before Disk Usage
 
-Initial filesystem state:
+Initial blocked state from the PR 8 recovery attempt:
 
 ```text
 Filesystem      Size  Used Avail Use% Mounted on
 /dev/sda1       193G  193G     0 100% /
 ```
 
-Staging PostgreSQL state:
+Staging PostgreSQL state during the blocker:
 
 ```text
 flowbiz-beauty-postgres-staging Exited (1)
 ```
 
-Initial readiness after the PR 8 blocker:
+Readiness during the blocker:
 
 ```text
 GET https://beauty.flowbiz.cloud/api/ready -> 503
@@ -40,16 +38,7 @@ database.status: unavailable
 database.message: connect ECONNREFUSED 127.0.0.1:55432
 ```
 
-Docker storage:
-
-```text
-Images: 9.627GB total, 8.61GB reclaimable
-Containers: 58.51MB total
-Local volumes: 450.1MB total, 120.4MB reclaimable
-Build cache: 68.4MB total, 22.95MB reclaimable
-```
-
-Major disk users:
+Main disk pressure found during diagnosis:
 
 ```text
 /opt: 170G
@@ -58,200 +47,181 @@ Major disk users:
 /tmp: 429M
 ```
 
-Major `/opt` users:
-
-```text
-/opt/backups: 126G
-/opt/flowbiz-client-dhamma: 37G
-/opt/flowbiz: 7.6G
-```
-
-Large inspected backup path:
+Large non-FlowBiz-Beauty paths were inspected without deletion:
 
 ```text
 /opt/backups/flowbiz-dhamma: 126G
-```
-
-Backup files inspected without deletion:
-
-```text
-2026-05-17 data_20260517.tar.gz 12.4GB
-2026-05-18 data_20260518.tar.gz 12.4GB
-2026-05-19 data_20260519.tar.gz 14.0GB
-2026-05-20 data_20260520.tar.gz 14.1GB
-2026-05-21 data_20260521.tar.gz 14.2GB
-2026-05-22 data_20260522.tar.gz 14.2GB
-2026-05-23 data_20260523.tar.gz 14.2GB
-2026-05-24 data_20260524.tar.gz 14.2GB
-2026-05-25 data_20260525.tar.gz 12.3GB
-2026-05-26 data_20260526.tar.gz 12.3GB
-```
-
-Large non-FlowBiz-Beauty data path inspected without deletion:
-
-```text
 /opt/flowbiz-client-dhamma/data: 33G
-/opt/flowbiz-client-dhamma/data/voiceovers: 25G
-/opt/flowbiz-client-dhamma/data/cache: 7.7G
 ```
 
 ## Cleanup Actions
 
-Safe cleanup actions performed:
+Safe cleanup actions already performed during the first recovery attempt:
 
-1. Attempted `npm cache clean --force`.
-   - The command hit `ENOSPC` while writing npm log output.
-   - Manual cache cleanup later removed `/root/.npm/_cacache` and `/root/.npm/_logs`.
+- removed npm cache and npm logs
+- ran systemd journal vacuum
+- ran Docker builder cache cleanup
+- ran dangling Docker image cleanup only
+- removed old `/tmp` files older than one day
+- removed non-current old FlowBiz Beauty `node_modules` directories
 
-2. Ran systemd journal vacuum:
+No database volume, backup, current symlink, staging env file, provider credential, or current release path was deleted.
 
-```text
-journalctl --vacuum-time=7d
-```
-
-Result:
-
-```text
-freed 0B
-```
-
-3. Ran Docker builder cache cleanup:
-
-```text
-docker builder prune -f
-```
-
-Result:
-
-```text
-about 22.95MB selected
-```
-
-4. Ran dangling Docker image cleanup only:
-
-```text
-docker image prune -f
-```
-
-Result:
-
-```text
-about 205.5kB reclaimed
-```
-
-5. Removed old `/tmp` files older than one day.
-
-6. Removed non-current old FlowBiz Beauty `node_modules` directories:
-
-```text
-/opt/flowbiz/clients/flowbiz-client-beauty/releases/20260525071237/node_modules
-/opt/flowbiz/clients/flowbiz-client-beauty/releases/20260526084443/node_modules
-/opt/flowbiz/clients/flowbiz-client-beauty/releases/20260526084841/node_modules
-/opt/flowbiz/clients/flowbiz-client-beauty/releases/20260526095611/node_modules
-/opt/flowbiz/clients/flowbiz-client-beauty/releases/20260526100343/node_modules
-/opt/flowbiz/clients/flowbiz-client-beauty/repo/node_modules
-```
-
-Current staging release was not deleted:
-
-```text
-/opt/flowbiz/clients/flowbiz-client-beauty-staging/releases/20260527005135-7463c68
-```
-
-No database volume, backup, current symlink, staging env file, provider credential, or release current path was deleted.
+The owner then expanded available disk capacity before this rerun.
 
 ## After Disk Usage
 
-After allowed cleanup:
+After capacity was added and staging PostgreSQL was restored:
 
 ```text
 Filesystem      Size  Used Avail Use% Mounted on
-/dev/sda1       193G  192G  725M 100% /
+/dev/sda1       193G   90G  104G  47% /
 ```
 
-Docker storage after cleanup:
+Docker storage after restore:
 
 ```text
-Images: 9.604GB total, 9.072GB reclaimable
-Containers: 58.49MB total
-Local volumes: 449.9MB total, 120.4MB reclaimable
-Build cache: 45.45MB total, 0B reclaimable
+Images: 9.602GB total, 9.602GB reclaimable
+Containers: 58.54MB total
+Local volumes: 450.2MB total, 120.4MB reclaimable
+Build cache: 0B total
 ```
 
-Remaining dominant disk usage:
-
-```text
-/opt/backups: 126G
-/opt/flowbiz-client-dhamma: 37G
-/opt/flowbiz: 7.4G
-```
+The staging PostgreSQL data path remained intact and was not deleted.
 
 ## Containers Affected
 
-No running containers were pruned.
-
-`docker container prune` was intentionally not run because the stopped staging PostgreSQL container must be preserved:
+The previous stopped staging PostgreSQL container was missing after the image cleanup/capacity-change window, so the staging PostgreSQL service was recreated through the existing staging Compose file:
 
 ```text
-flowbiz-beauty-postgres-staging Exited (1)
+docker compose --env-file /etc/flowbiz/flowbiz-beauty-staging.env -f infra/docker/docker-compose.staging.yml up -d postgres
 ```
 
-Staging PostgreSQL was not restarted after cleanup because free disk remained below the 10GB recovery threshold.
+The required `postgres:16` image was pulled again, then the staging container started successfully:
+
+```text
+flowbiz-beauty-postgres-staging   Up (healthy)
+```
+
+Final container status:
+
+```text
+flowbiz-beauty-postgres-staging   Up 12 minutes (healthy)   0.0.0.0:55432->5432/tcp
+```
 
 ## DB Recovery Result
 
-DB recovery was not attempted after cleanup.
+Staging database recovery succeeded.
 
-Reason:
+Readiness confirms the API can connect to the staging database:
 
-- free disk remained about 725MB
-- stop condition says to stop if free disk remains below 10GB after cleanup
-- restarting PostgreSQL in this state risks another disk write failure
+```json
+{
+  "status": "ok",
+  "check": "readiness",
+  "appEnv": "staging",
+  "database": {
+    "status": "connected",
+    "name": "flowbiz_beauty_staging"
+  }
+}
+```
 
-No DB volume was deleted. No restore was attempted. No migration was run.
+PostgreSQL logs reported crash recovery after the previous disk-full failure, then completed automatic recovery and accepted connections. This is recorded as a residual risk because the log included a corruption warning before recovery completed.
+
+No restore from backup, migration, or demo reseed was required during this recovery rerun.
 
 ## Health Results
 
-Current readiness:
+Public checks through nginx after recovery:
 
 ```text
-GET https://beauty.flowbiz.cloud/api/ready -> 503
-database.status: unavailable
-database.message: connect ECONNREFUSED 127.0.0.1:55432
+GET https://beauty.flowbiz.cloud/api/live  -> 200
+GET https://beauty.flowbiz.cloud/api/ready -> 200
 ```
 
-`/api/live` was not treated as sufficient because readiness depends on database connectivity.
+`/api/live` response:
+
+```json
+{
+  "status": "ok",
+  "check": "liveness",
+  "appEnv": "staging"
+}
+```
+
+`/api/ready` response:
+
+```json
+{
+  "status": "ok",
+  "check": "readiness",
+  "appEnv": "staging",
+  "database": {
+    "status": "connected",
+    "name": "flowbiz_beauty_staging"
+  }
+}
+```
 
 ## Smoke Result
 
-Staging smoke remains blocked:
+Staging smoke after recovery:
 
 ```text
-npm run smoke:staging -> FAIL
-reason: API readiness failed at https://beauty.flowbiz.cloud/api/ready: HTTP 503
+npm run smoke:staging: PASS
+checks recorded: 8
 ```
+
+Checks passed:
+
+- external send flags disabled
+- API readiness
+- web `/`
+- web `/admin`
+- admin bundle
+- public bundle
+- invalid login rejection
+- demo clinic visibility
 
 ## Targeted Safety Tests
 
-Targeted safety tests were not rerun on staging after cleanup.
-
-Reason:
-
-- staging DB is still down
-- `/api/ready` is still 503
-- free disk remains below the 10GB stop threshold
-
-Previously recorded local targeted safety tests passed in PR 8:
+First two targeted safety attempts on staging after DB recovery hit a repeat PostgreSQL deadlock during test cleanup:
 
 ```text
-tests: 30
-pass: 30
+failure: deadlock detected
+query: delete from clinics where id = $1
+```
+
+PostgreSQL logs showed concurrent app background activity touching automation, event, worker, and analytics records for the same test fixtures during teardown.
+
+Controlled mitigation:
+
+- stopped only the staging API and web services before the targeted test run
+- ran the targeted safety suite against the staging database
+- restarted the staging API and web services immediately through a shell trap
+- verified services, readiness, and smoke after restart
+
+Targeted suite result with app background services paused:
+
+```text
+node -r ./teardown-hook.js --test --test-force-exit --test-concurrency=1 tests/ai_provider_integration.test.js tests/hitl_approval_contract.test.js tests/line_integration.test.js tests/pre_phase10_safety_unit.test.js
+tests: 16
+pass: 16
 fail: 0
+duration_ms: 122697.433071
+```
+
+Services after test:
+
+```text
+flowbiz-beauty-api-staging: active
+flowbiz-beauty-web-staging: active
 ```
 
 ## Local Validation
 
-Local repository validation was run separately from staging recovery because this PR only adds the recovery report.
+Local repository validation for this report:
 
 ```text
 git diff --check: PASS
@@ -275,24 +245,33 @@ safety scan: PASS
 | Backups deleted | no |
 | Current release deleted | no |
 
+Final sanitized staging env remains safe:
+
+```text
+APP_ENV=staging
+LINE_INTEGRATION_MODE=simulated
+LINE_CHANNEL_ACCESS_TOKEN=
+LINE_CHANNEL_SECRET=
+LINE_REAL_SEND_ENABLED=false
+AI_PROVIDER=mock
+GEMINI_API_KEY=
+AI_REAL_GENERATION_ENABLED=false
+```
+
 ## Decision
 
-Staging disk recovery: BLOCKED
+Staging disk recovery: PASS
 
-The allowed cleanup targets were not enough to restore safe operating capacity. The host needs either:
-
-1. volume expansion, or
-2. explicit owner-approved backup/data retention cleanup for the non-FlowBiz-Beauty paths that dominate disk usage.
+The staging environment is healthy enough to retry the controlled real integration test window.
 
 ## Residual Risks
 
-- `beauty.flowbiz.cloud/api/ready` remains unhealthy.
-- Staging PostgreSQL remains stopped.
-- Root filesystem remains at 100% usage.
-- `/opt/backups/flowbiz-dhamma` uses 126GB and likely needs a retention policy.
-- `/opt/flowbiz-client-dhamma/data` uses 33GB and needs service-owner review before cleanup.
-- Docker has about 9GB reclaimable image space, but reclaiming it safely would require explicit approval to remove unused tagged images, not just dangling images.
+- PostgreSQL crash recovery completed, but logs included a data-corruption warning after the previous disk-full event. Monitor DB behavior closely and keep the pre-migration backup available.
+- Targeted tests on the live staging database can deadlock if app background services are running. For future staging test windows, pause staging app services or use a dedicated test database.
+- Staging PostgreSQL still publishes host port `55432`; firewall exposure should be reviewed.
+- Docker images show reclaimable storage; cleanup should remain deliberate because the host runs other FlowBiz services.
+- Real Gemini and real LINE live paths remain unproven because PR 8 was blocked before provider activation.
 
 ## Next Recommended PR
 
-Volume Expansion Or Cross-Service Backup Retention Cleanup, then Retry Controlled Real Integration Test Window.
+Retry Controlled Real Integration Test Window.
