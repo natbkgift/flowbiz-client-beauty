@@ -178,7 +178,7 @@ async function sendTextMessage(input = {}, options = {}) {
   if (runtime.mode === 'simulated') {
     const result = {
       provider: 'line',
-      providerMessageId: `line-simulated-${Date.now()}`,
+      providerMessageId: `local-${Date.now()}-line`,
       integrationStatus: 'simulated',
       status: 'sent',
       mode: runtime.mode,

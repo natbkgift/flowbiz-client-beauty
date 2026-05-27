@@ -734,7 +734,9 @@ async function queueApprovedMessageForOutbound(clinicContext, messageId, payload
       scheduledAt
     },
     {
-      messageType: 'manual'
+      messageType: 'manual',
+      source: 'ai',
+      approved: true
     }
   );
 

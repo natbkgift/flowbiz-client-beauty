@@ -479,6 +479,28 @@ function renderContent(templateContent, variables) {
   });
 }
 
+function buildProviderSendInput({ clinicContext, entityType, entityId, channel, recipientRef, contentRendered, templateId, messageType, options }) {
+  return {
+    clinicId: clinicContext.currentClinic.id,
+    entityType,
+    entityId,
+    actorUserId: clinicContext.currentUser?.id || null,
+    channelType: channel.channel_type,
+    recipientRef,
+    contentRendered,
+    source: options.source || 'manual',
+    approved: options.approved === true,
+    dryRun: options.dryRun === true,
+    metadata: {
+      messageType,
+      channelId: channel.id,
+      templateId,
+      executionId: options.executionId || null,
+      ...(options.metadata || {})
+    }
+  };
+}
+
 async function sendLeadOutboundMessage(clinicContext, leadId, payload, options = {}) {
   const client = await getPool().connect();
   const normalized = validateManualMessagePayload(payload);
@@ -548,11 +570,20 @@ async function sendLeadOutboundMessage(clinicContext, leadId, payload, options =
         failureReason: null
       };
     } else {
-      providerResult = await sendMessage({
-        channelType: channel.channel_type,
-        recipientRef,
-        contentRendered
-      });
+      providerResult = await sendMessage(
+        buildProviderSendInput({
+          clinicContext,
+          entityType: 'lead',
+          entityId: leadId,
+          channel,
+          recipientRef,
+          contentRendered,
+          templateId,
+          messageType,
+          options
+        }),
+        options.providerOptions || {}
+      );
     }
 
     const result = await client.query(
@@ -719,11 +750,20 @@ async function sendCustomerOutboundMessage(clinicContext, customerId, payload, o
         failureReason: null
       };
     } else {
-      providerResult = await sendMessage({
-        channelType: channel.channel_type,
-        recipientRef,
-        contentRendered
-      });
+      providerResult = await sendMessage(
+        buildProviderSendInput({
+          clinicContext,
+          entityType: 'customer',
+          entityId: customerId,
+          channel,
+          recipientRef,
+          contentRendered,
+          templateId,
+          messageType,
+          options
+        }),
+        options.providerOptions || {}
+      );
     }
 
     const result = await client.query(

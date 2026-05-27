@@ -1,7 +1,7 @@
 # LINE Integration Runbook
 
-Last updated: 2026-05-26  
-Scope: Phase 4 foundation for LINE Messaging API integration. Real sends are not enabled by default.
+Last updated: 2026-05-28
+Scope: Product LINE delivery wiring for the messaging path. Real sends are not enabled by default.
 
 ## Runtime Modes
 
@@ -41,6 +41,24 @@ Exported functions:
 - `dryRunSend()`
 - `auditOutboundAttempt()`
 
+Product messaging provider selector:
+
+```text
+apps/api/src/modules/messaging/provider.js
+```
+
+Messaging services that call the selector:
+
+```text
+apps/api/src/modules/messaging/service.js
+```
+
+The current HTTP product route for lead manual send remains in:
+
+```text
+apps/api/src/server.js
+```
+
 ## Outbound Send Contract
 
 Use `sendTextMessage()` for outbound LINE text attempts:
@@ -65,6 +83,29 @@ Important safety controls:
 - Medical-safety-sensitive text requires `approved: true`.
 - The adapter does not log raw recipient IDs or raw message text in audit context.
 - Audit context stores hashes and message length instead.
+
+## Product Route Wiring
+
+The product messaging path now dispatches by channel type:
+
+- `channelType = line` routes from `apps/api/src/modules/messaging/provider.js` to `sendTextMessage()`.
+- non-LINE channels keep the existing simulated provider behavior.
+
+Current behavior for `POST /leads/:leadId/messages` and service-level outbound calls:
+
+- default LINE behavior remains simulated
+- `LINE_INTEGRATION_MODE=real` is required before any real adapter path is considered
+- `LINE_REAL_SEND_ENABLED=true` is required for any real LINE send
+- missing `LINE_CHANNEL_ACCESS_TOKEN` blocks the send
+- low-risk manual LINE text can send when the runtime is explicitly enabled
+- `source: 'ai'` is blocked unless `approved: true`
+- medical-risk text is blocked unless `approved: true`
+- audit logs record `line.outbound_attempt` or `line.outbound_blocked` without raw recipient or raw text
+
+AI-related product path notes:
+
+- `queueApprovedMessageForOutbound()` now calls the messaging service with `source: 'ai'` and `approved: true`
+- automation steps that generate AI text now call the messaging service with `source: 'ai'` and `approved: false`, so real LINE delivery fails closed instead of silently bypassing HITL
 
 ## Dry Run
 
@@ -141,22 +182,21 @@ Audit metadata includes:
 
 ## Current Integration Boundary
 
-This phase adds the LINE adapter foundation only. It is not yet wired as the default provider behind existing messaging routes.
+The LINE adapter is now wired for the immediate product messaging path through the messaging provider selector.
 
-Before using LINE for real outbound in staging:
+Still required before broader rollout:
 
-- Wire `channel_type = line` sends to this adapter.
-- Preserve HITL approval checks before calling the adapter with `source: 'ai'`.
 - Add route-level webhook handler with signature verification.
 - Confirm tenant/workspace context resolution for inbound events.
 - Confirm opt-in/marketing consent policy.
+- If a future worker sends queued `outbound_messages`, it must preserve or reconstruct `source` and `approved` context before calling the provider.
 
 ## Validation
 
 Expected commands:
 
 ```text
-node -r ./teardown-hook.js --test --test-force-exit --test-concurrency=1 tests/line_integration.test.js tests/pre_phase10_safety_unit.test.js
+node -r ./teardown-hook.js --test --test-force-exit --test-concurrency=1 apps/api/tests/messaging.test.js tests/messaging_provider_wiring.test.js tests/line_integration.test.js tests/hitl_approval_contract.test.js
 npm run validate
 npm test
 ```

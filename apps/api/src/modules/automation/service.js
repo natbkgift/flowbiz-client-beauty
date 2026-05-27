@@ -1158,6 +1158,7 @@ async function applyAutomationStep(client, context, step, executionId) {
 
       try {
         let content = config.content;
+        let aiGenerated = false;
 
         if (!content && (config.aiGenerate === true || !config.templateId)) {
           const { generateLeadMessage } = require('../ai/service');
@@ -1177,6 +1178,7 @@ async function applyAutomationStep(client, context, step, executionId) {
             }
           );
           content = generated.messageText;
+          aiGenerated = true;
         }
 
         outbound = await sendLeadOutboundMessage(
@@ -1192,7 +1194,12 @@ async function applyAutomationStep(client, context, step, executionId) {
             variables: config.variables || {},
             scheduledAt
           },
-          { messageType: 'automation', executionId }
+          {
+            messageType: 'automation',
+            executionId,
+            source: aiGenerated ? 'ai' : 'manual',
+            approved: false
+          }
         );
       } catch (error) {
         if (error.code === 'RECIPIENT_NOT_FOUND') {
