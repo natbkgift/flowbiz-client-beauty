@@ -28,8 +28,8 @@ test('Clinic Website Schema Extension Tests', async (t) => {
   let clinicId2;
 
   t.before(async () => {
-    clinicId1 = await createClinicFixture(pool, uniqueId1);
-    clinicId2 = await createClinicFixture(pool, uniqueId2);
+    clinicId1 = await createClinicFixture(uniqueId1);
+    clinicId2 = await createClinicFixture(uniqueId2);
   });
 
   t.after(async () => {
