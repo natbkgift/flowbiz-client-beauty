@@ -16,6 +16,8 @@ test('Clinic Slug Validation - Pure Helper Tests', (t) => {
   assert.equal(normalizeClinicSlug(' Clinic Alpha '), 'clinic-alpha');
   assert.equal(normalizeClinicSlug('Clinic   Alpha!!'), 'clinic-alpha');
   assert.equal(normalizeClinicSlug('clinic_alpha'), 'clinic-alpha');
+  assert.equal(normalizeClinicSlug('a'.repeat(100)), 'a'.repeat(70));
+  assert.equal(normalizeClinicSlug('a'.repeat(69) + '-' + 'b'), 'a'.repeat(69));
   assert.equal(normalizeClinicSlug(''), '');
   assert.equal(normalizeClinicSlug(null), '');
 
