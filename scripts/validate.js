@@ -126,7 +126,7 @@ const requiredPaths = [
 ];
 
 function checkFiles() {
-  const missing = requiredPaths.filter((filePath) => !fs.existsSync(path.resolve(__dirname, '..', filePath)));
+  const missing = requiredPaths.filter((filePath) => !fs.existsSync(path.normalize(path.resolve(__dirname, '..', filePath))));
 
   if (missing.length > 0) {
     throw new Error(`Missing required files:\n- ${missing.join('\n- ')}`);
@@ -217,7 +217,7 @@ function checkSyntax() {
   ];
 
   for (const file of jsFiles) {
-    const target = path.resolve(__dirname, '..', file);
+    const target = path.normalize(path.resolve(__dirname, '..', file));
     const result = spawnSync(process.execPath, ['--check', target], { stdio: 'inherit' });
 
     if (result.status !== 0) {
@@ -235,7 +235,7 @@ function checkDatabasePathPolicy() {
     'database/.local-db-tx'
   ];
 
-  const present = prohibitedPaths.filter((filePath) => fs.existsSync(path.resolve(__dirname, '..', filePath)));
+  const present = prohibitedPaths.filter((filePath) => fs.existsSync(path.normalize(path.resolve(__dirname, '..', filePath))));
 
   if (present.length > 0) {
     throw new Error(`Embedded database artifacts still exist in repo:\n- ${present.join('\n- ')}`);
