@@ -30,10 +30,8 @@ HITL_REQUIRED=true
 
 Controlled, low-volume verification was executed against the approved test user:
 
-| Provider | Test Case ID | Target Recipient ID / Alias | Flow / Use Case | Status | Latency |
-|---|---|---|---|---|---|
-| **Gemini** | `tc-ai-gen-01` | `qa-line-user-01` (`U38b74be210beac456f05aba9c66dc420`) | Review Request Draft | **PASS** | 1,450ms |
-| **LINE API** | `tc-line-push-01` | `qa-line-user-01` (`U38b74be210beac456f05aba9c66dc420`) | Live Outbound Delivery | **PASS** | 320ms |
+| Gemini | `tc-ai-gen-01` | `qa-line-user-01` | Review Request Draft | **PASS** | 1,450ms |
+| **LINE API** | `tc-line-push-01` | `qa-line-user-01` | Live Outbound Delivery | **PASS** | 320ms |
 
 ### Observed Flow Activity
 1. **AI Suggestion Generation:**
@@ -59,7 +57,7 @@ The following metrics were captured during the approved live staging window:
 | **Modified drafts count** | `0` | Draft sent as generated without editing |
 | **Real sends count** | `1` | Pushed message reached test user successfully |
 | **Failed sends count** | `0` | No push request failure occurred |
-| **Wrong-recipient incidents** | `0` | Message correctly targetted `U38b74be210beac456f05aba9c66dc420` |
+| **Wrong-recipient incidents** | `0` | Message correctly targetted test user |
 | **Duplicate-send incidents** | `0` | Exactly one push event executed |
 | **Operator intervention count** | `1` | One manual HITL approval action |
 | **Incident count** | `0` | No failures, errors, or anomalies |

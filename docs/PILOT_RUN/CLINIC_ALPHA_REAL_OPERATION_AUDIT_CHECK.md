@@ -37,7 +37,7 @@ Query execution on `audit_logs` matching clinic context:
 
 We performed a strict regex scan on the databases, JSON logs, and audit trail tables for sensitive patterns:
 
-*   **Raw LINE User ID Scan:** Checked for prefix `U` followed by 32 hex/alphanumeric characters (e.g. `U38b74be210beac456f05aba9c66dc420`).
+*   **Raw LINE User ID Scan:** Checked for prefix `U` followed by 32 hex/alphanumeric characters (e.g. `U12345678901234567890123456789012`).
     *   *Result:* **CLEAN**. Only SHA-256 hashes are recorded in `context_json` under field `recipientHash` (e.g. `4f0b2...`).
 *   **Raw Message Text Scan:** Checked for message bodies, greeting formulas, or clinic-specific text.
     *   *Result:* **CLEAN**. Only `messageHash` and `messageLength` fields were logged in `context_json`.

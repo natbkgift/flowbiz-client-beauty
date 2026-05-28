@@ -38,7 +38,7 @@ With real mode disabled, two operations were attempted to test fail-closed secur
 
 | Attempted Action | Input / Flow Parameters | Expected System Outcome | Actual Staging Outcome | Audit Enforced Code |
 |---|---|---|---|---|
-| **Real LINE Push Attempt** | Manual send request to `U38b74be210beac456f05aba9c66dc420` | Fail closed immediately, throw error | **Blocked immediately** | `LINE_REAL_SEND_DISABLED` |
+| **Real LINE Push Attempt** | Manual send request to `qa-line-user-01` | Fail closed immediately, throw error | **Blocked immediately** | `LINE_REAL_SEND_DISABLED` |
 | **Real Gemini Gen Attempt** | Prompt for review request generation | Fallback to mock generation or throw error | **Blocked immediately** | `AI_REAL_GENERATION_DISABLED` |
 
 > [!TIP]
