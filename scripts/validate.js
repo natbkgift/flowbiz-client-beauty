@@ -87,6 +87,7 @@ const requiredPaths = [
   'database/migrations/020_crm_lead_pipeline_engine.sql',
   'database/migrations/021_automation_event_driven_lifecycle_engine.sql',
   'database/migrations/035_phase9_blog_forum.sql',
+  'database/migrations/038_clinic_website_schema.sql',
   'database/seeds/001_runtime_seed.sql',
   'database/seeds/002_multi_tenant_seed.sql',
   'database/seeds/003_lead_crm_seed.sql',
@@ -118,7 +119,8 @@ const requiredPaths = [
   'tests/admin_ui.test.js',
   'tests/crm_lead_pipeline.test.js',
   'tests/phase9_seo_web.test.js',
-  'tests/phase9_blog_forum.test.js'
+  'tests/phase9_blog_forum.test.js',
+  'tests/clinic_website_schema.test.js'
 ];
 
 function checkFiles() {
@@ -206,7 +208,8 @@ function checkSyntax() {
     'tests/admin_ui.test.js',
     'tests/crm_lead_pipeline.test.js',
     'tests/phase9_seo_web.test.js',
-    'tests/phase9_blog_forum.test.js'
+    'tests/phase9_blog_forum.test.js',
+    'tests/clinic_website_schema.test.js'
   ];
 
   for (const file of jsFiles) {
