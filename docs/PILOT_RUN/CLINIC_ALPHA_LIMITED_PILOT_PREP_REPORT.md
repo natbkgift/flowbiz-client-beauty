@@ -1,6 +1,6 @@
-# Clinic Alpha - Limited Pilot Prep Report (PR-19)
+# Clinic Alpha - Limited Pilot Prep Report (PR-19 / PR-20 Update)
 
-Document type: PR-19 prep completion report
+Document type: PR-19 prep completion report with PR-20 Day 1 verification update
 Pilot clinic: Clinic Alpha (pseudonym only)
 Date: 2026-05-28
 Decision baseline: READY_FOR_LIMITED_PILOT_PREP
@@ -88,3 +88,40 @@ Recommended next PR:
 - PR-20 Clinic Alpha Day 1 Prep Verification and Go/No-Go
 
 PR-20 should verify staging health, safe flags, staff access, HITL queue, audit view, selected workflows, and support readiness before first operational use.
+
+---
+
+## 7) PR-20 Day 1 Verification Update
+
+PR-20 files created:
+1. CLINIC_ALPHA_DAY_1_PREFLIGHT_EVIDENCE.md
+2. CLINIC_ALPHA_DAY_1_GO_NO_GO.md
+3. CLINIC_ALPHA_DAY_1_RISK_REVIEW.md
+
+Live evidence summary:
+1. Canonical staging URL: https://beauty.flowbiz.cloud.
+2. DNS and TCP checks: PASS.
+3. /api/live and /api/ready: PASS.
+4. appEnv and database target: PASS.
+5. npm run smoke:staging: PASS.
+6. Demo login, HITL queue, and audit visibility: PASS.
+7. PR-20 data import: NOT_PERFORMED.
+8. PR-20 outbound send: NOT_PERFORMED.
+
+Fixes required:
+1. Operational health endpoint reports degraded.
+2. Active workflow list includes items outside the selected Day 1 scope.
+3. Repeat reminder workflow label needs operator mapping note.
+
+PR-20 decision:
+- GO_WITH_FIXES
+
+This does not mark the limited pilot as started.
+
+PR-20 validation:
+1. git diff --check: PASS.
+2. npm run validate: PASS.
+3. safety scan for real identifiers, credential material, agreement attachment, and prohibited claim language: PASS.
+
+Recommended next PR:
+- PR-21 Clinic Alpha Day 1 Fix Closure and Start Approval Recheck
