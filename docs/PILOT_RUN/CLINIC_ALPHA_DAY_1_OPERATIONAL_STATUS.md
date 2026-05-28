@@ -101,3 +101,36 @@ Operational watch items:
 
 PR-23 operational decision:
 - GO_WITH_IMPROVEMENTS
+
+---
+
+## 7) PR-24 Active Usage Cadence Update
+
+Cadence snapshot timestamp:
+- 2026-05-28T11:25:00+07:00
+
+Cadence scope:
+1. selected workflow only: Review Request
+2. no workflow expansion
+3. no runtime code changes
+
+Cadence results:
+1. reviewed HITL items: 12
+2. approve decisions: 4
+3. reject decisions: 4
+4. modify-before-approve decisions: 4
+5. average review latency: 08m 49s
+6. queue end-of-window pending items: 0
+7. operator confusion points captured: 3
+8. queue friction items captured: 2
+
+Safety continuity in cadence window:
+1. outbound actions: 0
+2. real-send indicators: 0
+3. broad import indicators: 0
+4. HITL bypass indicators: 0
+5. broadcast indicators: 0
+6. excluded workflow handling events: 0
+
+PR-24 operational decision:
+- READY_FOR_RECURRING_LIMITED_PILOT

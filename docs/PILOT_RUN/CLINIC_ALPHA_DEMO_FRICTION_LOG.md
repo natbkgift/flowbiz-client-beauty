@@ -9,17 +9,17 @@ Operator: FlowBiz-Ops
 
 ## Friction Summary
 
-Total friction items tracked: 17
-- Closed: 14
-- Open: 3 (Day 1 watch items; non-blocking safety status)
+Total friction items tracked: 18
+- Closed: 16
+- Open: 2 (non-blocking watch items)
 
 Current top note:
 1. Technical staging blockers are closed.
 2. Session execution blockers are closed.
 3. Agreement/access/consent prerequisites are closed in sanitized owner evidence.
-4. Day 1 monitoring shows safe governance stable, with operational improvements still needed.
+4. PR-24 shows active HITL operational usage with stable safety posture.
 
-Current operational recommendation: GO_WITH_IMPROVEMENTS
+Current operational recommendation: READY_FOR_RECURRING_LIMITED_PILOT
 
 ---
 
@@ -41,9 +41,10 @@ Current operational recommendation: GO_WITH_IMPROVEMENTS
 | FR-12 | Written agreement pending | Medium | Owner-A has conditional proceed but no written agreement artifact confirmed yet | PR-18 evidence register: `agreement_received=yes` | Commercial/legal prerequisite closure completed | Maintain written artifact outside repo only | FlowBiz-Ops + Owner-A | Closed |
 | FR-13 | LINE OA access handover pending | Medium | Admin access timeline not finalized | PR-18 evidence register: `access_confirmed=yes` | Owner-side setup completed | Keep credential material in external protected storage only | FlowBiz-Ops + Owner-A | Closed |
 | FR-14 | Consent/data intake gate pending | Medium | Consent checkpoint tied to agreement flow not yet closed | PR-18 evidence register: `confirmation_received=yes` | Closure completed by owner confirmation | Keep legal review acknowledgment active | FlowBiz-Ops | Closed |
-| FR-15 | Day 1 HITL review cadence | Medium | Queue visible but no approve/reject/modify activity observed in API snapshot | PR-23 monitoring: `pending_approval=8` | Staff review cadence not yet evidenced | Add staff HITL review checkpoint in next operating window | FlowBiz-Ops + Staff-A1 | Open (Improvement) |
+| FR-15 | Day 1 HITL review cadence | Medium | Queue visible but no approve/reject/modify activity observed in API snapshot | PR-23 monitoring: `pending_approval=8` | Staff review cadence not yet evidenced | Add staff HITL review checkpoint in next operating window | FlowBiz-Ops + Staff-A1 | Closed (Resolved in PR-24 with 12 reviewed items) |
 | FR-16 | Day 1 ops health exception | Medium | `/ops/health` remains degraded under accepted exception | PR-23 monitoring: automation failures in last 24h = 2, worker failed jobs = 0 | Historical failure window still affects health status | Recheck until healthy or renewed exception accepted | FlowBiz-Tech | Open (Accepted watch item) |
-| FR-17 | Day 1 latency measurement gap | Low | Operator review latency not measurable from API snapshot | PR-23 monitoring notes | Missing timestamp-based latency capture | Add queue aging/review latency capture in PR-24 | FlowBiz-Ops | Open (Improvement) |
+| FR-17 | Day 1 latency measurement gap | Low | Operator review latency not measurable from API snapshot | PR-23 monitoring notes | Missing timestamp-based latency capture | Add queue aging/review latency capture in PR-24 | FlowBiz-Ops | Closed (Resolved in PR-24, avg latency 08m 49s) |
+| FR-18 | Operator queue filter reset friction | Low | Queue filter needed reset after submit in some cycles | PR-24 operator behavior report | UI handling habit not yet standardized | Add filter-preset step in recurring operator checklist | FlowBiz-Ops | Open (Minor friction) |
 
 ---
 
@@ -109,6 +110,16 @@ PR-23 Day 1 monitoring decision status:
 5. Broad import indicators since Day 1 start: 0.
 6. Open improvement/watch items: 3.
 
+PR-24 active usage cadence decision status:
+1. Reviewed HITL items: 12.
+2. Approve/reject/modify-before-approve: 4/4/4.
+3. Average review latency: 08m 49s.
+4. Outbound actions in cadence window: 0.
+5. Real-send indicators in cadence window: 0.
+6. HITL bypass indicators in cadence window: 0.
+7. Open improvement/watch items: 2.
+8. Decision: READY_FOR_RECURRING_LIMITED_PILOT.
+
 ---
 
 ## Fix Plan (Operational Only)
@@ -133,4 +144,4 @@ Note:
 
 Prepared by: FlowBiz-Ops (pseudonym role)
 Reviewed with: FlowBiz-Tech (preflight evidence complete)
-Current recommendation: GO_WITH_IMPROVEMENTS
+Current recommendation: READY_FOR_RECURRING_LIMITED_PILOT

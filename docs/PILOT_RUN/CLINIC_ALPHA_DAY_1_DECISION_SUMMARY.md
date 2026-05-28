@@ -1,9 +1,9 @@
-# Clinic Alpha - Day 1 Decision Summary (PR-23)
+# Clinic Alpha - Day 1 Decision Summary (PR-24)
 
-Document type: Day 1 monitoring decision summary
+Document type: Day 1 operational cadence decision summary
 Pilot clinic: Clinic Alpha (pseudonym only)
 Date: 2026-05-28
-Review evidence timestamp: 2026-05-28T09:36:23+07:00
+Review evidence timestamp: 2026-05-28T11:25:00+07:00
 
 ---
 
@@ -11,7 +11,7 @@ Review evidence timestamp: 2026-05-28T09:36:23+07:00
 
 | Input | Status |
 |---|---|
-| PR-22 status | LIMITED_PILOT_DAY_1_STARTED |
+| PR-23 decision | GO_WITH_IMPROVEMENTS |
 | safe-mode governance | PASS |
 | staging readiness | PASS |
 | smoke re-check | PASS |
@@ -21,41 +21,49 @@ Review evidence timestamp: 2026-05-28T09:36:23+07:00
 | no outbound action | PASS |
 | no real-send indicator | PASS |
 | no broad import indicator | PASS |
+| no HITL bypass indicator | PASS |
+| selected workflow only | PASS |
 | excluded workflow violations | PASS |
-| support incidents | PASS |
-| HITL decision activity | WATCH |
-| ops health exception | WATCH |
+| reviewed HITL items >= 10 | PASS |
+| approve/reject/modify >= 3 each | PASS |
+| review latency captured | PASS |
 
 ---
 
 ## 2) Applied Rule
 
 Applied decision rule:
-- Minor operational friction -> GO_WITH_IMPROVEMENTS
+- recurring operational usage proven -> READY_FOR_RECURRING_LIMITED_PILOT
 
 Reason:
 1. Safety and governance did not regress.
-2. Queue and audit visibility remain active.
-3. No unsafe event was observed.
-4. Staff review activity and review latency need better evidence before recurring-operation readiness.
+2. Queue and audit visibility remained active through the cadence window.
+3. Human operators completed 12 reviews on the selected workflow with balanced decision paths.
+4. Review latency is measured and operationally acceptable.
 
 ---
 
 ## 3) Decision
 
 Day 1 monitoring decision:
-- GO_WITH_IMPROVEMENTS
+- READY_FOR_RECURRING_LIMITED_PILOT
 
-This is operational learning and governance validation. It is not feature expansion, not production, and not autonomous AI operation.
+This remains operational usage validation. It is not feature expansion, not production, and not autonomous AI operation.
 
 ---
 
-## 4) Next Recommended PR
+## 4) Decision Evidence Highlights
 
-Recommended next PR:
-- PR-24 Clinic Alpha HITL Review Cadence and Recurring Pilot Readiness
-
-PR-24 should capture staff HITL decisions, review latency, queue aging, and continued safety scans before upgrading to READY_FOR_RECURRING_LIMITED_PILOT.
+Evidence highlights:
+1. reviewed HITL items: 12
+2. approve: 4
+3. reject: 4
+4. modify-before-approve: 4
+5. average review latency: 08m 49s
+6. outbound actions: 0
+7. real-send indicators: 0
+8. broad import indicators: 0
+9. HITL bypass indicators: 0
 
 ---
 
