@@ -7,8 +7,6 @@ Pilot clinic: Clinic Alpha (pseudonym only)
 
 ## 1) Immediate BLOCKED Conditions
 
-1. LINE_REAL_SEND_ENABLED=true detected
-2. AI_REAL_GENERATION_ENABLED=true detected
 1. real-send mode flag is found enabled
 2. real AI generation flag is found enabled
 3. HITL bypass detected
