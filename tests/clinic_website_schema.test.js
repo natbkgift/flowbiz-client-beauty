@@ -2,21 +2,22 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Pool } = require('pg');
 const { loadConfig } = require('../apps/api/src/config');
-const { signup } = require('../apps/api/src/modules/auth/service');
 const {
   isValidWebsiteStatus,
   isValidHomepageSectionStatus,
   normalizeSectionKey
 } = require('../apps/api/src/modules/clinic-website/validation');
 
-async function createClinicFixture(uniqueId) {
-  const session = await signup({
-    clinicName: `Schema Clinic ${uniqueId}`,
-    ownerName: 'Schema Owner',
-    email: `schema-owner-${uniqueId}@example.com`,
-    password: 'StrongPass123!'
-  });
-  return session.currentClinic.id;
+async function createClinicFixture(pool, uniqueId) {
+  const result = await pool.query(
+    `
+      insert into clinics (name, slug, plan, status, timezone)
+      values ($1, $2, 'starter', 'active', 'Asia/Bangkok')
+      returning id
+    `,
+    [`Schema Clinic ${uniqueId}`, `schema-clinic-${uniqueId}`]
+  );
+  return Number(result.rows[0].id);
 }
 
 test('Clinic Website Schema Extension Tests', async (t) => {
@@ -28,8 +29,8 @@ test('Clinic Website Schema Extension Tests', async (t) => {
   let clinicId2;
 
   t.before(async () => {
-    clinicId1 = await createClinicFixture(uniqueId1);
-    clinicId2 = await createClinicFixture(uniqueId2);
+    clinicId1 = await createClinicFixture(pool, uniqueId1);
+    clinicId2 = await createClinicFixture(pool, uniqueId2);
   });
 
   t.after(async () => {
