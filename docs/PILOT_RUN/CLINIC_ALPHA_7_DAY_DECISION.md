@@ -53,3 +53,19 @@ Applied PR-27 decision rule:
 PR-27 decision:
 - READY_FOR_PAID_PILOT
 
+---
+
+## 5) PR-28 Paid Pilot Activation Update
+
+Activation checks:
+1. paid pilot activated: yes
+2. no unsafe event observed: yes
+3. support burden acceptable: yes
+4. owner engagement maintained: yes
+
+Applied PR-28 decision rule:
+1. READY_FOR_ACTIVE_PAID_PILOT
+
+PR-28 decision:
+- READY_FOR_ACTIVE_PAID_PILOT
+
