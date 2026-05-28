@@ -10,6 +10,7 @@ const { toPublicClinic } = require('../clinics/clinic-entity');
 const { getMembershipsByUserId, resolveMembership } = require('../tenancy/service');
 const { getLifecycleFlowPresets } = require('../automation/flow-presets');
 const { recordAuditLog } = require('../audit/service');
+const { normalizeClinicSlug, assertValidClinicSlug } = require('../clinics/validation');
 
 const config = loadConfig();
 
@@ -85,6 +86,27 @@ async function ensureUniqueSlug(client, tableName, columnName, preferredSlug) {
   }
 
   return `${preferredSlug}-${createRandomSuffix()}`;
+}
+
+async function ensureUniqueClinicSlug(client, preferredSlug) {
+  let slug = preferredSlug;
+  let counter = 0;
+
+  while (counter < 20) {
+    const result = await client.query('select 1 from clinics where slug = $1 limit 1', [slug]);
+
+    if (result.rowCount === 0) {
+      assertValidClinicSlug(slug);
+      return slug;
+    }
+
+    counter += 1;
+    slug = `${preferredSlug}-${counter}`;
+  }
+
+  const finalSlug = `${preferredSlug}-${createRandomSuffix()}`;
+  assertValidClinicSlug(finalSlug);
+  return finalSlug;
 }
 
 function validateSignupPayload(payload) {
@@ -294,7 +316,9 @@ async function signup(payload) {
   try {
     await ensureEmailAvailable(client, normalized.email);
 
-    const clinicSlug = await ensureUniqueSlug(client, 'clinics', 'slug', toSlug(normalized.clinicName, 'tenant'));
+    const preferredClinicSlug = normalizeClinicSlug(normalized.clinicName) || 'tenant';
+    assertValidClinicSlug(preferredClinicSlug);
+    const clinicSlug = await ensureUniqueClinicSlug(client, preferredClinicSlug);
     const organizationSlug = await ensureUniqueSlug(client, 'organizations', 'slug', `${clinicSlug}-org`);
     const workspaceSlug = await ensureUniqueSlug(client, 'workspaces', 'slug', toSlug(normalized.workspaceName, 'main-workspace'));
     const passwordHash = hashPassword(normalized.password, crypto.randomBytes(16).toString('hex'));

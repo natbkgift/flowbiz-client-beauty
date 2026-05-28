@@ -62,6 +62,7 @@ const requiredPaths = [
   'apps/api/src/modules/customers/routes.js',
   'apps/api/src/modules/clinic-website/constants.js',
   'apps/api/src/modules/clinic-website/validation.js',
+  'apps/api/src/modules/clinics/validation.js',
   'apps/web/src/server.js',
   'apps/web/src/index.html',
   'apps/web/src/styles.css',
@@ -122,7 +123,8 @@ const requiredPaths = [
   'tests/crm_lead_pipeline.test.js',
   'tests/phase9_seo_web.test.js',
   'tests/phase9_blog_forum.test.js',
-  'tests/clinic_website_schema.test.js'
+  'tests/clinic_website_schema.test.js',
+  'tests/clinic_slug_validation.test.js'
 ];
 
 function checkFiles() {
@@ -193,6 +195,7 @@ function checkSyntax() {
     'apps/api/src/modules/customers/routes.js',
     'apps/api/src/modules/clinic-website/constants.js',
     'apps/api/src/modules/clinic-website/validation.js',
+    'apps/api/src/modules/clinics/validation.js',
     'apps/web/src/server.js',
     'apps/web/src/main.js',
     'apps/web/src/public-main.js',
@@ -213,7 +216,8 @@ function checkSyntax() {
     'tests/crm_lead_pipeline.test.js',
     'tests/phase9_seo_web.test.js',
     'tests/phase9_blog_forum.test.js',
-    'tests/clinic_website_schema.test.js'
+    'tests/clinic_website_schema.test.js',
+    'tests/clinic_slug_validation.test.js'
   ];
 
   for (const file of jsFiles) {

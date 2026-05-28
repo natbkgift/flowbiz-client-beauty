@@ -14,6 +14,8 @@ const THAI_ERROR_MESSAGES = {
   WEAK_PASSWORD: 'รหัสผ่านต้องมีความปลอดภัยมากกว่านี้',
   EMAIL_ALREADY_EXISTS: 'อีเมลนี้ถูกใช้งานแล้ว',
   INVALID_SIGNUP_PAYLOAD: 'ข้อมูลสมัครใช้งานไม่ครบถ้วนหรือไม่ถูกต้อง',
+  INVALID_CLINIC_SLUG: 'สลักของคลินิกไม่ถูกต้อง',
+  RESERVED_CLINIC_SLUG: 'สลักของคลินิกเป็นคำสงวนของระบบ',
   RATE_LIMIT_EXCEEDED: 'มีคำขอเข้ามามากเกินไป กรุณารอสักครู่แล้วลองใหม่',
   INVALID_WEBHOOK_SIGNATURE: 'ลายเซ็นหรือ secret ของ webhook ไม่ถูกต้อง',
   PUBLIC_SIGNUP_DISABLED: 'ยังไม่เปิดให้สมัครใช้งานสาธารณะ กรุณาติดต่อผู้ดูแลระบบ',
