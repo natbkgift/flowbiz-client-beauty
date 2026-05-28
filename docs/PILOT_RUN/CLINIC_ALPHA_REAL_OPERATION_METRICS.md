@@ -83,3 +83,23 @@ Week 1 business-critical metrics:
 
 PR-28 week 1 status:
 - READY_FOR_ACTIVE_PAID_PILOT
+
+---
+
+## 6) PR-29 Controlled Real Operation Metrics Update
+
+PR-29 verification metrics:
+1. outbound send count: 0
+2. approval latency: not measured (real execution blocked window)
+3. HITL modification rate: not measured (real execution blocked window)
+4. AI rejection rate: not measured (real execution blocked window)
+5. workflow trigger count: 0 (real path)
+6. operator intervention count: 1
+7. support escalation count: 1
+8. rollback event count: 1
+
+PR-29 outcome:
+- STOP_OR_REDUCE_SCOPE
+
+Blocking reason:
+1. runtime credential gate for controlled real provider mode was not satisfied during this execution window.

@@ -198,3 +198,27 @@ Seven-day safety continuity:
 
 PR-26 final decision:
 - READY_FOR_PAID_PILOT_DISCUSSION
+
+---
+
+## 10) PR-29 Build, Deploy, and Controlled Real Operation Update
+
+PR-29 execution summary:
+1. branch and runtime prechecks executed on main and staging host
+2. host build and validation executed
+3. controlled runtime real-mode toggle was attempted
+4. runtime credential gap triggered 502 and immediate rollback
+5. safe mode was restored and health checks recovered to 200
+
+PR-29 scope guard status:
+1. no production deploy
+2. no multi-clinic routing
+3. no broad import actions
+4. hitl remained mandatory
+5. no uncontrolled outbound execution
+
+PR-29 status:
+- STOP_OR_REDUCE_SCOPE
+
+Reason:
+1. controlled real execution path is blocked until required runtime credentials are prepared under supervised operator window.
