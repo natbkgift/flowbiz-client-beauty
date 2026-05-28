@@ -1,6 +1,6 @@
-# Clinic Alpha - Limited Pilot Prep Report (PR-19 / PR-20 Update)
+# Clinic Alpha - Limited Pilot Prep Report (PR-19 / PR-20 / PR-22 Update)
 
-Document type: PR-19 prep completion report with PR-20 Day 1 verification update
+Document type: PR-19 prep completion report with Day 1 verification and start updates
 Pilot clinic: Clinic Alpha (pseudonym only)
 Date: 2026-05-28
 Decision baseline: READY_FOR_LIMITED_PILOT_PREP
@@ -58,14 +58,14 @@ Not approved:
 Validation completed:
 1. git diff --check: PASS.
 2. npm run validate: PASS.
-3. safety scan for real identifiers, credential material, agreement attachment, and prohibited claim language: PASS.
+3. safety scan for real identifiers, credential material, signed-file attachment, and prohibited claim language: PASS.
 
 Safety scan scope:
 1. no real clinic name recorded
 2. no real owner or staff name recorded
 3. no real contact identifier pattern recorded
 4. no credential value pattern recorded
-5. no agreement attachment added
+5. no signed-file attachment added
 6. no prohibited claim language recorded
 
 ---
@@ -121,7 +121,42 @@ This does not mark the limited pilot as started.
 PR-20 validation:
 1. git diff --check: PASS.
 2. npm run validate: PASS.
-3. safety scan for real identifiers, credential material, agreement attachment, and prohibited claim language: PASS.
+3. safety scan for real identifiers, credential material, signed-file attachment, and prohibited claim language: PASS.
 
 Recommended next PR:
 - PR-21 Clinic Alpha Day 1 Fix Closure and Start Approval Recheck
+
+---
+
+## 8) PR-22 Day 1 Start Update
+
+PR-22 files created:
+1. CLINIC_ALPHA_DAY_1_START_LOG.md
+2. CLINIC_ALPHA_DAY_1_OPERATIONAL_STATUS.md
+3. CLINIC_ALPHA_DAY_1_AUDIT_BASELINE.md
+4. CLINIC_ALPHA_DAY_1_WORKFLOW_ACTIVATION.md
+5. CLINIC_ALPHA_DAY_1_OPERATOR_HANDOFF.md
+6. CLINIC_ALPHA_DAY_1_SUPPORT_WINDOW.md
+
+Start evidence:
+1. Start timestamp: 2026-05-28T08:53:41+07:00.
+2. Canonical staging URL: https://beauty.flowbiz.cloud.
+3. DNS, TCP, /api/live, and /api/ready: PASS.
+4. appEnv = staging and DB = flowbiz_beauty_staging: PASS.
+5. smoke:staging: PASS.
+6. demo login, HITL queue, and audit visibility: PASS.
+7. audit baseline established with 138 records scanned and 10 recent records visible.
+8. audit since start window shows 0 outbound actions, 0 real-send indicators, and 0 broad import indicators.
+
+PR-22 decision:
+- LIMITED_PILOT_DAY_1_STARTED
+
+Boundaries remain active:
+1. not production
+2. not mass rollout
+3. not autonomous AI operation
+4. safe-mode only
+5. selected workflow scope only
+
+Recommended next PR:
+- PR-23 Clinic Alpha Day 1 Monitoring and End-of-Day Review
