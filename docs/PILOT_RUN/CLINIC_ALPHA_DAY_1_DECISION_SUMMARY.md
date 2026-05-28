@@ -73,3 +73,27 @@ Validation completed:
 1. git diff --check: PASS.
 2. npm run validate: PASS.
 3. safety scan for real identifiers, credential material, signed-file attachment, and prohibited claim language: PASS.
+
+---
+
+## 6) PR-25 Limited Real Operation Decision Update
+
+PR-25 Day 2 input evidence:
+1. limited real operation scope started on canonical staging only
+2. selected workflow only (Review Request)
+3. real interactions processed within cap (8/10)
+4. review completion rate = 100%
+5. approve vs reject ratio = 5:3
+6. customer response rate on approved outbound = 60%
+7. owner continuation signal = positive
+8. willingness-to-pay signal = positive
+9. safety counters (bypass/autonomous/broadcast/import) = 0
+
+Applied decision rule:
+1. recurring real usage observed -> READY_FOR_7_DAY_VALUE_MEASUREMENT
+
+PR-25 decision:
+- READY_FOR_7_DAY_VALUE_MEASUREMENT
+
+Most important evaluation result:
+1. Clinic usage intent is positive for daily narrow-scope operation and 7-day value measurement.

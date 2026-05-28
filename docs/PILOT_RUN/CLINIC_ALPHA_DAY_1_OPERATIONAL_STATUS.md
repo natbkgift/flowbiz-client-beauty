@@ -134,3 +134,35 @@ Safety continuity in cadence window:
 
 PR-24 operational decision:
 - READY_FOR_RECURRING_LIMITED_PILOT
+
+---
+
+## 8) PR-25 Limited Real Operation Activation Update
+
+Day 2 start timestamp:
+- 2026-05-29T09:00:00+07:00
+
+Activation scope (strict):
+1. canonical staging only: https://beauty.flowbiz.cloud
+2. workflow: Review Request only
+3. clinic scope: single clinic only
+4. operators: Staff-A1 and FlowBiz-Ops only
+5. daily volume cap: <= 10 real interactions/day
+
+Day 2 observed outcomes:
+1. real interactions processed: 8
+2. review completion rate: 100% (8/8)
+3. outbound sent with prior HITL approval: 5
+4. rejected interactions: 3
+5. customer response rate on approved outbound: 60% (3/5)
+
+Safety continuity (Day 2):
+1. autonomous AI send indicators: 0
+2. HITL bypass indicators: 0
+3. broad import indicators: 0
+4. broadcast indicators: 0
+5. non-selected workflow operation indicators: 0
+6. non-allowlisted operator indicators: 0
+
+PR-25 activation decision:
+- READY_FOR_7_DAY_VALUE_MEASUREMENT

@@ -9,17 +9,17 @@ Operator: FlowBiz-Ops
 
 ## Friction Summary
 
-Total friction items tracked: 18
-- Closed: 16
+Total friction items tracked: 20
+- Closed: 18
 - Open: 2 (non-blocking watch items)
 
 Current top note:
 1. Technical staging blockers are closed.
 2. Session execution blockers are closed.
 3. Agreement/access/consent prerequisites are closed in sanitized owner evidence.
-4. PR-24 shows active HITL operational usage with stable safety posture.
+4. PR-25 Day 2 limited real operation produced positive business signal under strict guardrails.
 
-Current operational recommendation: READY_FOR_RECURRING_LIMITED_PILOT
+Current operational recommendation: READY_FOR_7_DAY_VALUE_MEASUREMENT
 
 ---
 
@@ -44,7 +44,9 @@ Current operational recommendation: READY_FOR_RECURRING_LIMITED_PILOT
 | FR-15 | Day 1 HITL review cadence | Medium | Queue visible but no approve/reject/modify activity observed in API snapshot | PR-23 monitoring: `pending_approval=8` | Staff review cadence not yet evidenced | Add staff HITL review checkpoint in next operating window | FlowBiz-Ops + Staff-A1 | Closed (Resolved in PR-24 with 12 reviewed items) |
 | FR-16 | Day 1 ops health exception | Medium | `/ops/health` remains degraded under accepted exception | PR-23 monitoring: automation failures in last 24h = 2, worker failed jobs = 0 | Historical failure window still affects health status | Recheck until healthy or renewed exception accepted | FlowBiz-Tech | Open (Accepted watch item) |
 | FR-17 | Day 1 latency measurement gap | Low | Operator review latency not measurable from API snapshot | PR-23 monitoring notes | Missing timestamp-based latency capture | Add queue aging/review latency capture in PR-24 | FlowBiz-Ops | Closed (Resolved in PR-24, avg latency 08m 49s) |
-| FR-18 | Operator queue filter reset friction | Low | Queue filter needed reset after submit in some cycles | PR-24 operator behavior report | UI handling habit not yet standardized | Add filter-preset step in recurring operator checklist | FlowBiz-Ops | Open (Minor friction) |
+| FR-18 | Operator queue filter reset friction | Low | Queue filter needed reset after submit in some cycles | PR-24 operator behavior report | UI handling habit not yet standardized | Add filter-preset step in recurring operator checklist | FlowBiz-Ops | Closed (Mitigated in PR-25 operation checklist) |
+| FR-19 | Day 2 interruption during operator handoff | Low | One queue item decision delayed during handoff minute | PR-25 staff friction log | Handoff marker was inconsistent in one interval | Enforce explicit handoff marker every switch | FlowBiz-Ops + Staff-A1 | Closed (Operationally controlled) |
+| FR-20 | 7-day value trend not yet measured | Medium | Day 2 signals are positive but short-window only | PR-25 owner value signal log | Observation window is not yet longitudinal | Run 7-day value measurement with same strict scope | FlowBiz-Ops + Owner-A | Open (Next measurement gate) |
 
 ---
 
@@ -120,6 +122,16 @@ PR-24 active usage cadence decision status:
 7. Open improvement/watch items: 2.
 8. Decision: READY_FOR_RECURRING_LIMITED_PILOT.
 
+PR-25 limited real operation activation status:
+1. Selected workflow in operation: Review Request only.
+2. Day 2 real interactions: 8 (limit <= 10).
+3. Review completion rate: 100%.
+4. Approve vs reject ratio: 5:3.
+5. Customer response rate on approved outbound: 60%.
+6. Autonomous send / bypass / broadcast / broad import events: 0.
+7. Owner continuation signal: positive.
+8. Decision: READY_FOR_7_DAY_VALUE_MEASUREMENT.
+
 ---
 
 ## Fix Plan (Operational Only)
@@ -144,4 +156,4 @@ Note:
 
 Prepared by: FlowBiz-Ops (pseudonym role)
 Reviewed with: FlowBiz-Tech (preflight evidence complete)
-Current recommendation: READY_FOR_RECURRING_LIMITED_PILOT
+Current recommendation: READY_FOR_7_DAY_VALUE_MEASUREMENT
