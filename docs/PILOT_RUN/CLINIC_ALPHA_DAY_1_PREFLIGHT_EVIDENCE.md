@@ -143,3 +143,49 @@ Fix required before Day 1 start log:
 
 Current evidence outcome:
 - GO_WITH_FIXES
+
+---
+
+## 9) PR-21 Recheck Evidence
+
+Recheck time:
+- 2026-05-28T08:36:13+07:00
+
+Canonical staging checks:
+
+| Check | Evidence | Result |
+|---|---|---|
+| DNS canonical host resolves | Host resolved with 1 address record | PASS |
+| TCP 443 reachable | TCP check succeeded | PASS |
+| GET /api/live | HTTP 200 | PASS |
+| GET /api/ready | HTTP 200 | PASS |
+| App environment | appEnv = staging | PASS |
+| Database target | database name = flowbiz_beauty_staging | PASS |
+| npm run smoke:staging | 8 checks recorded, PASS | PASS |
+| demo login | HTTP 200 | PASS |
+| HITL queue | HTTP 200 with 8 visible records | PASS |
+| audit log | HTTP 200 with visible records | PASS |
+
+Audit since fix window:
+1. new outbound actions: 0
+2. new real-send indicators: 0
+3. broad import indicators: 0
+
+Operational health:
+1. /ops/health: HTTP 200
+2. systemStatus: degraded
+3. automation failures in last 24 hours: 2
+4. worker failed jobs: 0
+5. recent visible failure rows: 0
+
+Workflow evidence:
+1. New Lead Welcome: present
+2. Uncontacted Lead Alert: present
+3. No-Show Recovery: present
+4. Review Request: present
+5. Botox/Filler Repeat Reminder: present by mapped Botox Cycle Reminder + Filler Cycle Reminder
+6. Daily Marketing Reminder: extra demo workflow, excluded from Day 1 operating path
+7. Lead Qualification Nurture: extra demo workflow, excluded from Day 1 operating path
+
+PR-21 evidence outcome:
+- READY_TO_START_LIMITED_PILOT_DAY_1_WITH_ACCEPTED_EXCEPTIONS

@@ -89,3 +89,40 @@ Day 1 Go/No-Go status:
 - GO_WITH_FIXES
 
 Next status may become READY_TO_START_LIMITED_PILOT_DAY_1 only after required fixes are closed and evidence is re-run.
+
+---
+
+## 7) PR-21 Fix Closure Recheck
+
+PR-21 fix closure status:
+
+| Fix ID | Result |
+|---|---|
+| FIX-01 | CLOSED_WITH_ACCEPTED_EXCEPTION |
+| FIX-02 | CLOSED_WITH_ACCEPTED_EXCEPTION |
+| FIX-03 | CLOSED |
+| FIX-04 | CLOSED |
+| FIX-05 | CLOSED |
+
+Recheck evidence:
+1. Canonical DNS, TCP, /api/live, and /api/ready passed.
+2. /api/ready confirmed appEnv = staging.
+3. /api/ready confirmed database = flowbiz_beauty_staging.
+4. npm run smoke:staging passed.
+5. Demo login, HITL queue, and audit visibility passed.
+6. Audit since the PR-21 fix window showed 0 outbound actions.
+7. Audit since the PR-21 fix window showed 0 real-send indicators.
+8. Audit since the PR-21 fix window showed 0 broad import indicators.
+
+Accepted exceptions:
+1. Operational health remains degraded because last-24-hour automation failure count has not aged out; worker failed jobs and recent visible failure rows are 0.
+2. Extra demo workflows remain active but are excluded from Clinic Alpha Day 1 operating path.
+3. Botox/Filler Repeat Reminder is represented by separate Botox Cycle Reminder and Filler Cycle Reminder flows.
+
+Applied PR-21 rule:
+- non-blocking exceptions accepted
+
+PR-21 Day 1 decision:
+- READY_TO_START_LIMITED_PILOT_DAY_1_WITH_ACCEPTED_EXCEPTIONS
+
+This remains a start approval recheck only. The limited pilot is not marked as started in PR-21.

@@ -75,3 +75,37 @@ Escalate to BLOCKED if:
 
 Risk status:
 - GO_WITH_FIXES
+
+---
+
+## 7) PR-21 Risk Recheck
+
+PR-21 risk decision:
+- READY_TO_START_LIMITED_PILOT_DAY_1_WITH_ACCEPTED_EXCEPTIONS
+
+Recheck summary:
+1. Core staging health passed.
+2. Smoke staging passed.
+3. Demo login, HITL queue, and audit visibility passed.
+4. Audit since fix window shows 0 outbound actions.
+5. Audit since fix window shows 0 real-send indicators.
+6. Audit since fix window shows 0 broad import indicators.
+
+Open risks converted to accepted exceptions:
+
+| Risk ID | PR-21 Status | Exception Handling |
+|---|---|---|
+| RISK-01 | ACCEPTED_NON_BLOCKING_EXCEPTION | Operational health exception recorded; recheck required before start log |
+| RISK-02 | ACCEPTED_NON_BLOCKING_EXCEPTION | Extra demo workflows excluded from Day 1 operating path |
+| RISK-03 | CLOSED | Repeat reminder mapping note created |
+| RISK-04 | CONTROLLED | Audit review uses PR-21 fix window |
+| RISK-05 | CONTROLLED | Safe mode evidence relies on smoke flags and no outbound actions; staging ops path must reconfirm before start log |
+
+Residual watch items:
+1. Recheck /ops/health in PR-22 before start log.
+2. Confirm extra demo workflows are not used in Day 1 operating steps.
+3. Keep audit window filtering active.
+4. Keep real send and AI auto-send disabled unless a separate approved window exists.
+
+PR-21 risk status:
+- READY_TO_START_LIMITED_PILOT_DAY_1_WITH_ACCEPTED_EXCEPTIONS
