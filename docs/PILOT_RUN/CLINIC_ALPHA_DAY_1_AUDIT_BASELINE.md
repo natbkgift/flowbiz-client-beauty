@@ -57,3 +57,24 @@ No action performed:
 
 Audit baseline status:
 - BASELINE_ESTABLISHED
+
+---
+
+## 6) PR-23 Monitoring Baseline Update
+
+Monitoring snapshot timestamp:
+- 2026-05-28T09:36:23+07:00
+
+Updated audit evidence:
+1. recent audit records visible: 10
+2. baseline scanned records: 139
+3. records since Day 1 start window: 2
+4. records since monitoring snapshot window: 1
+5. outbound actions since Day 1 start: 0
+6. real-send indicators since Day 1 start: 0
+7. broad import indicators since Day 1 start: 0
+8. HITL bypass indicators since Day 1 start: 0
+9. broadcast indicators since Day 1 start: 0
+
+Updated audit baseline status:
+- CONTINUITY_CONFIRMED

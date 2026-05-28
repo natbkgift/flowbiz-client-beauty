@@ -75,3 +75,29 @@ Day 1 operations exclude:
 
 Current Day 1 operational decision:
 - LIMITED_PILOT_DAY_1_STARTED
+
+---
+
+## 6) PR-23 Monitoring Update
+
+Monitoring snapshot timestamp:
+- 2026-05-28T09:36:23+07:00
+
+Monitoring results:
+1. staging readiness: PASS
+2. smoke:staging: PASS
+3. demo login: PASS
+4. HITL queue visibility: PASS
+5. audit visibility: PASS
+6. outbound actions since start: 0
+7. real-send indicators since start: 0
+8. broad import indicators since start: 0
+9. safety events observed: 0
+
+Operational watch items:
+1. HITL queue remains pending with no review decisions observed in the API snapshot.
+2. /ops/health remains degraded under the accepted exception.
+3. Excluded demo workflows remain visible and must stay outside the operating path.
+
+PR-23 operational decision:
+- GO_WITH_IMPROVEMENTS

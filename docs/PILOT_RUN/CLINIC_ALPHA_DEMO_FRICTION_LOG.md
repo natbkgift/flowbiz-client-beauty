@@ -9,16 +9,17 @@ Operator: FlowBiz-Ops
 
 ## Friction Summary
 
-Total friction items tracked: 14
+Total friction items tracked: 17
 - Closed: 14
-- Open: 0 (no blocking friction)
+- Open: 3 (Day 1 watch items; non-blocking safety status)
 
 Current top note:
 1. Technical staging blockers are closed.
 2. Session execution blockers are closed.
 3. Agreement/access/consent prerequisites are closed in sanitized owner evidence.
+4. Day 1 monitoring shows safe governance stable, with operational improvements still needed.
 
-Current operational recommendation: READY_FOR_LIMITED_PILOT_PREP
+Current operational recommendation: GO_WITH_IMPROVEMENTS
 
 ---
 
@@ -32,14 +33,17 @@ Current operational recommendation: READY_FOR_LIMITED_PILOT_PREP
 | FR-04 | API live endpoint | High | Previously unreachable | Canonical `/api/live` is HTTP 200 | Wrong host used in PR-13 | Recheck on canonical host | FlowBiz-Tech | Closed |
 | FR-05 | API ready endpoint | High | Previously unreachable | Canonical `/api/ready` is HTTP 200 | Wrong host used in PR-13 | Recheck on canonical host | FlowBiz-Tech | Closed |
 | FR-06 | Smoke live mode | High | Previously fetch-failed | `npm run smoke:staging` PASS (8 checks) on canonical host | Wrong host used in PR-13 | Keep canonical env vars pinned | FlowBiz-Tech | Closed |
-| FR-07 | Demo login verification | Medium | Previously blocked | Login on canonical host is HTTP 200 with token | Wrong host used in PR-13 | Keep canonical env vars pinned | FlowBiz-Ops | Closed |
+| FR-07 | Demo login verification | Medium | Previously blocked | Login on canonical host is HTTP 200 with authenticated session | Wrong host used in PR-13 | Keep canonical env vars pinned | FlowBiz-Ops | Closed |
 | FR-08 | HITL queue visibility | Medium | Previously blocked | Authenticated queue endpoint is HTTP 200 with pending records | Wrong host used in PR-13 | Keep canonical env vars pinned | FlowBiz-Ops | Closed |
 | FR-09 | Audit log visibility | Medium | Previously blocked | Authenticated audit endpoint is HTTP 200 with records | Wrong host used in PR-13 | Keep canonical env vars pinned | FlowBiz-Ops | Closed |
 | FR-10 | Readiness payload assertions | Medium | Previously blocked | `appEnv=staging`, DB `flowbiz_beauty_staging` confirmed | Wrong host used in PR-13 | Keep readiness assertion in preflight checklist | FlowBiz-Tech | Closed |
 | FR-11 | Workflow-name payload visibility | Low | Queue API payload does not expose explicit workflow-name field | Queue item schema lacks workflow label field | API shape limitation | Verify workflow labels in UI during Day 0 run-through | FlowBiz-Ops | Closed (Non-blocking accepted) |
-| FR-12 | Written agreement pending | Medium | Owner-A has conditional proceed but no signed agreement yet | PR-18 evidence register: `agreement_received=yes` | Commercial/legal prerequisite closure completed | Maintain signed artifact outside repo only | FlowBiz-Ops + Owner-A | Closed |
-| FR-13 | LINE OA access handover pending | Medium | Admin access timeline not finalized | PR-18 evidence register: `access_confirmed=yes` | Owner-side setup completed | Keep credentials in external secret storage only | FlowBiz-Ops + Owner-A | Closed |
+| FR-12 | Written agreement pending | Medium | Owner-A has conditional proceed but no written agreement artifact confirmed yet | PR-18 evidence register: `agreement_received=yes` | Commercial/legal prerequisite closure completed | Maintain written artifact outside repo only | FlowBiz-Ops + Owner-A | Closed |
+| FR-13 | LINE OA access handover pending | Medium | Admin access timeline not finalized | PR-18 evidence register: `access_confirmed=yes` | Owner-side setup completed | Keep credential material in external protected storage only | FlowBiz-Ops + Owner-A | Closed |
 | FR-14 | Consent/data intake gate pending | Medium | Consent checkpoint tied to agreement flow not yet closed | PR-18 evidence register: `confirmation_received=yes` | Closure completed by owner confirmation | Keep legal review acknowledgment active | FlowBiz-Ops | Closed |
+| FR-15 | Day 1 HITL review cadence | Medium | Queue visible but no approve/reject/modify activity observed in API snapshot | PR-23 monitoring: `pending_approval=8` | Staff review cadence not yet evidenced | Add staff HITL review checkpoint in next operating window | FlowBiz-Ops + Staff-A1 | Open (Improvement) |
+| FR-16 | Day 1 ops health exception | Medium | `/ops/health` remains degraded under accepted exception | PR-23 monitoring: automation failures in last 24h = 2, worker failed jobs = 0 | Historical failure window still affects health status | Recheck until healthy or renewed exception accepted | FlowBiz-Tech | Open (Accepted watch item) |
+| FR-17 | Day 1 latency measurement gap | Low | Operator review latency not measurable from API snapshot | PR-23 monitoring notes | Missing timestamp-based latency capture | Add queue aging/review latency capture in PR-24 | FlowBiz-Ops | Open (Improvement) |
 
 ---
 
@@ -97,14 +101,22 @@ PR-18 closure decision status:
 2. Readiness outcome: READY_FOR_LIMITED_PILOT_PREP.
 3. Blocking friction count: 0.
 
+PR-23 Day 1 monitoring decision status:
+1. Day 1 operational status: LIMITED_PILOT_DAY_1_STARTED.
+2. Monitoring decision: GO_WITH_IMPROVEMENTS.
+3. Safety event count: 0.
+4. Outbound actions since Day 1 start: 0.
+5. Broad import indicators since Day 1 start: 0.
+6. Open improvement/watch items: 3.
+
 ---
 
 ## Fix Plan (Operational Only)
 
 1. Keep canonical URL pinned to `https://beauty.flowbiz.cloud` for pilot preflight.
 2. Continue to keep real LINE and real AI generation disabled in Day 0 demo mode.
-3. Preserve signed agreement outside repo only.
-4. Keep LINE OA credentials in external secret storage only.
+3. Preserve written agreement artifact outside repo only.
+4. Keep LINE OA credential material in external protected storage only.
 5. Keep consent/data handling acknowledgements active during limited pilot prep.
 
 Note:
@@ -112,6 +124,7 @@ Note:
 - No runtime code changes were performed in PR-16.
 - No runtime code changes were performed in PR-17.
 - No runtime code changes were performed in PR-18.
+- No runtime code changes were performed in PR-23.
 - If a runtime defect appears in Day 0 execution, raise separate PR Summary for runtime blocker handling.
 
 ---
@@ -120,4 +133,4 @@ Note:
 
 Prepared by: FlowBiz-Ops (pseudonym role)
 Reviewed with: FlowBiz-Tech (preflight evidence complete)
-Current recommendation: READY_FOR_LIMITED_PILOT_PREP
+Current recommendation: GO_WITH_IMPROVEMENTS
