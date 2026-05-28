@@ -9,7 +9,7 @@ const {
   normalizeSectionKey
 } = require('../apps/api/src/modules/clinic-website/validation');
 
-async function createClinicFixture(pool, uniqueId) {
+async function createClinicFixture(uniqueId) {
   const session = await signup({
     clinicName: `Schema Clinic ${uniqueId}`,
     ownerName: 'Schema Owner',
