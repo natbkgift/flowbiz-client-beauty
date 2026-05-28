@@ -76,7 +76,7 @@ graph TD
    * ตรวจสอบว่าผู้ใช้มีสิทธิ์เข้าถึง `clinic_id` นั้นจริงตามความสัมพันธ์ในตาราง `clinic_users`
    * ป้องกันการสืบค้น ปรับปรุง หรือทำรายการใดๆ ข้ามไปคลินิกอื่น
 3. **Super Admin** เท่านั้นที่มีสิทธิ์ดูข้อมูลข้ามคลินิกและใช้ API สรุปภาพรวมหรือรายงานระดับ Franchise/Platform ได้
-4. การสร้าง **Clinic Slug** จะต้องมีกระบวนการตรวจสอบค่าให้ Unique เสมอ และต้องห้ามใช้คำที่ตรงกับ Reserved Routes (เช่น `admin`, `api`, `live`, `ready`, `health`, `sitemap.xml`, `robots.txt`, `public.css`, `styles.css`)
+4. การสร้าง **Clinic Slug** จะต้องมีกระบวนการตรวจสอบค่าให้ Unique เสมอ และต้องห้ามใช้คำที่ตรงกับ Reserved Routes (เช่น `admin`, `api`, `auth`, `tenant-context`, `live`, `ready`, `health`, `sitemap.xml`, `robots.txt`, `public.css`, `styles.css`)
 5. คลินิกที่มีสถานะปิดชั่วคราวหรือไม่ได้เปิดใช้งาน (**Inactive Clinic**) จะต้องไม่แสดงหน้าเว็บของคลินิกแก่บุคคลทั่วไป โดยระบบจะแสดงหน้าแจ้งเตือนความไม่พร้อมใช้งานแทน
 
 ---

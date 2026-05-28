@@ -3,7 +3,7 @@
 ## Current Stack
 * **Runtime**: Node.js v22+
 * **Backend**: Node HTTP (Vanilla Router ใน `apps/api/src/server.js`), `pg` Pool เชื่อมต่อฐานข้อมูล PostgreSQL v16
-* **Frontend**: React v19, servirce serving ผ่าน `apps/web/src/server.js` พร้อมคอมไพล์บันเดิลด้วย `esbuild`
+* **Frontend**: React v19, service serving ผ่าน `apps/web/src/server.js` พร้อมคอมไพล์บันเดิลด้วย `esbuild`
 * **Styling**: Vanilla CSS (`styles.css` สำหรับหลังบ้าน, `public.css` สำหรับหน้าบ้าน)
 * **Testing**: Node.js built-in test runner, รันด้วยสคริปต์ `npm test` และตัวตรวจสอบความถูกต้องของโครงสร้าง `npm run validate`
 
