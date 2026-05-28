@@ -50,3 +50,19 @@ Seven-day aggregation (Day 1 to Day 7):
 
 PR-26 outcome:
 - READY_FOR_PAID_PILOT_DISCUSSION
+
+---
+
+## 4) PR-27 Commercial Metrics Update
+
+Commercial business metrics:
+1. estimated monthly value: THB 14,300
+2. estimated support hours: 3.5 hours/month
+3. estimated infra cost: THB 900/month
+4. estimated operator overhead: 4.0 hours/month
+5. projected gross margin: 55.7%
+6. retention likelihood: 78%
+7. expansion likelihood: 35%
+
+PR-27 commercial decision:
+- READY_FOR_PAID_PILOT

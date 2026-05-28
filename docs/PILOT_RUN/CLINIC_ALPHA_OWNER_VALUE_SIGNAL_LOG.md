@@ -47,3 +47,15 @@ Updated owner classification:
 Commercial signal:
 1. pricing discussion requested: yes
 2. renewal intent proxy: positive
+
+---
+
+## 5) PR-27 Paid Discussion Signal Update
+
+PR-27 discussion outcomes:
+1. owner confirms willingness to pay in comfort pricing band.
+2. owner confirms workflow value remains clear after novelty window.
+3. owner requests paid continuation with same strict scope.
+
+Updated commercial classification:
+- READY_FOR_PAID_PILOT

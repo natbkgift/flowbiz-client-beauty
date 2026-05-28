@@ -37,3 +37,19 @@ Reason summary:
 Immediate next operational step:
 1. open paid pilot discussion with same strict workflow scope.
 2. keep existing guardrails unchanged while commercial terms are reviewed.
+
+---
+
+## 4) PR-27 Paid Pilot Discussion Decision Update
+
+Commercial validation result:
+1. owner accepts paid continuation direction at proposed comfort-band pricing.
+2. support burden remains commercially acceptable.
+3. workflow scope remains locked to Review Request.
+
+Applied PR-27 decision rule:
+1. owner agrees to paid continuation -> READY_FOR_PAID_PILOT
+
+PR-27 decision:
+- READY_FOR_PAID_PILOT
+
