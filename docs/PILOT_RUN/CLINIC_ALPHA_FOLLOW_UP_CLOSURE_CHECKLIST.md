@@ -1,6 +1,6 @@
-# Clinic Alpha — Follow-Up Closure Checklist (PR-16)
+# Clinic Alpha — Follow-Up Closure Checklist (PR-18)
 
-Document type: POST-PHASE 10 PR-16 blocker closure pack
+Document type: POST-PHASE 10 PR-18 blocker closure pack
 Pilot clinic: Clinic Alpha (pseudonym only)
 Date: 2026-05-28
 Status baseline from PR-15: DEMO_FOLLOW_UP_NEEDED
@@ -16,7 +16,7 @@ Blocking scope:
 2. LINE OA access confirmation
 3. consent/data handling confirmation
 
-Current pack status: IN_PROGRESS
+Current pack status: CLOSED
 
 ---
 
@@ -24,9 +24,9 @@ Current pack status: IN_PROGRESS
 
 | Blocker ID | Blocker | Owner | Evidence Required | Status | Due Date (placeholder) | Decision Impact | Stop Condition |
 |---|---|---|---|---|---|---|---|
-| BL-01 | Written pilot agreement pending | Owner-A + FlowBiz-Ops | Signed agreement record (outside repo), version/date, sign authority confirmed | PENDING_OWNER_ACTION | YYYY-MM-DD | If open -> cannot move to READY_FOR_LIMITED_PILOT_PREP | If agreement terms are disputed or legal review requests pause |
-| BL-02 | LINE OA access pending | Owner-A + FlowBiz-Tech | Admin access confirmation note, webhook URL set (placeholder), controlled test-user plan approved, no credential in repo attestation | PENDING_OWNER_ACTION | YYYY-MM-DD | If open -> gate remains PENDING_OWNER_ACTION | If access owner unknown, or environment is not staging-safe |
-| BL-03 | Consent/data handling gate pending | FlowBiz-Ops + Owner-A | Signed data handling confirmation checklist, allowed/disallowed fields confirmed, retention/deletion-export path confirmed | PENDING_OWNER_ACTION | YYYY-MM-DD | If open -> gate remains PENDING_OWNER_ACTION | If consent basis is unclear for selected outreach workflows |
+| BL-01 | Written pilot agreement confirmation | Owner-A + FlowBiz-Ops | Signed agreement metadata only; no signed file in repo | CLOSED | 2026-05-28 | Closed -> contributes to READY_FOR_LIMITED_PILOT_PREP | If agreement terms are disputed or legal review requests pause |
+| BL-02 | LINE OA access confirmation | Owner-A + FlowBiz-Tech | Admin access confirmation note, controlled test-user plan approved, no credential in repo attestation | CLOSED | 2026-05-28 | Closed -> contributes to READY_FOR_LIMITED_PILOT_PREP | If access owner unknown, or environment is not staging-safe |
+| BL-03 | Consent/data handling confirmation | FlowBiz-Ops + Owner-A | Data handling confirmation metadata only; allowed/disallowed fields confirmed, retention/deletion-export path acknowledged | CLOSED | 2026-05-28 | Closed -> contributes to READY_FOR_LIMITED_PILOT_PREP | If consent basis is unclear for selected outreach workflows |
 
 ---
 
@@ -36,7 +36,7 @@ Current pack status: IN_PROGRESS
 2. Any BL item pending owner/business action -> set decision to PENDING_OWNER_ACTION.
 3. Any safety/data/access red flag -> set decision to BLOCKED.
 
-Current decision from this checklist: PENDING_OWNER_ACTION
+Current decision from this checklist: READY_FOR_LIMITED_PILOT_PREP
 
 ---
 
@@ -53,4 +53,4 @@ Current decision from this checklist: PENDING_OWNER_ACTION
 
 - Prepared by: FlowBiz-Ops
 - Reviewed by: FlowBiz-Tech
-- Owner acknowledgement: Pending (Owner-A)
+- Owner acknowledgement: Completed (Owner-A; sanitized role only)

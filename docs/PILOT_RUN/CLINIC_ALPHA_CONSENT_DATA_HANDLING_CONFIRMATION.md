@@ -1,9 +1,9 @@
-# Clinic Alpha — Consent and Data Handling Confirmation (PR-16)
+# Clinic Alpha — Consent and Data Handling Confirmation (PR-18)
 
 Document type: Consent/data handling confirmation checklist for limited pilot preparation
 Pilot clinic: Clinic Alpha (pseudonym only)
 Date: 2026-05-28
-Status: PENDING_OWNER_ACTION
+Status: CLOSED
 
 ---
 
@@ -12,7 +12,7 @@ Status: PENDING_OWNER_ACTION
 Current approved mode for follow-up stage:
 1. Demo/fake data first.
 2. Clinic-approved minimal sample data only when explicitly confirmed.
-3. No broad real customer import in PR-16 closure stage.
+3. No broad real customer import in PR-18 limited pilot prep stage.
 
 Current mode status: DEMO_OR_MINIMUM_SAMPLE_ONLY
 
@@ -54,10 +54,10 @@ If any disallowed field is requested, status must move to BLOCKED until legal/ow
 
 | Consent ID | Requirement | Owner | Evidence Required | Status |
 |---|---|---|---|---|
-| CONSENT-01 | Marketing/contact consent basis acknowledged for selected workflows | Owner-A + FlowBiz-Ops | Consent basis note (outside repo record) | PENDING_OWNER_ACTION |
-| CONSENT-02 | Channel consent logic acknowledged (LINE/phone/email by channel) | Owner-A + FlowBiz-Ops | Operator checklist sign-off | PENDING_OWNER_ACTION |
-| CONSENT-03 | AI processing notice acknowledged (draft-only + HITL) | Owner-A + Staff-A1 | Session note acknowledgment | PENDING_OWNER_ACTION |
-| CONSENT-04 | Staff role/access scope confirmed for pilot data | Owner-A + FlowBiz-Ops | Role map note | PENDING_OWNER_ACTION |
+| CONSENT-01 | Marketing/contact consent basis acknowledged for selected workflows | Owner-A + FlowBiz-Ops | Consent basis note (outside repo record) | PASS |
+| CONSENT-02 | Channel consent logic acknowledged by channel | Owner-A + FlowBiz-Ops | Operator checklist sign-off | PASS |
+| CONSENT-03 | AI processing notice acknowledged (draft-only + HITL) | Owner-A + Staff-A1 | Session note acknowledgment | PASS |
+| CONSENT-04 | Staff role/access scope confirmed for pilot data | Owner-A + FlowBiz-Ops | Role map note | PASS |
 
 ---
 
@@ -68,7 +68,7 @@ Required closure notes before pilot prep start:
 2. Identify requester authority and approver role.
 3. Record completion timestamp and operator.
 
-Current status: PENDING_OWNER_ACTION
+Current status: ACKNOWLEDGED
 
 ---
 
@@ -79,7 +79,7 @@ Operational expectation:
 2. Avoid unnecessary raw PII in audit metadata.
 3. Align retention window with owner/legal-reviewed policy before real data usage.
 
-Current status: PENDING_OWNER_ACTION
+Current status: ACKNOWLEDGED
 
 ---
 
@@ -94,14 +94,14 @@ Before enabling limited real operational data, legal/owner review should confirm
 4. deletion/export handling
 5. role/access approvals
 
-Current legal-review status: PENDING_OWNER_ACTION
+Current legal-review status: ACKNOWLEDGED_REQUIRED_BEFORE_EXPANSION
 
 ---
 
 ## 8) Decision Impact
 
-- Complete all consent/data items with owner confirmation -> contributes to READY_FOR_LIMITED_PILOT_PREP.
-- Owner/business confirmations still pending -> keep decision PENDING_OWNER_ACTION.
+- Consent/data items are confirmed in sanitized PR-18 evidence and contribute to READY_FOR_LIMITED_PILOT_PREP.
+- If owner/business confirmations are revoked or disputed -> re-evaluate decision.
 - Any consent/data safety ambiguity -> decision BLOCKED.
 
 ---
@@ -110,4 +110,4 @@ Current legal-review status: PENDING_OWNER_ACTION
 
 - Prepared by: FlowBiz-Ops
 - Reviewed by: FlowBiz-Tech
-- Owner confirmation: Pending (Owner-A)
+- Owner confirmation: Completed (Owner-A; sanitized role only)

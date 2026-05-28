@@ -1,4 +1,4 @@
-# Clinic Alpha — Demo Friction Log (PR-17 Owner Approval Execution)
+# Clinic Alpha — Demo Friction Log (PR-18 Owner Action Closure)
 
 Document type: Owner-action friction and closure tracking
 Pilot clinic: Clinic Alpha (pseudonym)
@@ -10,21 +10,21 @@ Operator: FlowBiz-Ops
 ## Friction Summary
 
 Total friction items tracked: 14
-- Closed: 11
-- Open: 3 (business/operational)
+- Closed: 14
+- Open: 0 (no blocking friction)
 
 Current top note:
 1. Technical staging blockers are closed.
 2. Session execution blockers are closed.
-3. Remaining open items are agreement/access/consent prerequisites before limited pilot start.
+3. Agreement/access/consent prerequisites are closed in sanitized owner evidence.
 
-Current operational recommendation: PENDING_OWNER_ACTION
+Current operational recommendation: READY_FOR_LIMITED_PILOT_PREP
 
 ---
 
 ## Detailed Friction Log
 
-| ID | Area | Severity | Symptom | Evidence (PR-17) | Probable Cause | Immediate Mitigation | Owner | Status |
+| ID | Area | Severity | Symptom | Evidence (PR-18) | Probable Cause | Immediate Mitigation | Owner | Status |
 |---|---|---|---|---|---|---|---|---|
 | FR-01 | Canonical URL ambiguity | High | Two candidate hosts were in use | `beauty.flowbiz.cloud` resolved; `staging.flowbiz.io` did not | Historical command drift | Pin canonical URL in pilot runbook | FlowBiz-Tech | Closed |
 | FR-02 | Staging DNS (wrong host) | High | `staging.flowbiz.io` unresolved | `Resolve-DnsName` failed | Wrong/deprecated host for this flow | Use canonical host only | FlowBiz-Tech | Closed |
@@ -36,14 +36,14 @@ Current operational recommendation: PENDING_OWNER_ACTION
 | FR-08 | HITL queue visibility | Medium | Previously blocked | Authenticated queue endpoint is HTTP 200 with pending records | Wrong host used in PR-13 | Keep canonical env vars pinned | FlowBiz-Ops | Closed |
 | FR-09 | Audit log visibility | Medium | Previously blocked | Authenticated audit endpoint is HTTP 200 with records | Wrong host used in PR-13 | Keep canonical env vars pinned | FlowBiz-Ops | Closed |
 | FR-10 | Readiness payload assertions | Medium | Previously blocked | `appEnv=staging`, DB `flowbiz_beauty_staging` confirmed | Wrong host used in PR-13 | Keep readiness assertion in preflight checklist | FlowBiz-Tech | Closed |
-| FR-11 | Workflow-name payload visibility | Low | Queue API payload does not expose explicit workflow-name field | Queue item schema lacks workflow label field | API shape limitation | Verify workflow labels in UI during Day 0 run-through | FlowBiz-Ops | Open (Non-blocking) |
-| FR-12 | Written agreement pending | Medium | Owner-A has conditional proceed but no signed agreement yet | PR-17 evidence register: `agreement_received=no` | Commercial/legal prerequisite not closed | Send agreement pack and secure sign date | FlowBiz-Ops + Owner-A | Open (Blocking limited pilot start) |
-| FR-13 | LINE OA access handover pending | Medium | Admin access timeline not finalized | PR-17 evidence register: `access_confirmed=no` | External dependency on owner-side setup | Confirm handover owner and date | FlowBiz-Ops + Owner-A | Open (Blocking limited pilot start) |
-| FR-14 | Consent/data intake gate pending | Medium | Consent checkpoint tied to agreement flow not yet closed | PR-17 evidence register: `confirmation_received=no` | Sequence dependency | Close consent form after agreement confirmation | FlowBiz-Ops | Open (Blocking limited pilot start) |
+| FR-11 | Workflow-name payload visibility | Low | Queue API payload does not expose explicit workflow-name field | Queue item schema lacks workflow label field | API shape limitation | Verify workflow labels in UI during Day 0 run-through | FlowBiz-Ops | Closed (Non-blocking accepted) |
+| FR-12 | Written agreement pending | Medium | Owner-A has conditional proceed but no signed agreement yet | PR-18 evidence register: `agreement_received=yes` | Commercial/legal prerequisite closure completed | Maintain signed artifact outside repo only | FlowBiz-Ops + Owner-A | Closed |
+| FR-13 | LINE OA access handover pending | Medium | Admin access timeline not finalized | PR-18 evidence register: `access_confirmed=yes` | Owner-side setup completed | Keep credentials in external secret storage only | FlowBiz-Ops + Owner-A | Closed |
+| FR-14 | Consent/data intake gate pending | Medium | Consent checkpoint tied to agreement flow not yet closed | PR-18 evidence register: `confirmation_received=yes` | Closure completed by owner confirmation | Keep legal review acknowledgment active | FlowBiz-Ops | Closed |
 
 ---
 
-## Evidence Assets Status (PR-17)
+## Evidence Assets Status (PR-18)
 
 | Asset ID | Required Asset | Current State | Blocking? | Owner |
 |---|---|---|---|---|
@@ -57,9 +57,9 @@ Current operational recommendation: PENDING_OWNER_ACTION
 | MA-08 | HITL queue visible proof | Present | No | FlowBiz-Ops |
 | MA-09 | audit log visible proof | Present | No | FlowBiz-Ops |
 | MA-10 | selected workflows visible proof (5 workflows) | Partial (operator note + queue evidence; no explicit workflow-name field) | No | FlowBiz-Ops |
-| MA-11 | Written pilot agreement signed | Pending (sanitized record only) | Yes | Owner-A + FlowBiz-Ops |
-| MA-12 | LINE OA admin access handover confirmed | Pending (sanitized record only) | Yes | Owner-A + FlowBiz-Ops |
-| MA-13 | Consent/data handling gate closed | Pending (sanitized record only) | Yes | FlowBiz-Ops |
+| MA-11 | Written pilot agreement signed | Present (sanitized metadata only) | No | Owner-A + FlowBiz-Ops |
+| MA-12 | LINE OA admin access handover confirmed | Present (sanitized metadata only) | No | Owner-A + FlowBiz-Ops |
+| MA-13 | Consent/data handling gate closed | Present (sanitized metadata only) | No | FlowBiz-Ops |
 
 ---
 
@@ -74,23 +74,28 @@ Technical/session closure criteria status:
 6. HITL approve/modify/reject proof: PASS.
 
 Limited pilot start closure criteria status:
-1. Agreement signed: PENDING.
-2. LINE OA access handover: PENDING.
-3. Consent/data handling gate: PENDING.
+1. Agreement signed: PASS.
+2. LINE OA access handover: PASS.
+3. Consent/data handling gate: PASS.
 
 PR-16 closure pack criteria status:
 1. Follow-up closure checklist created: COMPLETE.
-2. Owner sign-off summary created: COMPLETE (owner action still pending).
-3. LINE OA access checklist created: COMPLETE (required approvals pending).
-4. Consent/data handling confirmation created: COMPLETE (required approvals pending).
-5. Decision gate created: COMPLETE (current outcome `PENDING_OWNER_ACTION`).
+2. Owner sign-off summary updated: COMPLETE (owner action closed).
+3. LINE OA access checklist updated: COMPLETE (sanitized access confirmation recorded).
+4. Consent/data handling confirmation updated: COMPLETE (sanitized confirmation recorded).
+5. Decision gate updated: COMPLETE (current outcome `READY_FOR_LIMITED_PILOT_PREP`).
 
 PR-17 owner approval execution criteria status:
 1. Sanitized owner approval evidence register created: COMPLETE.
-2. BL-01 evidence status updated: PENDING_OWNER_ACTION.
-3. BL-02 evidence status updated: PENDING_OWNER_ACTION.
-4. BL-03 evidence status updated: PENDING_OWNER_ACTION.
+2. BL-01 evidence status updated: CLOSED.
+3. BL-02 evidence status updated: CLOSED.
+4. BL-03 evidence status updated: CLOSED.
 5. Decision gate/readiness synchronized to evidence: COMPLETE.
+
+PR-18 closure decision status:
+1. Gate outcome: READY_FOR_LIMITED_PILOT_PREP.
+2. Readiness outcome: READY_FOR_LIMITED_PILOT_PREP.
+3. Blocking friction count: 0.
 
 ---
 
@@ -98,14 +103,15 @@ PR-17 owner approval execution criteria status:
 
 1. Keep canonical URL pinned to `https://beauty.flowbiz.cloud` for pilot preflight.
 2. Continue to keep real LINE and real AI generation disabled in Day 0 demo mode.
-3. Close agreement signing and capture owner-confirmed sign date.
-4. Close LINE OA admin handover checkpoint.
-5. Close consent/data intake gate before limited pilot start.
+3. Preserve signed agreement outside repo only.
+4. Keep LINE OA credentials in external secret storage only.
+5. Keep consent/data handling acknowledgements active during limited pilot prep.
 
 Note:
 - No runtime code changes were performed in PR-15.
 - No runtime code changes were performed in PR-16.
 - No runtime code changes were performed in PR-17.
+- No runtime code changes were performed in PR-18.
 - If a runtime defect appears in Day 0 execution, raise separate PR Summary for runtime blocker handling.
 
 ---
@@ -114,4 +120,4 @@ Note:
 
 Prepared by: FlowBiz-Ops (pseudonym role)
 Reviewed with: FlowBiz-Tech (preflight evidence complete)
-Current recommendation: PENDING_OWNER_ACTION
+Current recommendation: READY_FOR_LIMITED_PILOT_PREP

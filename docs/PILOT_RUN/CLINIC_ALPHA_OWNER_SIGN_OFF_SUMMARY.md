@@ -1,9 +1,9 @@
-# Clinic Alpha — Owner Sign-Off Summary (PR-16)
+# Clinic Alpha — Owner Sign-Off Summary (PR-18)
 
 Document type: Owner sign-off summary for limited pilot preparation
 Pilot clinic: Clinic Alpha (pseudonym only)
 Date: 2026-05-28
-Sign-off status: PENDING_OWNER_ACTION
+Sign-off status: CLOSED
 
 ---
 
@@ -14,7 +14,7 @@ Owner-A is requested to approve:
 2. Use of selected MVP workflows in safe operating mode.
 3. AI draft workflow under mandatory staff approval (HITL).
 4. Use of demo data or clinic-approved minimal data scope only.
-5. Follow-up closure actions in PR-16 checklists.
+5. Follow-up closure actions in PR-18 checklists.
 
 ---
 
@@ -57,7 +57,7 @@ Owner-A acknowledgement checklist:
 Boundary:
 1. Limited pilot prep only after blocker closure.
 2. Selected workflows only.
-3. No runtime code change required in PR-16.
+3. No runtime code change required in PR-18.
 
 Exit/rollback triggers:
 1. Consent scope unclear.
@@ -72,8 +72,8 @@ Exit/rollback triggers:
 - Owner approver: Owner-A
 - Clinic operator witness: Staff-A1
 - FlowBiz operator: FlowBiz-Ops
-- Decision captured: PENDING_OWNER_ACTION
-- Signature timestamp (placeholder): YYYY-MM-DD HH:MM (+07:00)
+- Decision captured: READY_FOR_LIMITED_PILOT_PREP
+- Signature date: 2026-05-28
 - Notes:
   - This summary is a pseudonymized operational record.
   - No legal contract text or credentials are stored in repo.

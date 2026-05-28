@@ -1,6 +1,6 @@
-# Clinic Alpha — Owner Approval Evidence (PR-17)
+# Clinic Alpha — Owner Approval Evidence (PR-18)
 
-Document type: POST-PHASE 10 PR-17 owner action evidence register (sanitized)
+Document type: POST-PHASE 10 PR-18 owner action evidence register (sanitized)
 Pilot clinic: Clinic Alpha (pseudonym only)
 Date: 2026-05-28
 Evidence handling mode: sanitized metadata only
@@ -19,49 +19,52 @@ Evidence handling mode: sanitized metadata only
 ## 2) BL-01 Written Pilot Agreement Evidence
 
 - blocker_id: BL-01
-- agreement_received: no
-- stored_location: external signed folder (pending)
+- agreement_received: yes
+- stored_location: private vault / signed external folder
 - signer_role: Owner-A (pseudonym)
-- signed_at: N/A
-- evidence_note: Signed agreement artifact has not been confirmed in sanitized record.
-- blocker_status: PENDING_OWNER_ACTION
+- signed_at: 2026-05-28
+- no_signed_file_in_repo: yes
+- evidence_note: Agreement receipt confirmed in sanitized metadata record only.
+- blocker_status: CLOSED
 
 ---
 
 ## 3) BL-02 LINE OA Access Evidence
 
 - blocker_id: BL-02
-- access_confirmed: no
-- access_type: N/A
-- credential_location: external secret storage only (pending confirmation)
+- access_confirmed: yes
+- access_type: admin
+- credential_location: external secret storage only
 - no_token_in_repo: yes
-- evidence_note: Access confirmation and role assignment are still pending owner-side action.
-- blocker_status: PENDING_OWNER_ACTION
+- test_user_confirmed: yes
+- evidence_note: Access role and sanitized operational confirmation received; no credential material stored in repo.
+- blocker_status: CLOSED
 
 ---
 
 ## 4) BL-03 Consent/Data Handling Confirmation Evidence
 
 - blocker_id: BL-03
-- confirmation_received: no
-- data_mode: demo
-- disallowed_data_acknowledged: no
-- deletion_export_path_acknowledged: no
-- evidence_note: Formal owner confirmation not yet recorded in sanitized form.
-- blocker_status: PENDING_OWNER_ACTION
+- confirmation_received: yes
+- data_mode: pseudonymized
+- disallowed_data_acknowledged: yes
+- deletion_export_path_acknowledged: yes
+- legal_review_required: acknowledged
+- evidence_note: Consent/data handling confirmation received in sanitized operational form.
+- blocker_status: CLOSED
 
 ---
 
 ## 5) Decision Snapshot
 
 Decision rule input summary:
-1. BL-01 complete: no
-2. BL-02 complete: no
-3. BL-03 complete: no
-4. safety/data/access concern present: no active breach, but business approvals pending
+1. BL-01 complete: yes
+2. BL-02 complete: yes
+3. BL-03 complete: yes
+4. safety/data/access concern present: none identified in current sanitized review
 
-Decision result for PR-17 at this timestamp:
-- PENDING_OWNER_ACTION
+Decision result for PR-18 at this timestamp:
+- READY_FOR_LIMITED_PILOT_PREP
 
 ---
 
@@ -76,10 +79,12 @@ Upgrade to READY_FOR_LIMITED_PILOT_PREP only when:
 
 Otherwise keep PENDING_OWNER_ACTION or set BLOCKED if safety/data/access concern appears.
 
+Current preconditions status: ALL_MET
+
 ---
 
 ## 7) Sign-Off (Pseudonym)
 
 - Prepared by: FlowBiz-Ops
 - Reviewed by: FlowBiz-Tech
-- Owner action state: Pending (Owner-A)
+- Owner action state: Completed (Owner-A)

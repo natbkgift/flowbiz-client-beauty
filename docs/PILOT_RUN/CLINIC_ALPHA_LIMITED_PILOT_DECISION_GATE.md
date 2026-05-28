@@ -1,4 +1,4 @@
-# Clinic Alpha — Limited Pilot Decision Gate (PR-17)
+# Clinic Alpha — Limited Pilot Decision Gate (PR-18)
 
 Document type: Formal decision gate for limited pilot preparation after owner approval execution
 Pilot clinic: Clinic Alpha (pseudonym only)
@@ -10,7 +10,7 @@ Allowed gate outcomes:
 - PENDING_OWNER_ACTION
 - BLOCKED
 
-Current gate outcome: PENDING_OWNER_ACTION
+Current gate outcome: READY_FOR_LIMITED_PILOT_PREP
 
 ---
 
@@ -18,9 +18,9 @@ Current gate outcome: PENDING_OWNER_ACTION
 
 | Gate ID | Gate Criterion | Current Status | Evidence Source | Blocking Class |
 |---|---|---|---|---|
-| GATE-01 | Written agreement complete | PENDING_OWNER_ACTION | CLINIC_ALPHA_OWNER_APPROVAL_EVIDENCE.md (BL-01: agreement_received=no) | Business approval |
-| GATE-02 | LINE OA access confirmed | PENDING_OWNER_ACTION | CLINIC_ALPHA_OWNER_APPROVAL_EVIDENCE.md (BL-02: access_confirmed=no) | Access |
-| GATE-03 | Data handling confirmation complete | PENDING_OWNER_ACTION | CLINIC_ALPHA_OWNER_APPROVAL_EVIDENCE.md (BL-03: confirmation_received=no) | Data safety |
+| GATE-01 | Written agreement complete | PASS | CLINIC_ALPHA_OWNER_APPROVAL_EVIDENCE.md (BL-01: agreement_received=yes) | Business approval |
+| GATE-02 | LINE OA access confirmed | PASS | CLINIC_ALPHA_OWNER_APPROVAL_EVIDENCE.md (BL-02: access_confirmed=yes) | Access |
+| GATE-03 | Data handling confirmation complete | PASS | CLINIC_ALPHA_OWNER_APPROVAL_EVIDENCE.md (BL-03: confirmation_received=yes) | Data safety |
 | GATE-04 | Staff approvers identified | PASS | Day 0 report + training records (Owner-A, Staff-A1 roles) | Non-blocking |
 | GATE-05 | Selected workflows confirmed | PASS_WITH_NOTE | Day 0 live report workflow walkthrough | Non-blocking |
 | GATE-06 | Safe operating mode confirmed | PASS | Safe flags and simulated mode requirement | Safety critical |
@@ -40,7 +40,7 @@ Rule B:
 Rule C:
 - If any safety/data/access issue is unresolved or high risk -> BLOCKED.
 
-Applied rule (current): Rule B
+Applied rule (current): Rule A
 
 ---
 
@@ -48,12 +48,9 @@ Applied rule (current): Rule B
 
 1. Technical and safety checks from PR-15 are passing.
 2. Staff operator and support ownership are defined.
-3. PR-17 sanitized evidence register still shows all three closure items pending owner action:
-- written agreement
-- LINE OA access confirmation
-- consent/data handling confirmation
+3. PR-18 sanitized evidence register shows all three owner-action blockers closed.
 
-Therefore, outcome remains: PENDING_OWNER_ACTION
+Therefore, outcome is: READY_FOR_LIMITED_PILOT_PREP
 
 ---
 
@@ -81,5 +78,5 @@ Set outcome to BLOCKED immediately if:
 
 - Gate owner: FlowBiz-Ops
 - Technical reviewer: FlowBiz-Tech
-- Business approver: Owner-A (pending)
+- Business approver: Owner-A (sanitized confirmation recorded)
 - Last updated: 2026-05-28

@@ -1,9 +1,9 @@
-# Clinic Alpha — LINE OA Access Checklist (PR-16)
+# Clinic Alpha — LINE OA Access Checklist (PR-18)
 
 Document type: LINE OA access request and safety checklist
 Pilot clinic: Clinic Alpha (pseudonym only)
 Date: 2026-05-28
-Status: PENDING_OWNER_ACTION
+Status: CLOSED
 
 ---
 
@@ -19,13 +19,13 @@ This checklist does not authorize real broadcast, production rollout, or credent
 
 | Item ID | Requirement | Owner | Evidence Required | Status |
 |---|---|---|---|---|
-| LINE-01 | Test/staging LINE OA context is identified | Owner-A + FlowBiz-Tech | Environment note referencing staging context | PENDING_OWNER_ACTION |
-| LINE-02 | LINE OA admin access is granted to approved operator(s) | Owner-A | Access grant confirmation (outside repo) | PENDING_OWNER_ACTION |
+| LINE-01 | Test/staging LINE OA context is identified | Owner-A + FlowBiz-Tech | Environment note referencing staging context | PASS |
+| LINE-02 | LINE OA admin access is granted to approved operator(s) | Owner-A | Access grant confirmation (outside repo) | PASS |
 | LINE-03 | Token/secret handling remains outside repository | FlowBiz-Tech | Attestation: no token/secret committed | PASS |
-| LINE-04 | Webhook URL placeholder is prepared | FlowBiz-Tech | Placeholder recorded: `https://<staging-domain>/api/integrations/line/webhook` | PENDING_OWNER_ACTION |
+| LINE-04 | Webhook URL placeholder is prepared | FlowBiz-Tech | Placeholder recorded: staging webhook path only; no real host secret in repo | PASS |
 | LINE-05 | Broadcast send is disabled by policy | FlowBiz-Ops | Operating policy note confirmed | PASS |
-| LINE-06 | No real customer send until explicit approval checkpoint | Owner-A + FlowBiz-Ops | Written checkpoint acknowledgment | PENDING_OWNER_ACTION |
-| LINE-07 | One controlled test user is defined for first verification | Owner-A + FlowBiz-Tech | Pseudonym test-user plan (no real ID in repo) | PENDING_OWNER_ACTION |
+| LINE-06 | No real customer send until explicit approval checkpoint | Owner-A + FlowBiz-Ops | Written checkpoint acknowledgment | PASS |
+| LINE-07 | One controlled test user is defined for first verification | Owner-A + FlowBiz-Tech | Pseudonym test-user plan (no real ID in repo) | PASS |
 | LINE-08 | Disable switch and rollback path are documented | FlowBiz-Tech | Runtime safety note references fail-closed mode | PASS |
 
 ---
@@ -38,7 +38,7 @@ Required defaults during follow-up stage:
 - `AI_REAL_GENERATION_ENABLED=false`
 
 Controls:
-1. No real outbound send while status is PENDING_OWNER_ACTION.
+1. No real outbound send during limited pilot prep without separate QA approval.
 2. No credentials or webhook secrets in repository.
 3. Any move toward real mode requires separate QA checklist and explicit approval.
 
@@ -56,8 +56,8 @@ Controls:
 
 ## 5) Decision Impact
 
-- If all required pending items close: contributes to READY_FOR_LIMITED_PILOT_PREP.
-- If owner approval or access remains pending: overall decision remains PENDING_OWNER_ACTION.
+- Required owner access items are closed in sanitized PR-18 evidence and contribute to READY_FOR_LIMITED_PILOT_PREP.
+- If owner approval or access is revoked: overall decision must be re-evaluated.
 - If safety or access anomaly is detected: escalate decision to BLOCKED.
 
 ---
@@ -66,5 +66,5 @@ Controls:
 
 - Prepared by: FlowBiz-Tech
 - Reviewed by: FlowBiz-Ops
-- Owner approval: Pending (Owner-A)
+- Owner approval: Completed (Owner-A; sanitized role only)
 - Last update: 2026-05-28
