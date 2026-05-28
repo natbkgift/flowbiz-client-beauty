@@ -55,7 +55,7 @@ const RESERVED_CLINIC_SLUGS = new Set([
 
 function normalizeClinicSlug(value) {
   if (typeof value !== 'string') return '';
-  return toSlug(value, '');
+  return toSlug(value, '').slice(0, 70).replace(/-+$/, '');
 }
 
 function isReservedClinicSlug(slug) {
