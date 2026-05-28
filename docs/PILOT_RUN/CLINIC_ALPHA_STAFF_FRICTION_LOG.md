@@ -24,3 +24,21 @@ Date: 2026-05-29
 
 Friction status:
 - CONTROLLED
+
+---
+
+## 3) PR-26 Seven-Day Friction Trend Update
+
+Day 2 to Day 7 friction totals:
+1. interruption events: 6
+2. confusion events: 7
+3. unresolved high-severity friction: 0
+4. operator stop-usage signals: 0
+5. workflow abandonment signals: 0
+
+Trend note:
+1. confusion frequency declined by Day 7.
+2. interruption level remained low and manageable.
+
+Adoption risk classification:
+- LOW

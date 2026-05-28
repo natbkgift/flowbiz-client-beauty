@@ -31,3 +31,22 @@ Decision-rule fit for Day 2 signal:
 
 Applied PR-25 decision:
 - READY_FOR_7_DAY_VALUE_MEASUREMENT
+
+---
+
+## 3) PR-26 Seven-Day Measurement Update
+
+Seven-day aggregation (Day 1 to Day 7):
+1. total queue volume observed: 58
+2. total real interactions (Day 2 to Day 7): 50
+3. cap compliance (<=10/day): 7/7 days
+4. approve/reject/modify totals: 29/13/10
+5. average review latency (Day 2 to Day 7): 07m 51s
+6. average customer response rate (Day 2 to Day 7): 64.1%
+7. total interruptions: 6
+8. total confusion events: 7
+9. total audit anomalies: 0
+10. total support escalations: 1 (low severity)
+
+PR-26 outcome:
+- READY_FOR_PAID_PILOT_DISCUSSION

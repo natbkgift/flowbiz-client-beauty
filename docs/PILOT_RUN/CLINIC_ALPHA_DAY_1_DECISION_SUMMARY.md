@@ -97,3 +97,26 @@ PR-25 decision:
 
 Most important evaluation result:
 1. Clinic usage intent is positive for daily narrow-scope operation and 7-day value measurement.
+
+---
+
+## 7) PR-26 Seven-Day Value Measurement Decision Update
+
+PR-26 key inputs:
+1. repeated usage observed across Day 2 to Day 7
+2. workflow completion stayed at 100% on active days
+3. owner signal trend increased to strong positive
+4. pricing discussion signal present by Day 7
+5. no unsafe operation indicators observed
+
+Applied decision rule:
+1. strong repeated usage -> READY_FOR_PAID_PILOT_DISCUSSION
+
+PR-26 decision:
+- READY_FOR_PAID_PILOT_DISCUSSION
+
+Most important question:
+Would the clinic be disappointed if this workflow disappeared tomorrow?
+
+Answer:
+Yes. Owner and operator evidence indicate the workflow is now part of daily follow-up behavior and is valued enough to trigger paid pilot discussion.

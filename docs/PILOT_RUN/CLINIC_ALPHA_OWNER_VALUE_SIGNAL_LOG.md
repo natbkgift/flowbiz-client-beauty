@@ -31,3 +31,19 @@ Next request from owner:
 1. continue same narrow workflow scope
 2. keep HITL mandatory
 3. review value trend after 7 days
+
+---
+
+## 4) PR-26 Seven-Day Owner Signal Update
+
+Owner trend across Day 2 to Day 7:
+1. value confidence increased from cautious positive to strong positive.
+2. owner continued requesting daily usage under same narrow scope.
+3. owner raised paid pilot discussion signal at Day 7.
+
+Updated owner classification:
+- STRONG_POSITIVE_SIGNAL
+
+Commercial signal:
+1. pricing discussion requested: yes
+2. renewal intent proxy: positive
