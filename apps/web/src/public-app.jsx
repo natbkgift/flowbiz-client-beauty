@@ -22,6 +22,102 @@ function withPublicClinicContext(path) {
   return `${parsed.pathname}${parsed.search}`;
 }
 
+const PLATFORM_PUBLIC_PATHS = new Set([
+  '',
+  '/',
+  '/blog',
+  '/forum',
+  '/admin',
+  '/api',
+  '/public',
+  '/health',
+  '/healthz',
+  '/live',
+  '/ready',
+  '/assets',
+  '/static',
+  '/pricing',
+  '/demo',
+  '/contact',
+  '/support',
+  '/terms',
+  '/privacy'
+]);
+
+const PLATFORM_PREFIXES = [
+  '/blog/',
+  '/forum/',
+  '/admin/',
+  '/api/',
+  '/public/',
+  '/health/',
+  '/healthz/',
+  '/live/',
+  '/ready/',
+  '/assets/',
+  '/static/',
+  '/pricing/',
+  '/demo/',
+  '/contact/',
+  '/support/',
+  '/terms/',
+  '/privacy/'
+];
+
+function getPublicPathname() {
+  return window.location.pathname || '/';
+}
+
+function normalizePathname(pathname) {
+  let p = pathname || '/';
+  if (!p.startsWith('/')) {
+    p = '/' + p;
+  }
+  if (p.length > 1 && p.endsWith('/')) {
+    p = p.slice(0, -1);
+  }
+  return p;
+}
+
+function extractClinicSlugFromPathname(pathname) {
+  const normalized = normalizePathname(pathname);
+  if (PLATFORM_PUBLIC_PATHS.has(normalized)) {
+    return null;
+  }
+  for (const prefix of PLATFORM_PREFIXES) {
+    if (normalized.startsWith(prefix)) {
+      return null;
+    }
+  }
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments.length === 0) {
+    return null;
+  }
+  return segments[0];
+}
+
+async function getPublicClinicBySlug(slug) {
+  const url = `${API_BASE}/public/clinics/${encodeURIComponent(slug)}`;
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    if (response.status === 404) {
+      return { status: 404, data: null };
+    }
+    if (!response.ok) {
+      return { status: response.status, data: null, error: true };
+    }
+    const data = await response.json();
+    return { status: 200, data };
+  } catch (err) {
+    console.warn(`Fetch to ${url} failed:`, err.message);
+    return { status: 500, data: null, error: true };
+  }
+}
+
 async function apiFetch(path, options = {}) {
   const pathWithContext = withPublicClinicContext(path);
   try {
@@ -272,12 +368,47 @@ export function App() {
     }
   };
 
-  // Basic Hash Router parser
+  const pathname = normalizePathname(window.location.pathname);
+  const clinicSlug = extractClinicSlugFromPathname(pathname);
+
+  // Basic Router parser
   const renderPage = () => {
+    if (clinicSlug) {
+      return <ClinicPublicShell clinicSlug={clinicSlug} />;
+    }
+
+    if (pathname === '/blog') {
+      return <BlogListPage posts={blogPosts} />;
+    }
+    if (pathname.startsWith('/blog/')) {
+      const slug = pathname.replace('/blog/', '');
+      const post = blogPosts.find(p => p.slug === slug);
+      return <BlogDetailPage slug={slug} initialPost={post} />;
+    }
+    if (pathname === '/forum') {
+      return (
+        <ForumListPage 
+          topics={forumTopics} 
+          onTopicAdded={(newTopic) => setForumTopics([newTopic, ...forumTopics])}
+        />
+      );
+    }
+    if (pathname.startsWith('/forum/')) {
+      const topicIdOrSlug = pathname.replace('/forum/', '');
+      return (
+        <ForumDetailPage 
+          topicIdOrSlug={topicIdOrSlug}
+          onReplyAdded={() => {
+            loadData();
+          }}
+        />
+      );
+    }
+
     const hash = currentRoute.substring(1) || '/';
     
     if (hash === '/') {
-      return <LandingPage />;
+      return <PlatformLandingPlaceholder />;
     }
     
     if (hash === '/blog') {
@@ -315,7 +446,7 @@ export function App() {
       <div className="public-container" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
         <h1 style={{ fontSize: '3rem', marginBottom: '1.5rem', color: 'var(--gold-primary)' }}>404</h1>
         <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>ขออภัย ไม่พบหน้าที่ท่านต้องการ</p>
-        <a href="#/" className="cta-btn">กลับหน้าแรก</a>
+        <a href="/" className="cta-btn">กลับหน้าแรก</a>
       </div>
     );
   };
@@ -324,19 +455,33 @@ export function App() {
     <div>
       {/* Premium Sticky Navigation */}
       <header className="header-glass">
-        <a href="#/" className="logo">
-          <span className="logo-icon">✨</span> FlowBiz Beauty
-        </a>
+        {clinicSlug ? (
+          <a href={`/${clinicSlug}`} className="logo">
+            <span className="logo-icon">✨</span> FlowBiz Clinic
+          </a>
+        ) : (
+          <a href="/" className="logo">
+            <span className="logo-icon">✨</span> FlowBiz Beauty
+          </a>
+        )}
         <nav>
           <ul className="nav-links">
-            <li><a href="#/" className={currentRoute === '#/' ? 'active' : ''}>หน้าแรก</a></li>
-            <li><a href="#/blog" className={currentRoute.startsWith('#/blog') ? 'active' : ''}>บทความผิวดี</a></li>
-            <li><a href="#/forum" className={currentRoute.startsWith('#/forum') ? 'active' : ''}>เว็บบอร์ดถามตอบ</a></li>
+            {clinicSlug ? (
+              <li><a href={`/${clinicSlug}`} className="active">หน้าแรก</a></li>
+            ) : (
+              <>
+                <li><a href="#/" className={currentRoute === '#/' && pathname === '/' ? 'active' : ''}>หน้าแรก</a></li>
+                <li><a href="#/blog" className={currentRoute.startsWith('#/blog') || pathname.startsWith('/blog') ? 'active' : ''}>บทความผิวดี</a></li>
+                <li><a href="#/forum" className={currentRoute.startsWith('#/forum') || pathname.startsWith('/forum') ? 'active' : ''}>เว็บบอร์ดถามตอบ</a></li>
+              </>
+            )}
           </ul>
         </nav>
         <div className="header-actions">
           <a href="/admin" className="cta-btn secondary" target="_blank" rel="noopener noreferrer">เข้าระบบ CRM</a>
-          <button className="cta-btn" onClick={() => openExternalUrl('https://line.me')}>ปรึกษาหมอฟรี</button>
+          <button className="cta-btn" onClick={() => openExternalUrl('https://line.me')}>
+            {clinicSlug ? 'ติดต่อเรา' : 'ปรึกษาหมอฟรี'}
+          </button>
         </div>
       </header>
 
@@ -349,7 +494,10 @@ export function App() {
           <div>
             <h3 className="footer-section-title">เกี่ยวกับคลินิก</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-              FlowBiz Beauty Clinic คลินิกความงามระดับพรีเมียม ให้บริการปรับรูปหน้า ดูแลผิวพรรณ เลเซอร์ และการชะลอวัยโดยแพทย์ผู้เชี่ยวชาญ
+              {clinicSlug 
+                ? 'คลินิกความงามระดับพรีเมียม ให้บริการปรับรูปหน้า ดูแลผิวพรรณ เลเซอร์ และการชะลอวัยโดยแพทย์ผู้เชี่ยวชาญ'
+                : 'FlowBiz Beauty Clinic คลินิกความงามระดับพรีเมียม ให้บริการปรับรูปหน้า ดูแลผิวพรรณ เลเซอร์ และการชะลอวัยโดยแพทย์ผู้เชี่ยวชาญ'
+              }
             </p>
             <span style={{ color: 'var(--gold-primary)', fontWeight: '700' }}>✨ สวยมั่นใจ อย่างเป็นธรรมชาติ</span>
           </div>
@@ -376,9 +524,140 @@ export function App() {
           </div>
         </div>
         <div className="footer-bottom">
-          &copy; {new Date().getFullYear()} FlowBiz Beauty Clinic. All rights reserved.
+          &copy; {new Date().getFullYear()} {clinicSlug ? 'FlowBiz Clinic' : 'FlowBiz Beauty Clinic'}. All rights reserved.
         </div>
       </footer>
+    </div>
+  );
+}
+
+// ----------------------------------------------------
+// Page Component: Platform Landing Placeholder
+// ----------------------------------------------------
+function PlatformLandingPlaceholder() {
+  return (
+    <div className="public-container" data-testid="public-platform-landing" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
+      <h1 style={{ fontSize: '3rem', color: 'var(--gold-primary)', marginBottom: '1.5rem' }}>FlowBiz Beauty</h1>
+      <p style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', marginBottom: '2.5rem' }}>
+        AI CRM + LINE Automation + HITL for beauty clinics
+      </p>
+      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+        <button className="cta-btn" onClick={() => alert('Request Demo clicked')}>Request Demo</button>
+        <button className="cta-btn secondary" onClick={() => window.location.pathname = '/flowbiz-beauty-demo'}>View Example Clinic</button>
+      </div>
+    </div>
+  );
+}
+
+// ----------------------------------------------------
+// Page Component: Clinic Public Shell
+// ----------------------------------------------------
+function ClinicPublicShell({ clinicSlug }) {
+  const [loading, setLoading] = useState(true);
+  const [clinicData, setClinicData] = useState(null);
+  const [errorStatus, setErrorStatus] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      setLoading(true);
+      setErrorStatus(null);
+      try {
+        const result = await getPublicClinicBySlug(clinicSlug);
+        if (!active) return;
+        if (result.status === 200) {
+          setClinicData(result.data);
+        } else {
+          setErrorStatus(result.status);
+        }
+      } catch (err) {
+        if (!active) return;
+        setErrorStatus(500);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      active = false;
+    };
+  }, [clinicSlug]);
+
+  if (loading) {
+    return (
+      <div className="public-container" data-testid="clinic-loading-state" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
+        <p style={{ color: 'var(--text-secondary)' }}>กำลังโหลดข้อมูลคลินิก...</p>
+      </div>
+    );
+  }
+
+  if (errorStatus === 404) {
+    return (
+      <div className="public-container" data-testid="clinic-not-found" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
+        <h1 style={{ fontSize: '3rem', marginBottom: '1.5rem', color: 'var(--gold-primary)' }}>404</h1>
+        <p style={{ color: 'var(--text-secondary)' }}>ไม่พบคลินิกที่ต้องการ</p>
+      </div>
+    );
+  }
+
+  if (errorStatus) {
+    return (
+      <div className="public-container" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
+        <p style={{ color: 'var(--red-primary)' }}>เกิดข้อผิดพลาดในการโหลดข้อมูลคลินิก</p>
+      </div>
+    );
+  }
+
+  if (!clinicData) {
+    return null;
+  }
+
+  const { clinic, websiteSettings, contactSettings, locationSettings, homepageSections, isPubliclyRenderable } = clinicData;
+
+  return (
+    <div className="public-container" data-testid="clinic-public-shell">
+      {!isPubliclyRenderable && (
+        <div data-testid="clinic-unpublished-notice" style={{ backgroundColor: 'rgba(212, 175, 55, 0.1)', border: '1px solid var(--gold-primary)', padding: '1rem', borderRadius: '8px', marginBottom: '2rem', textAlign: 'center' }}>
+          <p style={{ color: 'var(--gold-primary)', margin: 0 }}>เว็บไซต์คลินิกนี้ยังไม่ถูกเผยแพร่เต็มรูปแบบ</p>
+        </div>
+      )}
+
+      <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', padding: '2.5rem', borderRadius: '12px' }}>
+        <h1 data-testid="clinic-name" style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>{clinic.name}</h1>
+        <p style={{ color: 'var(--text-secondary)' }}>Slug: <span data-testid="clinic-slug">{clinic.slug}</span></p>
+        <p>Status: <span data-testid="clinic-status" className="forum-tag">{websiteSettings.websiteStatus}</span></p>
+
+        {websiteSettings.tagline && (
+          <p style={{ fontStyle: 'italic', color: 'var(--text-secondary)', marginTop: '1rem' }}>"{websiteSettings.tagline}"</p>
+        )}
+
+        <div data-testid="clinic-contact" style={{ marginTop: '2rem', borderTop: '1px solid var(--glass-border)', paddingTop: '1.5rem' }}>
+          <h3>ข้อมูลติดต่อ</h3>
+          {contactSettings.phone && <p>📞 เบอร์โทร: {contactSettings.phone}</p>}
+          {contactSettings.email && <p>✉️ อีเมล: {contactSettings.email}</p>}
+          {contactSettings.lineUrl && <p>💬 LINE: <a href={contactSettings.lineUrl} target="_blank" rel="noopener noreferrer">{contactSettings.lineOaId || 'LINE OA'}</a></p>}
+        </div>
+
+        <div style={{ marginTop: '1.5rem' }}>
+          <h3>ที่ตั้งคลินิก</h3>
+          <p>📍 {locationSettings.province || 'ไม่ระบุ'}, {locationSettings.country}</p>
+        </div>
+
+        <div data-testid="clinic-homepage-sections" style={{ marginTop: '2rem', borderTop: '1px solid var(--glass-border)', paddingTop: '1.5rem' }}>
+          <h3>โครงสร้างหน้าแรก (Sections)</h3>
+          {homepageSections && homepageSections.length > 0 ? (
+            <ul>
+              {homepageSections.map((sec, idx) => (
+                <li key={idx} style={{ color: 'var(--text-secondary)' }}>
+                  {sec.sectionKey} ({sec.sectionType})
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ color: 'var(--text-muted)' }}>ไม่มีหัวข้อแสดงบนหน้าแรก</p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
