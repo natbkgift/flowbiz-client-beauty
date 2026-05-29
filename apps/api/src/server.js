@@ -49,6 +49,7 @@ const { handleLoyaltyRoutes } = require('./modules/loyalty-mgm/routes');
 const { handleBlogRoutes } = require('./modules/blog/routes');
 const { handleForumRoutes } = require('./modules/forum/routes');
 const { handleClinicRoutes } = require('./modules/clinics/routes');
+const { handlePublicContentRoutes } = require('./modules/public-content/routes');
 
 
 const config = loadConfig();
@@ -402,6 +403,10 @@ async function routeRequest(request, response) {
   }
 
   if (await handleClinicRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
+    return;
+  }
+
+  if (await handlePublicContentRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
     return;
   }
 

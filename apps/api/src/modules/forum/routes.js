@@ -29,7 +29,7 @@ async function handleForumRoutes(request, response, url, tools) {
       clinicId = context.currentClinic.id;
       canModerate = hasAnyPermission(context, [['forum', 'moderate'], ['forum', 'medical_answer']]);
     } catch (_) {
-      clinicId = resolvePublicClinicId(url);
+      clinicId = await resolvePublicClinicId(url);
     }
 
     const topics = await listTopics(clinicId, {
@@ -51,7 +51,7 @@ async function handleForumRoutes(request, response, url, tools) {
       clinicId = context.currentClinic.id;
       canModerate = hasAnyPermission(context, [['forum', 'moderate'], ['forum', 'medical_answer']]);
     } catch (_) {
-      clinicId = resolvePublicClinicId(url);
+      clinicId = await resolvePublicClinicId(url);
     }
 
     try {
@@ -75,7 +75,7 @@ async function handleForumRoutes(request, response, url, tools) {
     try {
       clinicContext = await authenticateRequest(request);
     } catch (_) {
-      clinicContext = resolvePublicClinicContext(url);
+      clinicContext = await resolvePublicClinicContext(url);
     }
 
     const body = await parseJsonBody(request);
@@ -97,7 +97,7 @@ async function handleForumRoutes(request, response, url, tools) {
       }
       allowRestrictedTopic = hasAnyPermission(clinicContext, [['forum', 'moderate'], ['forum', 'medical_answer']]);
     } catch (_) {
-      clinicContext = resolvePublicClinicContext(url);
+      clinicContext = await resolvePublicClinicContext(url);
     }
 
     const body = await parseJsonBody(request);
