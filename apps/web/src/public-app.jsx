@@ -1222,10 +1222,11 @@ function ClinicHomepageSections({ homepageSections }) {
 }
 
 function ClinicContactSection({ contactSettings }) {
-  const phone = contactSettings.phone || '';
-  const email = contactSettings.email || '';
-  const lineUrl = contactSettings.lineUrl || '';
-  const lineOaId = contactSettings.lineOaId || '';
+  const settings = contactSettings || {};
+  const phone = settings.phone || '';
+  const email = settings.email || '';
+  const lineUrl = settings.lineUrl || '';
+  const lineOaId = settings.lineOaId || '';
 
   return (
     <section className="clinic-template-section clinic-contact-block clinic-template-contact" data-testid="clinic-template-contact">
