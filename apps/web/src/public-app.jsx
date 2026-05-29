@@ -35,7 +35,13 @@ const PLATFORM_PUBLIC_PATHS = new Set([
   '/live',
   '/ready',
   '/assets',
-  '/static'
+  '/static',
+  '/pricing',
+  '/demo',
+  '/contact',
+  '/support',
+  '/terms',
+  '/privacy'
 ]);
 
 const PLATFORM_PREFIXES = [
@@ -49,7 +55,13 @@ const PLATFORM_PREFIXES = [
   '/live/',
   '/ready/',
   '/assets/',
-  '/static/'
+  '/static/',
+  '/pricing/',
+  '/demo/',
+  '/contact/',
+  '/support/',
+  '/terms/',
+  '/privacy/'
 ];
 
 function getPublicPathname() {

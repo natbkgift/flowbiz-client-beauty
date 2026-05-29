@@ -50,15 +50,21 @@ A client-side utility `extractClinicSlugFromPathname(pathname)` extracts and ide
 1. **First Segment Rule**: The first path segment is treated as the `clinicSlug` candidate.
 2. **Platform Path Protection**: The candidate is rejected and returns `null` if the normalized path matches `PLATFORM_PUBLIC_PATHS` or starts with any of the `PLATFORM_PREFIXES`.
 3. **Protected Paths Protected**:
-   - `/blog`, `/blog/*`
-   - `/forum`, `/forum/*`
-   - `/admin`, `/admin/*`
-   - `/api`, `/api/*`
-   - `/public`, `/public/*`
-   - `/health`, `/healthz`, `/live`, `/ready`
-   - `/assets`, `/static`
+  - `/blog`, `/blog/*`
+  - `/forum`, `/forum/*`
+  - `/admin`, `/admin/*`
+  - `/api`, `/api/*`
+  - `/public`, `/public/*`
+  - `/health`, `/healthz`, `/live`, `/ready`
+  - `/assets`, `/static`
+  - `/pricing`, `/pricing/`
+  - `/demo`, `/demo/`
+  - `/contact`, `/contact/`
+  - `/support`, `/support/`
+  - `/terms`, `/terms/`
+  - `/privacy`, `/privacy/`
 
-This guarantees that visitors navigating to `/blog` or `/forum` are never treated as clinic slugs and never trigger queries to `/public/clinics/blog` or `/public/clinics/forum`.
+This guarantees that visitors navigating to `/blog`, `/forum`, `/pricing`, `/demo` etc. are never treated as clinic slugs and never trigger queries to `/public/clinics/...`.
 
 ---
 
@@ -95,13 +101,15 @@ The dynamic `ClinicPublicShell` supports all required states:
 
 File: `tests/public_routing_split.test.js`
 
-Contains 6 targeted integration sub-tests using a compiled public JSDOM app environment:
+Contains 8 targeted integration sub-tests using a compiled public JSDOM app environment:
 1. **Platform Landing Placeholder**: Asserts `/` correctly renders the `public-platform-landing` test ID.
 2. **Clinic Shell Rendering**: Asserts that `/:clinicSlug` dynamically requests clinic configuration and renders all required data and test IDs.
 3. **Nested Extraction**: Asserts that `/clinic-alpha/services` extracts `clinic-alpha` and successfully calls the API for `clinic-alpha`.
 4. **Clinic Not Found**: Asserts that a 404 API response renders the `clinic-not-found` state.
 5. **Draft/Unpublished Clinic**: Asserts that a response with `isPubliclyRenderable=false` renders the `clinic-unpublished-notice` banner while displaying the draft clinic name.
-6. **Platform Guard Protection**: Asserts that `/blog` loads the legacy blog page and never triggers clinic resolver calls for `/public/clinics/blog`.
+6. **Platform Guard Protection (Blog)**: Asserts that `/blog` loads the legacy blog page and never triggers clinic resolver calls for `/public/clinics/blog`.
+7. **Platform Guard Protection (Forum)**: Asserts that `/forum` and `/forum/some-topic` preserve legacy forum pages and never trigger clinic resolver calls for `/public/clinics/forum`.
+8. **Platform Guard Protection (Pricing/Demo)**: Asserts that `/pricing` and `/demo` protect platform routes, never trigger clinic resolver, and render safely without crashing.
 
 ---
 
@@ -128,7 +136,7 @@ Run integration tests:
 ```powershell
 node tests/public_routing_split.test.js
 ```
-*Result: Passed! (7 sub-tests, 100% success)*
+*Result: Passed! (8 sub-tests, 9 passing assertions, 100% success)*
 
 Full test suite execution:
 ```powershell

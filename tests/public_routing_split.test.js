@@ -242,7 +242,7 @@ test('PR6 - Public Routing Split tests', async (t) => {
       pathName: '/blog',
       routes: {
         // Mock blog list fetch to let it load
-        'GET /api/blog/posts': { status: 200, body: { items: [] } }
+        'GET /blog/posts': { status: 200, body: { items: [] } }
       }
     });
 
@@ -252,5 +252,61 @@ test('PR6 - Public Routing Split tests', async (t) => {
     // Ensure getPublicClinicBySlug is never called for "blog"
     const hasClinicCall = app.requests.some(r => r.url.pathname.includes('/public/clinics/'));
     assert.equal(hasClinicCall, false, 'should not have made public clinic API calls');
+  });
+
+  // Test 7: "/forum" and "/forum/some-topic" do not trigger clinic resolver
+  await t.test('7. "/forum" and "/forum/some-topic" preserve legacy forum pages and never trigger clinic resolver', async () => {
+    const app = await loadPublicApp({
+      pathName: '/forum',
+      routes: {
+        'GET /forum/topics': { status: 200, body: { items: [] } }
+      }
+    });
+
+    await waitFor(() => app.document.body.textContent.includes('เว็บบอร์ดสุขภาพและผิวพรรณ'));
+    const hasClinicCall = app.requests.some(r => r.url.pathname.includes('/public/clinics/'));
+    assert.equal(hasClinicCall, false, 'should not have made public clinic API calls');
+
+    const appDetail = await loadPublicApp({
+      pathName: '/forum/some-topic',
+      routes: {
+        'GET /forum/topics/some-topic': { 
+          status: 200, 
+          body: { 
+            id: 123, 
+            title: 'Test Topic', 
+            content: 'content', 
+            replies: [],
+            author_display_name: 'คนไข้นิรนาม',
+            is_anonymous: true
+          } 
+        }
+      }
+    });
+
+    await waitFor(() => appDetail.document.body.textContent.includes('กลับหน้ากระดานเว็บบอร์ด'));
+    const hasClinicCallDetail = appDetail.requests.some(r => r.url.pathname.includes('/public/clinics/'));
+    assert.equal(hasClinicCallDetail, false, 'should not have made public clinic API calls');
+  });
+
+  // Test 8: "/pricing" and "/demo" protect platform routes, never trigger clinic resolver, and render safely
+  await t.test('8. "/pricing" and "/demo" protect platform routes, never trigger clinic resolver, and render safely', async () => {
+    const appPricing = await loadPublicApp({
+      pathName: '/pricing',
+      routes: {}
+    });
+
+    await waitFor(() => appPricing.document.querySelector('[data-testid="public-platform-landing"]'));
+    const hasClinicCallPricing = appPricing.requests.some(r => r.url.pathname.includes('/public/clinics/'));
+    assert.equal(hasClinicCallPricing, false, 'should not have made public clinic API calls');
+
+    const appDemo = await loadPublicApp({
+      pathName: '/demo',
+      routes: {}
+    });
+
+    await waitFor(() => appDemo.document.querySelector('[data-testid="public-platform-landing"]'));
+    const hasClinicCallDemo = appDemo.requests.some(r => r.url.pathname.includes('/public/clinics/'));
+    assert.equal(hasClinicCallDemo, false, 'should not have made public clinic API calls');
   });
 });
