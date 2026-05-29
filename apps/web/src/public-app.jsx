@@ -1168,7 +1168,7 @@ function ClinicPromotionsPreview({ homepageSections }) {
 }
 
 function ClinicAboutSection({ websiteSettings }) {
-  const shortDesc = websiteSettings.shortDescription || '';
+  const shortDesc = websiteSettings?.shortDescription || '';
   if (!shortDesc) return null;
 
   return (
