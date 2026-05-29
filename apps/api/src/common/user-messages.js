@@ -109,7 +109,10 @@ const THAI_ERROR_MESSAGES = {
 };
 
 function getThaiErrorMessage(code, fallback) {
-  return THAI_ERROR_MESSAGES[code] || fallback || THAI_ERROR_MESSAGES.INTERNAL_SERVER_ERROR;
+  if (typeof code === 'string' && Object.prototype.hasOwnProperty.call(THAI_ERROR_MESSAGES, code)) {
+    return THAI_ERROR_MESSAGES[code];
+  }
+  return fallback || THAI_ERROR_MESSAGES.INTERNAL_SERVER_ERROR;
 }
 
 module.exports = {

@@ -298,8 +298,8 @@ async function createDefaultClinicWebsiteRecords(client, clinicId, payload = {})
     { key: 'final_cta', type: 'final_cta', title: 'Book an Appointment', subtitle: 'Contact us today' }
   ];
 
-  for (let index = 0; index < defaultSections.length; index++) {
-    const sec = defaultSections[index];
+  let index = 0;
+  for (const sec of defaultSections) {
     await client.query(
       `
         insert into clinic_homepage_sections (clinic_id, section_key, section_type, title, subtitle, sort_order, status, content_json)
@@ -308,6 +308,7 @@ async function createDefaultClinicWebsiteRecords(client, clinicId, payload = {})
       `,
       [clinicId, sec.key, sec.type, sec.title, sec.subtitle, index + 1]
     );
+    index++;
   }
 }
 
@@ -500,7 +501,7 @@ async function updateClinic(context, clinicId, payload) {
     if (Object.keys(clinicUpdates).length > 0) {
       const keys = Object.keys(clinicUpdates);
       const setClause = keys.map((key, index) => `${key} = $${index + 2}`).join(', ');
-      const values = keys.map(key => clinicUpdates[key]);
+      const values = keys.map(key => Object.prototype.hasOwnProperty.call(clinicUpdates, key) ? clinicUpdates[key] : null);
       await client.query(
         `update clinics set ${setClause}, updated_at = now() where id = $1`,
         [parsedId, ...values]
@@ -525,7 +526,12 @@ async function updateClinic(context, clinicId, payload) {
     if (Object.keys(websiteUpdates).length > 0) {
       const keys = Object.keys(websiteUpdates);
       const insertCols = ['clinic_id', 'website_status', 'default_locale', ...keys];
-      const insertValues = [parsedId, 'draft', 'th-TH', ...keys.map(key => websiteUpdates[key])];
+      const insertValues = [
+        parsedId,
+        'draft',
+        'th-TH',
+        ...keys.map(key => Object.prototype.hasOwnProperty.call(websiteUpdates, key) ? websiteUpdates[key] : null)
+      ];
       const insertPlaceholders = insertCols.map((_, idx) => `$${idx + 1}`).join(', ');
       
       const updateClause = [...keys, 'updated_at'].map(key => {
