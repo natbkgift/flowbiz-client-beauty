@@ -18,6 +18,7 @@ const ExecutionDebuggerContext = createContext(null);
 
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'แดชบอร์ด', caption: 'ภาพรวมกิจกรรมคลินิก' },
+  { key: 'clinics', label: 'จัดการคลินิก', caption: 'เพิ่ม แก้ไข และควบคุมคลินิก' },
   { key: 'unified-inbox', label: 'กล่องแชทรวม', caption: 'แชทโซเชียลและ AI co-pilot' },
   { key: 'roas-analytics', label: 'ROAS และสะสมแต้ม', caption: 'ค่าโฆษณา CAC และแนะนำเพื่อน' },
   { key: 'ai-agent-console', label: 'คอนโซล AI Agent', caption: 'กฎ Agent และคิว HITL' },
@@ -484,6 +485,28 @@ function createApiClient(apiBaseUrl) {
     },
     createForumReply(session, topicId, body) {
       return request(`/forum/topics/${topicId}/replies`, { ...session, method: 'POST', body });
+    },
+    listAdminClinics(session, params = {}) {
+      const search = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          search.set(key, value);
+        }
+      });
+      const suffix = search.toString() ? `?${search.toString()}` : '';
+      return request(`/admin/clinics${suffix}`, session);
+    },
+    getAdminClinic(session, clinicId) {
+      return request(`/admin/clinics/${clinicId}`, session);
+    },
+    createAdminClinic(session, body) {
+      return request('/admin/clinics', { ...session, method: 'POST', body });
+    },
+    updateAdminClinic(session, clinicId, body) {
+      return request(`/admin/clinics/${clinicId}`, { ...session, method: 'PATCH', body });
+    },
+    updateAdminClinicStatus(session, clinicId, body) {
+      return request(`/admin/clinics/${clinicId}/status`, { ...session, method: 'PATCH', body });
     }
   };
 }
@@ -3901,8 +3924,495 @@ function ForumModeratorPage() {
   );
 }
 
+function ClinicsPage() {
+  const api = useApi();
+  const sessionOptions = useSessionRequestOptions();
+  
+  const [flash, setFlash] = useState(null);
+  const [searchVal, setSearchVal] = useState('');
+  const [statusVal, setStatusVal] = useState('');
+  
+  // Create Form State
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    slug: '',
+    plan: 'starter',
+    status: 'active',
+    timezone: 'Asia/Bangkok',
+    publicDisplayName: '',
+    tagline: '',
+    shortDescription: ''
+  });
+
+  // Edit State
+  const [editingClinicId, setEditingClinicId] = useState(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    slug: '',
+    plan: 'starter',
+    timezone: 'Asia/Bangkok',
+    publicDisplayName: '',
+    tagline: '',
+    shortDescription: ''
+  });
+  const [loadingEditDetail, setLoadingEditDetail] = useState(false);
+
+  // Fetch list
+  const [state, setState] = usePageData(
+    () => api.listAdminClinics(sessionOptions, { search: searchVal, status: statusVal }),
+    [api, sessionOptions, searchVal, statusVal]
+  );
+
+  async function refreshList() {
+    setState((current) => ({ ...current, status: 'loading' }));
+    try {
+      const data = await api.listAdminClinics(sessionOptions, { search: searchVal, status: statusVal });
+      setState({ status: 'ready', data, error: null });
+    } catch (error) {
+      setState({ status: 'error', data: null, error });
+    }
+  }
+
+  // Create Clinic Submit
+  async function handleCreateSubmit(e) {
+    e.preventDefault();
+    setFlash(null);
+    if (!createForm.name.trim()) {
+      setFlash({ kind: 'error', message: 'ชื่อคลินิกเป็นฟิลด์ที่จำเป็น' });
+      return;
+    }
+    try {
+      const body = {
+        name: createForm.name,
+        slug: createForm.slug.trim() || undefined,
+        plan: createForm.plan,
+        status: createForm.status,
+        timezone: createForm.timezone,
+        publicDisplayName: createForm.publicDisplayName.trim() || undefined,
+        tagline: createForm.tagline.trim() || undefined,
+        shortDescription: createForm.shortDescription.trim() || undefined
+      };
+      
+      await api.createAdminClinic(sessionOptions, body);
+      setFlash({ kind: 'success', message: 'เพิ่มคลินิกใหม่เรียบร้อยแล้ว' });
+      // Reset form
+      setCreateForm({
+        name: '',
+        slug: '',
+        plan: 'starter',
+        status: 'active',
+        timezone: 'Asia/Bangkok',
+        publicDisplayName: '',
+        tagline: '',
+        shortDescription: ''
+      });
+      // Reload
+      await refreshList();
+    } catch (error) {
+      setFlash({ kind: 'error', message: describeError(error) });
+    }
+  }
+
+  // Edit Click
+  async function handleEditClick(clinicId) {
+    setEditingClinicId(clinicId);
+    setLoadingEditDetail(true);
+    setFlash(null);
+    try {
+      const detail = await api.getAdminClinic(sessionOptions, clinicId);
+      setEditForm({
+        name: detail.name || '',
+        slug: detail.slug || '',
+        plan: detail.plan || 'starter',
+        timezone: detail.timezone || 'Asia/Bangkok',
+        publicDisplayName: detail.websiteSettings?.publicDisplayName || detail.websiteSettings?.public_display_name || '',
+        tagline: detail.websiteSettings?.tagline || '',
+        shortDescription: detail.websiteSettings?.shortDescription || detail.websiteSettings?.short_description || ''
+      });
+    } catch (error) {
+      setFlash({ kind: 'error', message: describeError(error) });
+    } finally {
+      setLoadingEditDetail(false);
+    }
+  }
+
+  // Edit Submit
+  async function handleEditSubmit(e) {
+    e.preventDefault();
+    setFlash(null);
+    if (!editForm.name.trim()) {
+      setFlash({ kind: 'error', message: 'ชื่อคลินิกเป็นฟิลด์ที่จำเป็น' });
+      return;
+    }
+    try {
+      const body = {
+        name: editForm.name,
+        slug: editForm.slug.trim(),
+        plan: editForm.plan,
+        timezone: editForm.timezone,
+        publicDisplayName: editForm.publicDisplayName.trim() || null,
+        tagline: editForm.tagline.trim() || null,
+        shortDescription: editForm.shortDescription.trim() || null
+      };
+      
+      await api.updateAdminClinic(sessionOptions, editingClinicId, body);
+      setFlash({ kind: 'success', message: 'แก้ไขข้อมูลคลินิกเรียบร้อยแล้ว' });
+      setEditingClinicId(null);
+      await refreshList();
+    } catch (error) {
+      setFlash({ kind: 'error', message: describeError(error) });
+    }
+  }
+
+  // Toggle status
+  async function handleToggleStatus(clinicId, currentStatus) {
+    setFlash(null);
+    const nextStatus = currentStatus === 'active' ? 'inactive' : 'active';
+    try {
+      await api.updateAdminClinicStatus(sessionOptions, clinicId, { status: nextStatus });
+      setFlash({ kind: 'success', message: `เปลี่ยนสถานะเป็น ${nextStatus} เรียบร้อยแล้ว` });
+      if (editingClinicId === clinicId) {
+        setEditingClinicId(null);
+      }
+      await refreshList();
+    } catch (error) {
+      setFlash({ kind: 'error', message: describeError(error) });
+    }
+  }
+
+  // Permission/Error 403 checks
+  if (state.status === 'error' && (state.error?.status === 403 || state.error?.code === 'PLATFORM_ADMIN_REQUIRED')) {
+    return (
+      <section className="page-shell" data-testid="clinics-page">
+        <Card variant="notice" className="error-card" data-testid="clinic-platform-permission-notice">
+          <h3 className="section-heading" style={{ color: 'var(--danger)' }}>ไม่สามารถเปิดหน้าจัดการคลินิกได้</h3>
+          <p className="muted" style={{ fontWeight: 'bold' }}>
+            ต้องเปิด ADMIN_CLINIC_API_ENABLED, เพิ่มอีเมลใน PLATFORM_ADMIN_EMAILS และตั้ง is_franchise_admin=true
+          </p>
+        </Card>
+      </section>
+    );
+  }
+
+  return (
+    <PageShell
+      title="จัดการคลินิก"
+      intro="Platform Admin console สำหรับเพิ่ม แก้ไข และควบคุมสถานะคลินิกทั้งหมดในระบบ"
+    >
+      <div className="alert-banner warning" style={{ marginBottom: '10px' }}>
+        <strong>คำเตือนความปลอดภัย:</strong> ต้องเปิด <code>ADMIN_CLINIC_API_ENABLED</code> ในสภาพแวดล้อม และระบุอีเมลผู้ดูแลใน <code>PLATFORM_ADMIN_EMAILS</code> เพื่อเข้าถึง API ชุดนี้
+      </div>
+
+      <StatusBanner state={flash} />
+
+      <div className="card forum-filter-card" style={{ display: 'flex', gap: '16px', alignItems: 'flex-end', padding: '16px' }}>
+        <label className="field" style={{ flex: 1 }}>
+          <span>ค้นหาคลินิก (ชื่อ หรือ slug)</span>
+          <input
+            type="text"
+            value={searchVal}
+            onChange={(e) => setSearchVal(e.target.value)}
+            placeholder="ค้นหาชื่อหรือสลัก..."
+            data-testid="clinics-search"
+          />
+        </label>
+        <label className="field" style={{ width: '200px' }}>
+          <span>สถานะ</span>
+          <select
+            value={statusVal}
+            onChange={(e) => setStatusVal(e.target.value)}
+            data-testid="clinics-status-filter"
+          >
+            <option value="">ทั้งหมด (all)</option>
+            <option value="active">เปิดใช้งาน (active)</option>
+            <option value="inactive">ปิดใช้งาน (inactive)</option>
+          </select>
+        </label>
+        <Button
+          variant="secondary"
+          onClick={refreshList}
+          data-testid="clinics-refresh"
+          style={{ height: '48px' }}
+        >
+          รีเฟรช
+        </Button>
+      </div>
+
+      <div className="blog-editor-layout" data-testid="clinics-page">
+        <div className="blog-editor-main">
+          {state.status === 'loading' && <LoadingCard label="กำลังโหลดข้อมูลคลินิก..." />}
+          {state.status === 'error' && <ErrorCard error={state.error} />}
+          {state.status === 'ready' && (
+            <div className="table-shell card" style={{ padding: '0px' }}>
+              <table className="data-table" data-testid="clinics-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>ชื่อคลินิก</th>
+                    <th>Slug</th>
+                    <th>แพ็กเกจ</th>
+                    <th>สถานะ</th>
+                    <th>สถานะเว็บไซต์</th>
+                    <th>Timezone</th>
+                    <th>สร้างเมื่อ</th>
+                    <th style={{ textAlign: 'right' }}>การจัดการ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {state.data.items.length === 0 ? (
+                    <tr>
+                      <td colSpan="9" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+                        ไม่พบข้อมูลคลินิกตามตัวกรองที่กำหนด
+                      </td>
+                    </tr>
+                  ) : (
+                    state.data.items.map((clinic) => (
+                      <tr key={clinic.id} data-testid={`clinic-row-${clinic.id}`}>
+                        <td>{clinic.id}</td>
+                        <td><strong>{clinic.name}</strong></td>
+                        <td><code>{clinic.slug}</code></td>
+                        <td><span className="pill" style={{ background: 'rgba(15, 118, 110, 0.08)' }}>{clinic.plan}</span></td>
+                        <td>
+                          <span className={`pill status-${clinic.status}`}>
+                            {clinic.status === 'active' ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className="pill" style={{ background: clinic.websiteStatus === 'active' ? 'rgba(15,118,110,0.1)' : 'rgba(0,0,0,0.06)' }}>
+                            {clinic.websiteStatus || 'draft'}
+                          </span>
+                        </td>
+                        <td>{clinic.timezone}</td>
+                        <td>{formatDateTime(clinic.createdAt)}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', gap: '8px' }}>
+                            <button
+                              type="button"
+                              className="secondary-button"
+                              style={{ padding: '6px 12px', fontSize: '13px' }}
+                              onClick={() => handleEditClick(clinic.id)}
+                              data-testid={`clinic-edit-button-${clinic.id}`}
+                            >
+                              แก้ไข
+                            </button>
+                            <button
+                              type="button"
+                              className={clinic.status === 'active' ? 'ghost-danger-button' : 'primary-button'}
+                              style={{ padding: '6px 12px', fontSize: '13px' }}
+                              onClick={() => handleToggleStatus(clinic.id, clinic.status)}
+                              data-testid={`clinic-status-toggle-${clinic.id}`}
+                            >
+                              {clinic.status === 'active' ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="blog-settings-panel">
+          {editingClinicId ? (
+            <form onSubmit={handleEditSubmit} className="form-grid" data-testid="clinic-edit-form" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h3 className="section-heading">แก้ไขคลินิก #{editingClinicId}</h3>
+              {loadingEditDetail ? (
+                <p className="muted">กำลังโหลดรายละเอียด...</p>
+              ) : (
+                <>
+                  <label className="field">
+                    <span>ชื่อคลินิก <span style={{ color: 'var(--danger)' }}>*</span></span>
+                    <input
+                      type="text"
+                      value={editForm.name}
+                      onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                      required
+                    />
+                  </label>
+                  <label className="field">
+                    <span>สลักคลินิก (slug)</span>
+                    <input
+                      type="text"
+                      value={editForm.slug}
+                      onChange={(e) => setEditForm({ ...editForm, slug: e.target.value })}
+                      placeholder="e.g. skin-clinic"
+                    />
+                  </label>
+                  <label className="field">
+                    <span>แพ็กเกจหลัก</span>
+                    <select
+                      value={editForm.plan}
+                      onChange={(e) => setEditForm({ ...editForm, plan: e.target.value })}
+                    >
+                      <option value="starter">Starter</option>
+                      <option value="pro">Pro</option>
+                      <option value="premium">Premium</option>
+                      <option value="enterprise">Enterprise</option>
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>Timezone</span>
+                    <input
+                      type="text"
+                      value={editForm.timezone}
+                      onChange={(e) => setEditForm({ ...editForm, timezone: e.target.value })}
+                    />
+                  </label>
+                  <label className="field">
+                    <span>ชื่อหน้าเว็บสาธารณะ (Branding)</span>
+                    <input
+                      type="text"
+                      value={editForm.publicDisplayName}
+                      onChange={(e) => setEditForm({ ...editForm, publicDisplayName: e.target.value })}
+                      placeholder="ชื่อที่จะแสดงให้สมาชิกลูกค้าเห็น"
+                    />
+                  </label>
+                  <label className="field">
+                    <span>คำโปรย (Tagline)</span>
+                    <input
+                      type="text"
+                      value={editForm.tagline}
+                      onChange={(e) => setEditForm({ ...editForm, tagline: e.target.value })}
+                      placeholder="e.g. Skin care experts"
+                    />
+                  </label>
+                  <label className="field">
+                    <span>คำอธิบายย่อ (Short Description)</span>
+                    <textarea
+                      value={editForm.shortDescription}
+                      onChange={(e) => setEditForm({ ...editForm, shortDescription: e.target.value })}
+                      placeholder="คำอธิบายโดยย่อของคลินิกความงาม..."
+                      rows="3"
+                      style={{ minHeight: '80px' }}
+                    />
+                  </label>
+                  <div className="blog-editor-actions" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                    <Button
+                      variant="ghost"
+                      onClick={() => setEditingClinicId(null)}
+                      style={{ padding: '8px 16px' }}
+                    >
+                      ยกเลิก
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      data-testid="clinic-edit-submit"
+                      style={{ padding: '8px 16px' }}
+                    >
+                      บันทึกข้อมูล
+                    </Button>
+                  </div>
+                </>
+              )}
+            </form>
+          ) : (
+            <form onSubmit={handleCreateSubmit} className="form-grid" data-testid="clinic-create-form" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <h3 className="section-heading">เพิ่มคลินิกใหม่</h3>
+              <label className="field">
+                <span>ชื่อคลินิก <span style={{ color: 'var(--danger)' }}>*</span></span>
+                <input
+                  type="text"
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                  placeholder="e.g. FlowBiz Beauty Center"
+                  data-testid="clinic-name-input"
+                  required
+                />
+              </label>
+              <label className="field">
+                <span>สลักคลินิก (slug - เว้นว่างเพื่อใช้ชื่อแปลงอัตโนมัติ)</span>
+                <input
+                  type="text"
+                  value={createForm.slug}
+                  onChange={(e) => setCreateForm({ ...createForm, slug: e.target.value })}
+                  placeholder="e.g. beauty-center"
+                  data-testid="clinic-slug-input"
+                />
+              </label>
+              <label className="field">
+                <span>แพ็กเกจหลัก</span>
+                <select
+                  value={createForm.plan}
+                  onChange={(e) => setCreateForm({ ...createForm, plan: e.target.value })}
+                  data-testid="clinic-plan-select"
+                >
+                  <option value="starter">Starter</option>
+                  <option value="pro">Pro</option>
+                  <option value="premium">Premium</option>
+                  <option value="enterprise">Enterprise</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>สถานะตั้งต้น</span>
+                <select
+                  value={createForm.status}
+                  onChange={(e) => setCreateForm({ ...createForm, status: e.target.value })}
+                  data-testid="clinic-status-select"
+                >
+                  <option value="active">เปิดใช้งาน (active)</option>
+                  <option value="inactive">ปิดใช้งาน (inactive)</option>
+                </select>
+              </label>
+              <label className="field">
+                <span>Timezone</span>
+                <input
+                  type="text"
+                  value={createForm.timezone}
+                  onChange={(e) => setCreateForm({ ...createForm, timezone: e.target.value })}
+                />
+              </label>
+              <label className="field">
+                <span>ชื่อหน้าเว็บสาธารณะ (Branding)</span>
+                <input
+                  type="text"
+                  value={createForm.publicDisplayName}
+                  onChange={(e) => setCreateForm({ ...createForm, publicDisplayName: e.target.value })}
+                  placeholder="ชื่อที่จะแสดงให้สมาชิกลูกค้าเห็น"
+                />
+              </label>
+              <label className="field">
+                <span>คำโปรย (Tagline)</span>
+                <input
+                  type="text"
+                  value={createForm.tagline}
+                  onChange={(e) => setCreateForm({ ...createForm, tagline: e.target.value })}
+                  placeholder="e.g. Skin care experts"
+                />
+              </label>
+              <label className="field">
+                <span>คำอธิบายย่อ (Short Description)</span>
+                <textarea
+                  value={createForm.shortDescription}
+                  onChange={(e) => setCreateForm({ ...createForm, shortDescription: e.target.value })}
+                  placeholder="คำอธิบายโดยย่อของคลินิกความงาม..."
+                  rows="3"
+                  style={{ minHeight: '80px' }}
+                />
+              </label>
+              <Button
+                type="submit"
+                variant="primary"
+                data-testid="clinic-create-submit"
+                style={{ padding: '10px 16px', marginTop: '10px' }}
+              >
+                เพิ่มคลินิก
+              </Button>
+            </form>
+          )}
+        </div>
+      </div>
+    </PageShell>
+  );
+}
+
 function renderPage(route) {
   switch (route?.key) {
+    case 'clinics':
+      return <ClinicsPage />;
     case 'unified-inbox':
       return <UnifiedInboxPage />;
     case 'roas-analytics':
