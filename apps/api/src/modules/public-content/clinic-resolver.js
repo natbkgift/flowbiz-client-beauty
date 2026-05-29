@@ -239,8 +239,8 @@ function serializePublicLocationSettings(row) {
     country: row.country || 'Thailand',
     googleMapUrl: row.google_map_url || null,
     googleMapEmbedUrl: row.google_map_embed_url || null,
-    latitude: row.latitude ? Number(row.latitude) : null,
-    longitude: row.longitude ? Number(row.longitude) : null,
+    latitude: row.latitude != null ? Number(row.latitude) : null,
+    longitude: row.longitude != null ? Number(row.longitude) : null,
     businessHours: row.business_hours_json || {}
   };
 }
