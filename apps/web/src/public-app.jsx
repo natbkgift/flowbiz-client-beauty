@@ -924,10 +924,11 @@ function isValidCssColor(color) {
   return hexRegex.test(trimmed) || rgbRegex.test(trimmed) || hslRegex.test(trimmed) || (colorNames.test(trimmed) && trimmed.length < 20);
 }
 
-function buildClinicThemeStyle(brandingSettings = {}) {
-  const primary = isValidCssColor(brandingSettings.primaryColor) ? brandingSettings.primaryColor : 'var(--gold-primary)';
-  const secondary = isValidCssColor(brandingSettings.secondaryColor) ? brandingSettings.secondaryColor : 'var(--bg-secondary)';
-  const accent = isValidCssColor(brandingSettings.accentColor) ? brandingSettings.accentColor : 'var(--gold-hover)';
+function buildClinicThemeStyle(brandingSettings) {
+  const settings = brandingSettings || {};
+  const primary = isValidCssColor(settings.primaryColor) ? settings.primaryColor : 'var(--gold-primary)';
+  const secondary = isValidCssColor(settings.secondaryColor) ? settings.secondaryColor : 'var(--bg-secondary)';
+  const accent = isValidCssColor(settings.accentColor) ? settings.accentColor : 'var(--gold-hover)';
   
   return {
     '--clinic-primary': primary,
