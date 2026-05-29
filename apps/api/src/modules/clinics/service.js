@@ -6,15 +6,21 @@ const { hasPermission } = require('../rbac/service');
 
 /**
  * Guard access specifically for platform administrators.
- * Restricts access to users with tenant:manage permission or owner role.
+ * Verifies the user has explicit is_franchise_admin system flag from database.
  */
-function assertPlatformClinicManageAccess(context) {
+async function assertPlatformClinicManageAccess(context) {
   if (!context || !context.currentUser) {
     throw new AppError(401, 'AUTH_REQUIRED', 'Authentication is required.');
   }
-  const isOwner = context.currentMembership?.role === 'owner';
-  const hasTenantManage = hasPermission(context, 'tenant', 'manage');
-  if (!isOwner && !hasTenantManage) {
+
+  const pool = getPool();
+  const userRes = await pool.query(
+    'select is_franchise_admin from users where id = $1 limit 1',
+    [context.currentUser.id]
+  );
+  
+  const isFranchiseAdmin = userRes.rows[0]?.is_franchise_admin || false;
+  if (!isFranchiseAdmin) {
     throw new AppError(403, 'PLATFORM_ADMIN_REQUIRED', 'Platform admin permission is required.');
   }
   return context;
@@ -24,7 +30,7 @@ function assertPlatformClinicManageAccess(context) {
  * List all clinics with pagination and search/status filters.
  */
 async function listClinics(context, options = {}) {
-  assertPlatformClinicManageAccess(context);
+  await assertPlatformClinicManageAccess(context);
 
   const limit = Math.min(Math.max(Number.parseInt(options.limit, 10) || 50, 1), 100);
   const offset = Math.max(Number.parseInt(options.offset, 10) || 0, 0);
@@ -108,23 +114,11 @@ async function listClinics(context, options = {}) {
   };
 }
 
-// Helper to build count query values
-function countOptions(options) {
-  const countValues = [];
-  if (options.status) {
-    countValues.push(options.status);
-  }
-  if (options.search) {
-    countValues.push(`%${options.search}%`);
-  }
-  return countValues;
-}
-
 /**
  * Retrieve detailed information of a single clinic.
  */
 async function getClinicDetail(context, clinicId) {
-  assertPlatformClinicManageAccess(context);
+  await assertPlatformClinicManageAccess(context);
 
   const parsedId = Number.parseInt(clinicId, 10);
   if (!Number.isInteger(parsedId) || parsedId <= 0) {
@@ -227,6 +221,11 @@ async function getClinicDetail(context, clinicId) {
  * Create a default set of related website records inside a database transaction.
  */
 async function createDefaultClinicWebsiteRecords(client, clinicId, payload = {}) {
+  // Defensive check on website payload attributes
+  const publicDisplayName = payload ? payload.publicDisplayName : null;
+  const tagline = payload ? payload.tagline : null;
+  const shortDescription = payload ? payload.shortDescription : null;
+
   // 1. clinic_website_settings
   await client.query(
     `
@@ -236,9 +235,9 @@ async function createDefaultClinicWebsiteRecords(client, clinicId, payload = {})
     `,
     [
       clinicId,
-      payload.publicDisplayName || null,
-      payload.tagline || null,
-      payload.shortDescription || null
+      publicDisplayName || null,
+      tagline || null,
+      shortDescription || null
     ]
   );
 
@@ -299,7 +298,12 @@ async function createDefaultClinicWebsiteRecords(client, clinicId, payload = {})
  * Provision a new clinic.
  */
 async function createClinic(context, payload) {
-  assertPlatformClinicManageAccess(context);
+  await assertPlatformClinicManageAccess(context);
+
+  // Defensive check on empty/null/undefined payload
+  if (!payload) {
+    throw new AppError(400, 'INVALID_CLINIC_PAYLOAD', 'Request payload is required.');
+  }
 
   const name = typeof payload.name === 'string' ? payload.name.trim() : '';
   if (!name) {
@@ -401,11 +405,16 @@ async function createClinic(context, payload) {
  * Partially update a clinic configuration.
  */
 async function updateClinic(context, clinicId, payload) {
-  assertPlatformClinicManageAccess(context);
+  await assertPlatformClinicManageAccess(context);
 
   const parsedId = Number.parseInt(clinicId, 10);
   if (!Number.isInteger(parsedId) || parsedId <= 0) {
     throw new AppError(400, 'INVALID_CLINIC_PAYLOAD', 'Clinic ID must be a positive integer.');
+  }
+
+  // Defensive check on payload
+  if (!payload) {
+    throw new AppError(400, 'INVALID_CLINIC_PAYLOAD', 'Request payload is required.');
   }
 
   const pool = getPool();
@@ -552,7 +561,7 @@ async function updateClinic(context, clinicId, payload) {
  * Toggle active status of a clinic.
  */
 async function updateClinicStatus(context, clinicId, payload) {
-  assertPlatformClinicManageAccess(context);
+  await assertPlatformClinicManageAccess(context);
 
   const parsedId = Number.parseInt(clinicId, 10);
   if (!Number.isInteger(parsedId) || parsedId <= 0) {

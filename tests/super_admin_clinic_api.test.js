@@ -80,13 +80,20 @@ test('Super Admin Clinic API - Full Integration Tests', async (t) => {
   const createdClinicIds = [];
 
   let testUserId;
+  let testStaffUserId;
 
   t.before(async () => {
     const userRes = await pool.query(
-      `insert into users (email, name, password_hash) values ($1, $2, $3) returning id`,
+      `insert into users (email, name, password_hash, is_franchise_admin) values ($1, $2, $3, true) returning id`,
       [`test-superadmin-${uniqueId}@flowbiz.local`, 'Test SuperAdmin', 'hash']
     );
     testUserId = Number(userRes.rows[0].id);
+
+    const staffRes = await pool.query(
+      `insert into users (email, name, password_hash, is_franchise_admin) values ($1, $2, $3, false) returning id`,
+      [`test-staff-${uniqueId}@flowbiz.local`, 'Test Staff', 'hash']
+    );
+    testStaffUserId = Number(staffRes.rows[0].id);
   });
 
   t.after(async () => {
@@ -97,6 +104,9 @@ test('Super Admin Clinic API - Full Integration Tests', async (t) => {
       }
       if (testUserId) {
         await pool.query('delete from users where id = $1', [testUserId]);
+      }
+      if (testStaffUserId) {
+        await pool.query('delete from users where id = $1', [testStaffUserId]);
       }
     } catch (err) {
       console.error('Test cleanup failed:', err);
@@ -112,7 +122,7 @@ test('Super Admin Clinic API - Full Integration Tests', async (t) => {
   });
 
   const staffAuth = async () => ({
-    currentUser: { id: testUserId, email: 'staff@flowbiz.local' },
+    currentUser: { id: testStaffUserId, email: 'staff@flowbiz.local' },
     currentMembership: { role: 'staff', permissions: [] }
   });
 
