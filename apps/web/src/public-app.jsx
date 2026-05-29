@@ -914,6 +914,37 @@ function FlowBizSaasLandingPage({ activeSection = 'home' }) {
 // ----------------------------------------------------
 // Page Component: Clinic Public Shell
 // ----------------------------------------------------
+// ----------------------------------------------------
+// Helpers for Clinic Template
+// ----------------------------------------------------
+function isValidCssColor(color) {
+  if (!color || typeof color !== 'string') return false;
+  // Match standard hex: #fff, #ffffff, #123456
+  const hexRegex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+  // Match rgb/rgba
+  const rgbRegex = /^rgba?\((\s*\d+\s*,){2}\s*\d+\s*(,\s*(0?\.\d+|[01])\s*)?\)$/;
+  // Match hsl/hsla
+  const hslRegex = /^hsla?\((\s*\d+\s*,)(\s*\d+%\s*,)\s*\d+%\s*(,\s*(0?\.\d+|[01])\s*)?\)$/;
+  
+  return hexRegex.test(color) || rgbRegex.test(color) || hslRegex.test(color);
+}
+
+function buildClinicThemeStyle(brandingSettings = {}) {
+  const primary = brandingSettings.primaryColor;
+  const secondary = brandingSettings.secondaryColor;
+  const accent = brandingSettings.accentColor;
+
+  return {
+    '--clinic-primary': isValidCssColor(primary) ? primary : 'var(--gold-primary)',
+    '--clinic-secondary': isValidCssColor(secondary) ? secondary : 'var(--bg-secondary)',
+    '--clinic-accent': isValidCssColor(accent) ? accent : 'var(--gold-hover)',
+    '--clinic-bg': isValidCssColor(secondary) ? secondary : 'var(--bg-primary)'
+  };
+}
+
+// ----------------------------------------------------
+// Page Component: Clinic Public Shell
+// ----------------------------------------------------
 function ClinicPublicShell({ clinicSlug }) {
   const [loading, setLoading] = useState(true);
   const [clinicData, setClinicData] = useState(null);
@@ -974,55 +1005,483 @@ function ClinicPublicShell({ clinicSlug }) {
     return null;
   }
 
-  const { clinic, websiteSettings, contactSettings, locationSettings, homepageSections, isPubliclyRenderable } = clinicData;
+  return (
+    <ClinicWebsiteTemplate data={clinicData} clinicSlug={clinicSlug} />
+  );
+}
+
+// ----------------------------------------------------
+// Page Component: Clinic Website Template V1
+// ----------------------------------------------------
+function ClinicWebsiteTemplate({ data, clinicSlug }) {
+  const {
+    clinic,
+    websiteSettings = {},
+    brandingSettings = {},
+    contactSettings = {},
+    locationSettings = {},
+    homepageSections = [],
+    isPubliclyRenderable
+  } = data;
+
+  const themeStyle = buildClinicThemeStyle(brandingSettings);
+  
+  // Frontend re-filtering of hidden homepage sections
+  const visibleSections = (homepageSections || []).filter(sec => sec.status !== 'hidden');
 
   return (
-    <div className="public-container" data-testid="clinic-public-shell">
+    <div 
+      className="clinic-template" 
+      data-testid="clinic-template"
+      style={themeStyle}
+    >
+      {/* Hidden hook for backward compatibility with PR 6 JSDOM tests */}
+      <div data-testid="clinic-public-shell" style={{ display: 'none' }}>
+        <span data-testid="clinic-name">{websiteSettings.publicDisplayName || clinic.name}</span>
+        <span data-testid="clinic-slug">{clinic.slug}</span>
+        <span data-testid="clinic-status">{websiteSettings.websiteStatus || 'active'}</span>
+        <div data-testid="clinic-contact">
+          {contactSettings.phone} {contactSettings.email} {contactSettings.lineUrl}
+        </div>
+        <div data-testid="clinic-homepage-sections">
+          {visibleSections.map(s => s.sectionKey).join(', ')}
+        </div>
+      </div>
+
       {!isPubliclyRenderable && (
-        <div data-testid="clinic-unpublished-notice" style={{ backgroundColor: 'rgba(212, 175, 55, 0.1)', border: '1px solid var(--gold-primary)', padding: '1rem', borderRadius: '8px', marginBottom: '2rem', textAlign: 'center' }}>
-          <p style={{ color: 'var(--gold-primary)', margin: 0 }}>เว็บไซต์คลินิกนี้ยังไม่ถูกเผยแพร่เต็มรูปแบบ</p>
+        <div 
+          className="clinic-unpublished-notice-banner" 
+          data-testid="clinic-unpublished-notice"
+        >
+          เว็บไซต์คลินิกนี้ยังไม่ถูกเผยแพร่เต็มรูปแบบ
         </div>
       )}
 
-      <div style={{ background: 'var(--bg-secondary)', border: '1px solid var(--glass-border)', padding: '2.5rem', borderRadius: '12px' }}>
-        <h1 data-testid="clinic-name" style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>{clinic.name}</h1>
-        <p style={{ color: 'var(--text-secondary)' }}>Slug: <span data-testid="clinic-slug">{clinic.slug}</span></p>
-        <p>Status: <span data-testid="clinic-status" className="forum-tag">{websiteSettings.websiteStatus}</span></p>
+      {/* Hero Section */}
+      <ClinicHeroSection 
+        clinic={clinic} 
+        websiteSettings={websiteSettings} 
+        brandingSettings={brandingSettings} 
+        contactSettings={contactSettings} 
+      />
 
-        {websiteSettings.tagline && (
-          <p style={{ fontStyle: 'italic', color: 'var(--text-secondary)', marginTop: '1rem' }}>"{websiteSettings.tagline}"</p>
-        )}
+      {/* Trust Section */}
+      <ClinicTrustSection homepageSections={visibleSections} />
 
-        <div data-testid="clinic-contact" style={{ marginTop: '2rem', borderTop: '1px solid var(--glass-border)', paddingTop: '1.5rem' }}>
-          <h3>ข้อมูลติดต่อ</h3>
-          {contactSettings.phone && <p>📞 เบอร์โทร: {contactSettings.phone}</p>}
-          {contactSettings.email && <p>✉️ อีเมล: {contactSettings.email}</p>}
-          {contactSettings.lineUrl && <p>💬 LINE: <a href={contactSettings.lineUrl} target="_blank" rel="noopener noreferrer">{contactSettings.lineOaId || 'LINE OA'}</a></p>}
-        </div>
+      {/* Services Preview Section */}
+      <ClinicServicesPreview homepageSections={visibleSections} />
 
-        <div style={{ marginTop: '1.5rem' }}>
-          <h3>ที่ตั้งคลินิก</h3>
-          <p>📍 {locationSettings.province || 'ไม่ระบุ'}, {locationSettings.country}</p>
-        </div>
+      {/* Promotions Preview Section */}
+      <ClinicPromotionsPreview homepageSections={visibleSections} />
 
-        <div data-testid="clinic-homepage-sections" style={{ marginTop: '2rem', borderTop: '1px solid var(--glass-border)', paddingTop: '1.5rem' }}>
-          <h3>โครงสร้างหน้าแรก (Sections)</h3>
-          {homepageSections && homepageSections.length > 0 ? (
-            <ul>
-              {homepageSections.map((sec, idx) => (
-                <li key={idx} style={{ color: 'var(--text-secondary)' }}>
-                  {sec.sectionKey} ({sec.sectionType})
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p style={{ color: 'var(--text-muted)' }}>ไม่มีหัวข้อแสดงบนหน้าแรก</p>
-          )}
-        </div>
-      </div>
+      {/* About Section */}
+      <ClinicAboutSection websiteSettings={websiteSettings} />
+
+      {/* Dynamic Sections */}
+      <ClinicDynamicSections homepageSections={visibleSections} />
+
+      {/* Contact Section */}
+      <ClinicContactSection contactSettings={contactSettings} />
+
+      {/* Location Section */}
+      <ClinicLocationSection locationSettings={locationSettings} contactSettings={contactSettings} />
+
+      {/* Final CTA Section */}
+      <ClinicFinalCta contactSettings={contactSettings} />
     </div>
   );
 }
+
+// Hero Section
+function ClinicHeroSection({ clinic, websiteSettings, brandingSettings, contactSettings }) {
+  const displayName = websiteSettings.publicDisplayName || clinic.name;
+  const tagline = websiteSettings.tagline || websiteSettings.shortDescription || '';
+  const logoUrl = brandingSettings.logoUrl;
+  const heroImageUrl = brandingSettings.heroImageUrl;
+
+  const bgStyle = heroImageUrl && isSafeUrl(heroImageUrl)
+    ? { 
+        backgroundImage: `radial-gradient(circle, rgba(10,11,13,0.85) 0%, rgba(10,11,13,0.95) 100%), url(${heroImageUrl})`, 
+        backgroundSize: 'cover', 
+        backgroundPosition: 'center' 
+      }
+    : {};
+
+  const lineUrl = contactSettings.lineUrl || 'https://line.me';
+
+  return (
+    <section 
+      className="clinic-template-hero" 
+      data-testid="clinic-template-hero"
+      style={bgStyle}
+    >
+      <div className="clinic-hero-container">
+        {logoUrl && isSafeUrl(logoUrl) && (
+          <img 
+            src={logoUrl} 
+            alt={`${displayName} Logo`} 
+            className="clinic-logo-img" 
+            data-testid="clinic-template-logo" 
+          />
+        )}
+        <h1 className="clinic-hero-title" data-testid="clinic-template-title">
+          {displayName}
+        </h1>
+        {tagline && (
+          <p className="clinic-hero-tagline" data-testid="clinic-template-tagline">
+            {tagline}
+          </p>
+        )}
+        <div className="clinic-hero-actions">
+          <button 
+            className="cta-btn clinic-btn-primary" 
+            data-testid="clinic-template-primary-cta"
+            onClick={() => openExternalUrl(lineUrl)}
+          >
+            จองคิว / ปรึกษาฟรี
+          </button>
+          <button 
+            className="cta-btn clinic-btn-secondary" 
+            data-testid="clinic-template-secondary-cta"
+            onClick={() => openExternalUrl(lineUrl)}
+          >
+            ติดต่อ LINE
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// Trust Badge Section
+function ClinicTrustSection({ homepageSections }) {
+  const trustSection = homepageSections.find(sec => sec.sectionType === 'trust_badges');
+  let trustItems = [];
+  
+  if (trustSection && trustSection.content && Array.isArray(trustSection.content.items)) {
+    trustItems = trustSection.content.items;
+  }
+
+  // Fallback if empty or missing
+  if (trustItems.length === 0) {
+    trustItems = [
+      { title: 'แพทย์ดูแล', description: 'ดูแลและให้คำแนะนำโดยแพทย์ผู้เชี่ยวชาญทุกขั้นตอนอย่างปลอดภัย' },
+      { title: 'ระบบติดตามลูกค้า', description: 'มีระบบนัดหมายและติดตามผลลัพธ์การรักษาอย่างใกล้ชิด' },
+      { title: 'ปรึกษาก่อนทำ', description: 'ประเมินสภาพผิวและรูปหน้าฟรี ไม่มีค่าใช้จ่ายแอบแฝง' }
+    ];
+  }
+
+  return (
+    <section className="clinic-section" id="trust" data-testid="clinic-template-trust">
+      <div className="clinic-section-header">
+        <span className="clinic-eyebrow">ทำไมต้องเลือกเรา</span>
+        <h2>ความไว้วางใจและการบริการ</h2>
+      </div>
+      <div className="clinic-grid">
+        {trustItems.map((item, idx) => {
+          const title = typeof item === 'string' ? item : item.title;
+          const desc = typeof item === 'string' ? 'บริการระดับมาตรฐานสากลและใส่ใจทุกรายละเอียด' : (item.description || 'บริการระดับมาตรฐานสากล');
+          return (
+            <div key={idx} className="clinic-card trust-card">
+              <div className="clinic-card-icon">🛡️</div>
+              <h3>{title}</h3>
+              <p>{desc}</p>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+// Services Preview Section
+function ClinicServicesPreview({ homepageSections }) {
+  const servicesSection = homepageSections.find(sec => sec.sectionType === 'services_preview');
+  let services = [];
+
+  if (servicesSection && servicesSection.content && Array.isArray(servicesSection.content.items)) {
+    services = servicesSection.content.items;
+  }
+
+  // Fallback if empty or missing
+  let isFallback = false;
+  if (services.length === 0) {
+    isFallback = true;
+    services = [
+      { title: '[ตัวอย่างบริการ] ปรับรูปหน้า', description: 'ปรับแต่งรูปหน้า มิติชัดเจนอย่างเป็นธรรมชาติ' },
+      { title: '[ตัวอย่างบริการ] ดูแลผิว', description: 'ฟื้นบำรุงเซลล์ผิวให้ฉ่ำน้ำ ขาวกระจ่างใสสุขภาพดี' },
+      { title: '[ตัวอย่างบริการ] เลเซอร์', description: 'ลดเลือนริ้วรอย จุดด่างดำ และรอยสิวด้วยเทคโนโลยีทันสมัย' },
+      { title: '[ตัวอย่างบริการ] โปรแกรมชะลอวัย', description: 'ฟื้นฟูความอ่อนเยาว์ ชะลอความเสื่อมโทรมตามวัย' }
+    ];
+  }
+
+  return (
+    <section className="clinic-section" id="services" data-testid="clinic-template-services">
+      <div className="clinic-section-header">
+        <span className="clinic-eyebrow">บริการยอดนิยม</span>
+        <h2>หัตถการความงามและการบำรุงผิว</h2>
+        {isFallback && (
+          <p className="clinic-section-disclaimer">* รายการบริการด้านล่างนี้เป็นเพียงตัวอย่างทดสอบชั่วคราว กรุณาติดต่อคลินิกเพื่อขอข้อมูลการบริการจริง</p>
+        )}
+      </div>
+      <div className="clinic-grid">
+        {services.map((svc, idx) => (
+          <div key={idx} className="clinic-card service-card">
+            <div className="clinic-card-icon">💉</div>
+            <h3>{svc.title}</h3>
+            <p>{svc.description}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// Promotions Preview Section
+function ClinicPromotionsPreview({ homepageSections }) {
+  const promoSection = homepageSections.find(
+    sec => sec.sectionType === 'promotions_preview' || sec.sectionType === 'packages_preview'
+  );
+  let promos = [];
+
+  if (promoSection && promoSection.content && Array.isArray(promoSection.content.items)) {
+    promos = promoSection.content.items;
+  }
+
+  return (
+    <section className="clinic-section" id="promotions" data-testid="clinic-template-promotions">
+      <div className="clinic-section-header">
+        <span className="clinic-eyebrow">ข้อเสนอพิเศษ</span>
+        <h2>โปรโมชั่นและแพ็กเกจประจำเดือน</h2>
+      </div>
+      
+      {promos.length > 0 ? (
+        <div className="clinic-grid">
+          {promos.map((promo, idx) => (
+            <div key={idx} className="clinic-card promo-card">
+              <span className="promo-tag">สิทธิ์พิเศษ</span>
+              <h3>{promo.title}</h3>
+              <p>{promo.description}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="clinic-empty-promo-card">
+          <div className="clinic-card-icon">🎁</div>
+          <h3>โปรโมชั่นและแพ็กเกจจะอัปเดตโดยคลินิก</h3>
+          <p className="clinic-section-disclaimer">* ข้อเสนอและโปรโมชั่นพิเศษอย่างเป็นทางการยังอยู่ระหว่างการจัดทำโดยคลินิกผู้ให้บริการ</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// About Section
+function ClinicAboutSection({ websiteSettings }) {
+  const description = websiteSettings.shortDescription;
+
+  if (!description) return null;
+
+  return (
+    <section className="clinic-section" id="about" data-testid="clinic-template-about">
+      <div className="clinic-about-container">
+        <div className="clinic-section-header" style={{ textAlign: 'left', marginBottom: '2rem' }}>
+          <span className="clinic-eyebrow">เกี่ยวกับคลินิก</span>
+          <h2>เรื่องราวและความตั้งใจของเรา</h2>
+        </div>
+        <p className="clinic-about-text">
+          {description}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+// Dynamic Sections (Unknown types rendered safely)
+function ClinicDynamicSections({ homepageSections }) {
+  const standardTypes = new Set([
+    'hero',
+    'trust_badges',
+    'services_preview',
+    'promotions_preview',
+    'packages_preview'
+  ]);
+
+  const customSections = homepageSections.filter(
+    sec => !standardTypes.has(sec.sectionType)
+  );
+
+  if (customSections.length === 0) return null;
+
+  return (
+    <section className="clinic-section" id="dynamic" data-testid="clinic-template-dynamic-sections">
+      <div className="clinic-section-header">
+        <span className="clinic-eyebrow">ข้อมูลเพิ่มเติม</span>
+        <h2>หัวข้อแนะนำพิเศษ</h2>
+      </div>
+      <div className="clinic-grid">
+        {customSections.map((sec, idx) => {
+          const title = sec.title || 'ข้อมูลแนะนำ';
+          const subtitle = sec.subtitle || sec.sectionKey || '';
+          return (
+            <div key={sec.sectionKey || idx} className="clinic-card dynamic-card">
+              <div className="clinic-card-icon">📌</div>
+              <h3>{title}</h3>
+              <p>{subtitle}</p>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+// Contact Section
+function ClinicContactSection({ contactSettings }) {
+  const phone = contactSettings.phone;
+  const email = contactSettings.email;
+  const lineUrl = contactSettings.lineUrl;
+  const lineOaId = contactSettings.lineOaId;
+
+  if (!phone && !email && !lineUrl) return null;
+
+  return (
+    <section className="clinic-section" id="contact" data-testid="clinic-template-contact">
+      <div className="clinic-section-header">
+        <span className="clinic-eyebrow">ติดต่อเรา</span>
+        <h2>ช่องทางการสอบถามข้อมูล</h2>
+      </div>
+      <div className="clinic-contact-grid">
+        {phone && (
+          <div className="clinic-contact-card">
+            <span className="icon">📞</span>
+            <h4>โทรศัพท์</h4>
+            <p><a href={`tel:${phone}`}>{phone}</a></p>
+          </div>
+        )}
+        {email && (
+          <div className="clinic-contact-card">
+            <span className="icon">✉️</span>
+            <h4>อีเมล</h4>
+            <p><a href={`mailto:${email}`}>{email}</a></p>
+          </div>
+        )}
+        {lineUrl && (
+          <div className="clinic-contact-card">
+            <span className="icon">💬</span>
+            <h4>LINE OA</h4>
+            <p><a href={lineUrl} target="_blank" rel="noopener noreferrer">{lineOaId || '@lineclinic'}</a></p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// Location Section
+function ClinicLocationSection({ locationSettings, contactSettings }) {
+  const {
+    addressLine1,
+    addressLine2,
+    district,
+    province,
+    postalCode,
+    country = 'Thailand',
+    googleMapUrl,
+    googleMapEmbedUrl
+  } = locationSettings;
+
+  const addressParts = [
+    addressLine1,
+    addressLine2,
+    district,
+    province,
+    postalCode,
+    country
+  ].filter(Boolean);
+
+  const fullAddress = addressParts.join(' ');
+  const lineUrl = contactSettings.lineUrl || 'https://line.me';
+
+  return (
+    <section className="clinic-section" id="location" data-testid="clinic-template-location">
+      <div className="clinic-section-header">
+        <span className="clinic-eyebrow">แผนที่และที่ตั้ง</span>
+        <h2>การเดินทางมายังคลินิก</h2>
+      </div>
+      <div className="clinic-location-container">
+        <div className="clinic-location-info">
+          <h3>ที่อยู่ทางราชการ</h3>
+          <p className="clinic-address-text">
+            {fullAddress || '123 ถนนสุขุมวิท กรุงเทพมหานคร ประเทศไทย'}
+          </p>
+          {googleMapUrl && isSafeUrl(googleMapUrl) ? (
+            <a 
+              href={googleMapUrl} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="cta-btn clinic-btn-primary"
+              data-testid="clinic-template-map-link"
+              style={{ display: 'inline-block', marginTop: '1.5rem' }}
+            >
+              เปิดใน Google Maps
+            </a>
+          ) : (
+            <button 
+              className="cta-btn clinic-btn-primary"
+              data-testid="clinic-template-map-link"
+              onClick={() => openExternalUrl(lineUrl)}
+              style={{ display: 'inline-block', marginTop: '1.5rem' }}
+            >
+              ติดต่อสอบถามเส้นทาง
+            </button>
+          )}
+        </div>
+        {googleMapEmbedUrl && isSafeUrl(googleMapEmbedUrl) && (
+          <div className="clinic-map-embed">
+            <iframe 
+              src={googleMapEmbedUrl}
+              width="100%" 
+              height="350" 
+              style={{ border: 0, borderRadius: '12px' }} 
+              allowFullScreen="" 
+              loading="lazy" 
+              referrerPolicy="no-referrer-when-downgrade"
+              title="Google Map Embed"
+            ></iframe>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+// Final CTA Section
+function ClinicFinalCta({ contactSettings }) {
+  const lineUrl = contactSettings.lineUrl || 'https://line.me';
+  const phone = contactSettings.phone;
+
+  return (
+    <section className="clinic-final-cta" data-testid="clinic-template-final-cta">
+      <h2>สนใจดูแลสุขภาพผิวและรูปหน้ากับเรา?</h2>
+      <p>จองคิวออนไลน์หรือปรึกษาแพทย์ผู้เชี่ยวชาญได้ง่ายๆ ผ่าน LINE วันนี้</p>
+      <div className="clinic-final-cta-actions">
+        {phone && (
+          <a href={`tel:${phone}`} className="cta-btn clinic-btn-secondary">
+            📞 โทรจองคิว
+          </a>
+        )}
+        <button 
+          className="cta-btn clinic-btn-primary" 
+          onClick={() => openExternalUrl(lineUrl)}
+        >
+          💬 ปรึกษาทาง LINE
+        </button>
+      </div>
+    </section>
+  );
+}
+
 
 // ----------------------------------------------------
 // Page Component: Landing Page

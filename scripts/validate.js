@@ -137,7 +137,9 @@ const requiredPaths = [
   'tests/public_routing_split.test.js',
   'docs/MULTI_CLINIC_PR6_PUBLIC_ROUTING_SPLIT_HANDOFF.md',
   'tests/public_saas_landing.test.js',
-  'docs/MULTI_CLINIC_PR7_FLOWBIZ_SAAS_LANDING_HANDOFF.md'
+  'docs/MULTI_CLINIC_PR7_FLOWBIZ_SAAS_LANDING_HANDOFF.md',
+  'tests/public_clinic_template.test.js',
+  'docs/MULTI_CLINIC_PR8_CLINIC_WEBSITE_TEMPLATE_HANDOFF.md'
 ];
 
 function checkFiles() {
@@ -239,7 +241,8 @@ function checkSyntax() {
     'apps/api/src/modules/public-content/clinic-resolver.js',
     'tests/public_clinic_slug_resolver.test.js',
     'tests/public_routing_split.test.js',
-    'tests/public_saas_landing.test.js'
+    'tests/public_saas_landing.test.js',
+    'tests/public_clinic_template.test.js'
   ];
 
   for (const file of jsFiles) {
