@@ -1064,7 +1064,7 @@ function ClinicTrustSection({ homepageSections }) {
   // Structured items parser from content
   let badges = [];
   if (trustSec && trustSec.content && Array.isArray(trustSec.content.items)) {
-    badges = trustSec.content.items.map(item => typeof item === 'string' ? item : item.title || item.name || '');
+    badges = trustSec.content.items.map(item => typeof item === 'string' ? item : (item?.title || item?.name || ''));
   }
 
   // Fallbacks if empty
