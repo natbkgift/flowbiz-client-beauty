@@ -129,6 +129,7 @@ All syntax and build verification steps are automated and pass successfully.
 
 ## Residual Risks
 
+- **Draft/Placeholder Pricing**: The pricing listed for the Starter (฿9,900/mo) and Growth (฿19,900/mo) packages represents internal draft parameters derived from sales planning sheets. These are strictly placeholder values for development/testing purposes, not finalized commercial pricing, and must be reviewed and officially validated prior to opening production marketing.
 - **Offline Client Storage**: Since demo request forms capture submissions locally without network transmission, any demo requests submitted by actual staging users will not persist in database. A simple webhook integration is recommended once infrastructure is live.
 
 ---
