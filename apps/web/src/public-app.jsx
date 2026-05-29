@@ -1300,8 +1300,9 @@ function ClinicLocationSection({ locationSettings }) {
 }
 
 function ClinicFinalCta({ contactSettings }) {
-  const phone = contactSettings.phone || '';
-  const lineUrl = contactSettings.lineUrl || 'https://line.me';
+  const settings = contactSettings || {};
+  const phone = settings.phone || '';
+  const lineUrl = settings.lineUrl || 'https://line.me';
 
   return (
     <section className="clinic-template-final-cta" data-testid="clinic-template-final-cta">
