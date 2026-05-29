@@ -216,6 +216,9 @@ test('Admin UI - Clinics Page - Navigation', async () => {
   await waitFor(() => app.document.querySelector('[data-testid="clinics-page"]'));
   assert.equal(app.window.location.hash, '#/clinics');
   assert.match(app.document.body.textContent, /Platform Admin console/);
+  
+  // Verify Dashboard Page is NOT rendered
+  assert.equal(app.document.querySelector('[data-testid="dashboard-metrics"]'), null);
 });
 
 test('Admin UI - Clinics Page - List Clinics', async () => {
