@@ -133,7 +133,9 @@ const requiredPaths = [
   'apps/api/src/modules/public-content/routes.js',
   'apps/api/src/modules/public-content/clinic-resolver.js',
   'tests/public_clinic_slug_resolver.test.js',
-  'docs/MULTI_CLINIC_PR5_PUBLIC_CLINIC_SLUG_RESOLVER_HANDOFF.md'
+  'docs/MULTI_CLINIC_PR5_PUBLIC_CLINIC_SLUG_RESOLVER_HANDOFF.md',
+  'tests/public_routing_split.test.js',
+  'docs/MULTI_CLINIC_PR6_PUBLIC_ROUTING_SPLIT_HANDOFF.md'
 ];
 
 function checkFiles() {
@@ -233,7 +235,8 @@ function checkSyntax() {
     'tests/clinic_slug_validation.test.js',
     'apps/api/src/modules/public-content/routes.js',
     'apps/api/src/modules/public-content/clinic-resolver.js',
-    'tests/public_clinic_slug_resolver.test.js'
+    'tests/public_clinic_slug_resolver.test.js',
+    'tests/public_routing_split.test.js'
   ];
 
   for (const file of jsFiles) {
