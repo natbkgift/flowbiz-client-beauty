@@ -408,7 +408,7 @@ export function App() {
     }
 
     // Platform SaaS landing routes
-    if (pathname === '/' || pathname === '/pricing' || pathname === '/demo' || pathname === '/contact') {
+    if (pathname === '/' || pathname in SAAS_SECTION_MAP) {
       return <FlowBizSaasLandingPage activeSection={SAAS_SECTION_MAP[pathname] || 'home'} />;
     }
 
