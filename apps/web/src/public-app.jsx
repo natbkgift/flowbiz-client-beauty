@@ -1156,9 +1156,9 @@ function ClinicPromotionsPreview({ homepageSections }) {
         <div className="clinic-grid-cards">
           {items.map((promo, idx) => (
             <div className="clinic-glass-card" key={idx} style={{ borderTop: '2px solid var(--clinic-primary)' }}>
-              {promo.tag && <span className="clinic-promo-badge">{promo.tag}</span>}
-              <h3 className="clinic-card-title" style={{ marginTop: promo.tag ? '1rem' : '0' }}>{promo.title}</h3>
-              <p className="clinic-card-desc">{promo.description}</p>
+              {promo?.tag && <span className="clinic-promo-badge">{promo.tag}</span>}
+              <h3 className="clinic-card-title" style={{ marginTop: promo?.tag ? '1rem' : '0' }}>{promo?.title}</h3>
+              <p className="clinic-card-desc">{promo?.description}</p>
             </div>
           ))}
         </div>
