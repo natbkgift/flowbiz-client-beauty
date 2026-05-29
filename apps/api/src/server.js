@@ -48,6 +48,7 @@ const { handleUnifiedChatRoutes } = require('./modules/unified-chat/routes');
 const { handleLoyaltyRoutes } = require('./modules/loyalty-mgm/routes');
 const { handleBlogRoutes } = require('./modules/blog/routes');
 const { handleForumRoutes } = require('./modules/forum/routes');
+const { handleClinicRoutes } = require('./modules/clinics/routes');
 
 
 const config = loadConfig();
@@ -397,6 +398,10 @@ async function routeRequest(request, response) {
   }
 
   if (await handleOpsRoutes(request, response, url, { authenticateRequest, json })) {
+    return;
+  }
+
+  if (await handleClinicRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
     return;
   }
 
