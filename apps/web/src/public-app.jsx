@@ -372,6 +372,8 @@ export function App() {
   const clinicSlug = extractClinicSlugFromPathname(pathname);
 
   // Basic Router parser
+  const SAAS_SECTION_MAP = { '/pricing': 'pricing', '/demo': 'demo', '/contact': 'contact' };
+
   const renderPage = () => {
     if (clinicSlug) {
       return <ClinicPublicShell clinicSlug={clinicSlug} />;
@@ -405,10 +407,15 @@ export function App() {
       );
     }
 
+    // Platform SaaS landing routes
+    if (pathname === '/' || pathname === '/pricing' || pathname === '/demo' || pathname === '/contact') {
+      return <FlowBizSaasLandingPage activeSection={SAAS_SECTION_MAP[pathname] || 'home'} />;
+    }
+
     const hash = currentRoute.substring(1) || '/';
     
     if (hash === '/') {
-      return <PlatformLandingPlaceholder />;
+      return <FlowBizSaasLandingPage activeSection="home" />;
     }
     
     if (hash === '/blog') {
@@ -465,23 +472,29 @@ export function App() {
           </a>
         )}
         <nav>
-          <ul className="nav-links">
+          <ul className={clinicSlug ? 'nav-links' : 'nav-links saas-nav-links'}>
             {clinicSlug ? (
               <li><a href={`/${clinicSlug}`} className="active">หน้าแรก</a></li>
             ) : (
               <>
-                <li><a href="#/" className={currentRoute === '#/' && pathname === '/' ? 'active' : ''}>หน้าแรก</a></li>
-                <li><a href="#/blog" className={currentRoute.startsWith('#/blog') || pathname.startsWith('/blog') ? 'active' : ''}>บทความผิวดี</a></li>
-                <li><a href="#/forum" className={currentRoute.startsWith('#/forum') || pathname.startsWith('/forum') ? 'active' : ''}>เว็บบอร์ดถามตอบ</a></li>
+                <li><a href="/" className={pathname === '/' ? 'active' : ''}>หน้าแรก</a></li>
+                <li><a href="/#saas-features">Features</a></li>
+                <li><a href="/pricing" className={pathname === '/pricing' ? 'active' : ''}>Pricing</a></li>
+                <li><a href="/demo" className={pathname === '/demo' ? 'active' : ''}>Demo</a></li>
+                <li><a href="/contact" className={pathname === '/contact' ? 'active' : ''}>Contact</a></li>
+                <li><a href="/blog" className={pathname.startsWith('/blog') ? 'active' : ''}>บทความ</a></li>
+                <li><a href="/forum" className={pathname.startsWith('/forum') ? 'active' : ''}>เว็บบอร์ด</a></li>
               </>
             )}
           </ul>
         </nav>
         <div className="header-actions">
-          <a href="/admin" className="cta-btn secondary" target="_blank" rel="noopener noreferrer">เข้าระบบ CRM</a>
-          <button className="cta-btn" onClick={() => openExternalUrl('https://line.me')}>
-            {clinicSlug ? 'ติดต่อเรา' : 'ปรึกษาหมอฟรี'}
-          </button>
+          <a href="/admin" className="cta-btn secondary" target="_blank" rel="noopener noreferrer">{clinicSlug ? 'เข้าระบบ CRM' : 'Clinic Login'}</a>
+          {clinicSlug ? (
+            <button className="cta-btn" onClick={() => openExternalUrl('https://line.me')}>ติดต่อเรา</button>
+          ) : (
+            <a href="/demo" className="cta-btn">Request Demo</a>
+          )}
         </div>
       </header>
 
@@ -491,40 +504,77 @@ export function App() {
       {/* Premium Footer */}
       <footer className="footer">
         <div className="footer-content">
-          <div>
-            <h3 className="footer-section-title">เกี่ยวกับคลินิก</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-              {clinicSlug 
-                ? 'คลินิกความงามระดับพรีเมียม ให้บริการปรับรูปหน้า ดูแลผิวพรรณ เลเซอร์ และการชะลอวัยโดยแพทย์ผู้เชี่ยวชาญ'
-                : 'FlowBiz Beauty Clinic คลินิกความงามระดับพรีเมียม ให้บริการปรับรูปหน้า ดูแลผิวพรรณ เลเซอร์ และการชะลอวัยโดยแพทย์ผู้เชี่ยวชาญ'
-              }
-            </p>
-            <span style={{ color: 'var(--gold-primary)', fontWeight: '700' }}>✨ สวยมั่นใจ อย่างเป็นธรรมชาติ</span>
-          </div>
-          <div>
-            <h3 className="footer-section-title">บริการของเรา</h3>
-            <ul className="footer-links">
-              <li><a href="#/">ฉีดโบต็อกปรับรูปหน้า</a></li>
-              <li><a href="#/">ฟิลเลอร์ใต้ตา ร่องแก้ม</a></li>
-              <li><a href="#/">Meso Glow กู้ผิวใส</a></li>
-              <li><a href="#/">ยกกระชับ Ultherapy</a></li>
-            </ul>
-          </div>
-          <div>
-            <h3 className="footer-section-title">ติดต่อเรา</h3>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-              📍 123 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร 10110
-            </p>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
-              📞 โทร: +66 2 123 4567
-            </p>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              ⏰ เวลาเปิดทำการ: ทุกวัน 10:00 - 20:00 น.
-            </p>
-          </div>
+          {clinicSlug ? (
+            <>
+              <div>
+                <h3 className="footer-section-title">เกี่ยวกับคลินิก</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+                  คลินิกความงามระดับพรีเมียม ให้บริการปรับรูปหน้า ดูแลผิวพรรณ เลเซอร์ และการชะลอวัยโดยแพทย์ผู้เชี่ยวชาญ
+                </p>
+                <span style={{ color: 'var(--gold-primary)', fontWeight: '700' }}>✨ สวยมั่นใจ อย่างเป็นธรรมชาติ</span>
+              </div>
+              <div>
+                <h3 className="footer-section-title">บริการของเรา</h3>
+                <ul className="footer-links">
+                  <li><a href="#/">ฉีดโบต็อกปรับรูปหน้า</a></li>
+                  <li><a href="#/">ฟิลเลอร์ใต้ตา ร่องแก้ม</a></li>
+                  <li><a href="#/">Meso Glow กู้ผิวใส</a></li>
+                  <li><a href="#/">ยกกระชับ Ultherapy</a></li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="footer-section-title">ติดต่อเรา</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                  📍 123 ถนนสุขุมวิท แขวงคลองเตย เขตคลองเตย กรุงเทพมหานคร 10110
+                </p>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                  📞 โทร: +66 2 123 4567
+                </p>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  ⏰ เวลาเปิดทำการ: ทุกวัน 10:00 - 20:00 น.
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                <h3 className="footer-section-title">FlowBiz Beauty</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+                  AI Operating System สำหรับคลินิกความงาม ช่วยจัดการ Lead, CRM, LINE follow-up และ AI governance ในระบบเดียว
+                </p>
+                <span style={{ color: 'var(--gold-primary)', fontWeight: '700' }}>✨ AI เสนอ · คนอนุมัติ · มี Audit Trail</span>
+              </div>
+              <div>
+                <h3 className="footer-section-title">Platform</h3>
+                <ul className="saas-footer-links">
+                  <li><a href="/">หน้าแรก</a></li>
+                  <li><a href="/pricing">Pricing</a></li>
+                  <li><a href="/demo">Request Demo</a></li>
+                  <li><a href="/contact">Contact</a></li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="footer-section-title">Resources</h3>
+                <ul className="saas-footer-links">
+                  <li><a href="/blog">บทความ</a></li>
+                  <li><a href="/forum">เว็บบอร์ด</a></li>
+                  <li><a href="/admin" target="_blank" rel="noopener noreferrer">Clinic Login / CRM</a></li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="footer-section-title">ติดต่อ FlowBiz</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '0.5rem' }}>
+                  ✉️ hello@flowbiz.cloud
+                </p>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                  💬 LINE: @flowbiz
+                </p>
+              </div>
+            </>
+          )}
         </div>
         <div className="footer-bottom">
-          &copy; {new Date().getFullYear()} {clinicSlug ? 'FlowBiz Clinic' : 'FlowBiz Beauty Clinic'}. All rights reserved.
+          &copy; {new Date().getFullYear()} {clinicSlug ? 'FlowBiz Clinic' : 'FlowBiz Beauty'}. All rights reserved.
         </div>
       </footer>
     </div>
@@ -532,19 +582,331 @@ export function App() {
 }
 
 // ----------------------------------------------------
-// Page Component: Platform Landing Placeholder
+// Page Component: FlowBiz SaaS Landing Page
 // ----------------------------------------------------
-function PlatformLandingPlaceholder() {
+function FlowBizSaasLandingPage({ activeSection = 'home' }) {
+  const [openFaq, setOpenFaq] = useState(null);
+  const [demoSubmitted, setDemoSubmitted] = useState(false);
+  const [demoForm, setDemoForm] = useState({
+    clinicName: '', contactName: '', phone: '', email: '', branches: '1', interest: 'general'
+  });
+
+  useEffect(() => {
+    if (activeSection && activeSection !== 'home') {
+      const targetId = activeSection === 'contact' ? 'saas-demo' : `saas-${activeSection}`;
+      setTimeout(() => {
+        const el = document.getElementById(targetId);
+        if (el && typeof el.scrollIntoView === 'function') {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 100);
+    }
+  }, [activeSection]);
+
+  const handleDemoSubmit = (e) => {
+    e.preventDefault();
+    setDemoSubmitted(true);
+  };
+
+  const painPoints = [
+    { icon: '😰', title: 'Lead จาก Facebook/LINE หลุดตามไม่ทัน', desc: 'ลูกค้าทักมาแล้วไม่มีระบบติดตาม ทำให้ lead หายไปโดยไม่รู้ตัว' },
+    { icon: '🔁', title: 'แอดมินตอบไม่สม่ำเสมอ', desc: 'แต่ละคนตอบไม่เหมือนกัน ไม่มี standard messaging ทำให้ลูกค้าสับสน' },
+    { icon: '📉', title: 'ไม่มีระบบติดตามลูกค้าเก่า', desc: 'ลูกค้าเก่าที่ควรกลับมาทำหัตถการซ้ำ ถูกลืมไปเพราะไม่มีระบบ remind' },
+    { icon: '⚠️', title: 'AI ตอบเองเสี่ยงเกินไป', desc: 'ให้ AI ตอบโดยอัตโนมัติในบริบททางการแพทย์ อาจนำไปสู่ปัญหาด้านความปลอดภัย' },
+    { icon: '👁️', title: 'เจ้าของไม่เห็น performance รวม', desc: 'ไม่มี dashboard รวมดู lead, conversion, follow-up ของทุกช่องทาง' }
+  ];
+
+  const features = [
+    { icon: '🤖', title: 'AI CRM', desc: 'ระบบ CRM อัจฉริยะที่ช่วยจัดการ Lead Pipeline พร้อม AI สรุปข้อมูลลูกค้า' },
+    { icon: '💬', title: 'LINE Automation', desc: 'เชื่อมต่อ LINE OA เพื่อ follow-up อัตโนมัติ พร้อมระบบ template ที่ปรับแต่งได้' },
+    { icon: '✅', title: 'Human-in-the-Loop Approval', desc: 'AI ช่วยร่าง แต่คนต้องอนุมัติก่อนส่งจริง มั่นใจได้ว่าข้อความปลอดภัย' },
+    { icon: '🌐', title: 'Clinic Website Builder', desc: 'สร้างเว็บไซต์คลินิกของคุณบนแพลตฟอร์ม FlowBiz พร้อม SEO และ blog' },
+    { icon: '📊', title: 'Lead Scoring', desc: 'ให้คะแนน lead อัตโนมัติตามพฤติกรรมและความสนใจ จัดลำดับความสำคัญได้ชัด' },
+    { icon: '📋', title: 'Audit Trail', desc: 'บันทึกทุกการกระทำของ AI และพนักงาน ตรวจสอบย้อนหลังได้ทุกขั้นตอน' },
+    { icon: '🏥', title: 'Multi-Clinic Management', desc: 'จัดการหลายสาขาในระบบเดียว แยกข้อมูลและสิทธิ์อย่างชัดเจน' },
+    { icon: '📈', title: 'Campaign Tracking', desc: 'ติดตาม campaign และ promotion ดู ROI แบบ real-time' }
+  ];
+
+  const steps = [
+    { num: '1', title: 'Lead เข้ามา', desc: 'ลูกค้าทักผ่าน LINE, Facebook, หรือเว็บไซต์' },
+    { num: '2', title: 'บันทึกเข้า CRM', desc: 'ระบบจับ lead เข้า pipeline อัตโนมัติ' },
+    { num: '3', title: 'AI วิเคราะห์', desc: 'AI สรุปข้อมูลและแนะนำ follow-up ที่เหมาะสม' },
+    { num: '4', title: 'คนตรวจ/อนุมัติ', desc: 'พนักงานรีวิวและอนุมัติข้อความก่อนส่ง' },
+    { num: '5', title: 'ส่งและติดตาม', desc: 'ส่งข้อความจริงและติดตามผลลัพธ์' },
+    { num: '6', title: 'เจ้าของดู Dashboard', desc: 'ดูภาพรวม lead, conversion และ performance' }
+  ];
+
+  const packages = [
+    {
+      name: 'Starter',
+      desc: 'สำหรับคลินิกเดี่ยวที่ต้องการเริ่มต้นระบบ lead management',
+      price: '9,900',
+      features: ['Clinic website', 'Lead CRM dashboard', 'Basic LINE follow-up', 'Manual approval workflow', 'Audit trail', 'Demo/simulated mode']
+    },
+    {
+      name: 'Growth',
+      desc: 'สำหรับคลินิกที่มีหลายช่องทาง lead และทีม 2-5 คน',
+      price: '19,900',
+      featured: true,
+      features: ['ทุกอย่างใน Starter', 'AI lead summary & scoring', 'AI suggested replies (HITL)', 'No-show recovery workflow', 'Botox/Filler cycle reminder', 'Campaign tracking', 'Multi-admin workflow']
+    },
+    {
+      name: 'Enterprise',
+      desc: 'สำหรับกลุ่มคลินิกหรือ chain ที่ต้องการ governance เต็มรูปแบบ',
+      price: null,
+      features: ['ทุกอย่างใน Growth', 'Multi-branch management', 'Advanced audit & RBAC', 'Custom automation rules', 'Dedicated setup & support', 'Integration architecture review', 'SLA & governance workshop']
+    }
+  ];
+
+  const faqs = [
+    { q: 'FlowBiz ใช้แทน CRM ได้ไหม?', a: 'FlowBiz Beauty ออกแบบมาเพื่อเป็น AI-powered CRM สำหรับคลินิกความงามโดยเฉพาะ ครอบคลุมการจัดการ lead, follow-up, และ customer lifecycle ทั้งหมด ไม่ใช่แค่ CRM ทั่วไป แต่รวม AI automation และ approval workflow ไว้ในระบบเดียว' },
+    { q: 'AI ส่งข้อความเองหรือไม่?', a: 'ไม่ครับ FlowBiz ใช้หลัก Human-in-the-Loop (HITL) ทุกข้อความที่ AI ร่างจะต้องผ่านการตรวจสอบและอนุมัติจากพนักงานก่อนส่งจริง โดยเฉพาะข้อความที่เกี่ยวกับการแพทย์หรือการรักษา AI จะไม่ส่งออกเองโดยเด็ดขาด' },
+    { q: 'ใช้กับ LINE OA ได้ไหม?', a: 'ได้ครับ FlowBiz รองรับการเชื่อมต่อกับ LINE Official Account ของคลินิก เพื่อรับ-ส่งข้อความอัตโนมัติ follow-up lead และจัดการ conversation ทั้งหมดผ่านระบบ CRM ส่วนกลาง' },
+    { q: 'คลินิกหลายสาขาใช้ได้ไหม?', a: 'ได้ครับ FlowBiz รองรับ Multi-Clinic Management แยกข้อมูล สิทธิ์ และการตั้งค่าของแต่ละสาขาอย่างชัดเจน เจ้าของสามารถดูภาพรวมทุกสาขาได้จาก dashboard เดียว' },
+    { q: 'ต้องมีทีม IT ไหม?', a: 'ไม่จำเป็นครับ FlowBiz เป็น SaaS ที่ใช้งานผ่าน browser ได้ทันที ไม่ต้องติดตั้งซอฟต์แวร์ ทีม FlowBiz จะช่วย setup และ onboarding ให้ในช่วงเริ่มต้น' }
+  ];
+
   return (
-    <div className="public-container" data-testid="public-platform-landing" style={{ textAlign: 'center', padding: '5rem 2rem' }}>
-      <h1 style={{ fontSize: '3rem', color: 'var(--gold-primary)', marginBottom: '1.5rem' }}>FlowBiz Beauty</h1>
-      <p style={{ fontSize: '1.25rem', color: 'var(--text-secondary)', marginBottom: '2.5rem' }}>
-        AI CRM + LINE Automation + HITL for beauty clinics
-      </p>
-      <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-        <button className="cta-btn" onClick={() => alert('Request Demo clicked')}>Request Demo</button>
-        <button className="cta-btn secondary" onClick={() => window.location.pathname = '/flowbiz-beauty-demo'}>View Example Clinic</button>
+    <div className="saas-landing" data-testid="saas-landing-page">
+
+      {/* Hero Section */}
+      <section className="saas-hero" data-testid="saas-hero" id="saas-hero">
+        <div className="saas-hero-content">
+          <span className="saas-hero-eyebrow">AI Operating System for Beauty Clinics</span>
+          <h1>AI CRM & Automation Platform for Beauty Clinics</h1>
+          <p className="saas-hero-sub">
+            รวมเว็บไซต์คลินิก, Lead CRM, LINE Automation, AI Copilot และ Human Approval ไว้ในระบบเดียว
+          </p>
+          <div className="saas-hero-actions">
+            <a href="/demo" className="cta-btn" data-testid="saas-request-demo-cta">Request Demo</a>
+            <a href="/pricing" className="cta-btn secondary" data-testid="saas-pricing-cta">View Pricing</a>
+          </div>
+        </div>
+      </section>
+
+      {/* Pain Points Section */}
+      <div className="saas-section-alt">
+        <section className="saas-section" data-testid="saas-pain-points" id="saas-pain-points">
+          <div className="saas-section-header">
+            <span className="saas-eyebrow">ปัญหาที่คลินิกกำลังเจอ</span>
+            <h2>ทำไมคลินิกถึงต้องการ FlowBiz?</h2>
+            <p>ปัญหาเหล่านี้คุ้นเคยไหม? FlowBiz ถูกออกแบบมาเพื่อแก้ไขทุกจุดนี้</p>
+          </div>
+          <div className="saas-grid">
+            {painPoints.map((pp, i) => (
+              <div key={i} className="saas-pain-card">
+                <div className="saas-pain-icon">{pp.icon}</div>
+                <div>
+                  <h4>{pp.title}</h4>
+                  <p>{pp.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
+
+      {/* Core Features Section */}
+      <section className="saas-section" data-testid="saas-features" id="saas-features">
+        <div className="saas-section-header">
+          <span className="saas-eyebrow">Core Features</span>
+          <h2>ครบทุกฟีเจอร์ที่คลินิกต้องการ</h2>
+          <p>ไม่ใช่แค่เว็บคลินิก ไม่ใช่แค่ CRM แต่เป็นระบบจัดการ lead + automation + AI governance สำหรับคลินิก</p>
+        </div>
+        <div className="saas-grid">
+          {features.map((feat, i) => (
+            <div key={i} className="saas-feature-card">
+              <div className="saas-feature-icon">{feat.icon}</div>
+              <h3>{feat.title}</h3>
+              <p>{feat.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* How It Works Section */}
+      <div className="saas-section-alt">
+        <section className="saas-section" data-testid="saas-how-it-works" id="saas-how-it-works">
+          <div className="saas-section-header">
+            <span className="saas-eyebrow">How It Works</span>
+            <h2>ขั้นตอนการทำงานของ FlowBiz</h2>
+            <p>จาก lead เข้าสู่ระบบ จนถึงเจ้าของคลินิกเห็นผลลัพธ์ใน dashboard</p>
+          </div>
+          <div className="saas-flow-steps">
+            {steps.map((step, i) => (
+              <div key={i} className="saas-flow-step">
+                <div className="saas-flow-step-number">{step.num}</div>
+                <h4>{step.title}</h4>
+                <p>{step.desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      {/* HITL Safety Section */}
+      <section className="saas-section" data-testid="saas-hitl-safety" id="saas-hitl-safety">
+        <div className="saas-safety-section">
+          <div>
+            <div className="saas-safety-badge">🛡️ Safety First</div>
+            <h2 style={{ fontSize: '2rem', marginBottom: '1rem' }}>Human Approval Gate</h2>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', lineHeight: '1.7' }}>
+              AI ไม่ควรส่งข้อความทางการแพทย์หรือข้อความสำคัญออกไปเอง FlowBiz ใช้ Human Approval Gate ก่อนส่งจริงทุกครั้ง
+            </p>
+          </div>
+          <div>
+            <ul className="saas-safety-points">
+              <li><span className="check">✓</span> AI ร่างข้อความ แต่ไม่ส่งเองโดยอัตโนมัติ</li>
+              <li><span className="check">✓</span> พนักงานต้องอนุมัติทุกข้อความก่อนส่งถึงลูกค้า</li>
+              <li><span className="check">✓</span> ข้อความที่มีความเสี่ยงทางการแพทย์จะถูก flag พิเศษ</li>
+              <li><span className="check">✓</span> บันทึก audit trail ทุกการอนุมัติ/ปฏิเสธ</li>
+              <li><span className="check">✓</span> แก้ไขข้อความ AI ก่อนส่งได้ พร้อมเก็บต้นฉบับ</li>
+              <li><span className="check">✓</span> ข้อความที่ถูกปฏิเสธ จะไม่ถูกส่งออกไปเด็ดขาด</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <div className="saas-section-alt">
+        <section className="saas-section" data-testid="saas-pricing" id="saas-pricing">
+          <div className="saas-section-header">
+            <span className="saas-eyebrow">Pricing</span>
+            <h2>แพ็กเกจที่เหมาะกับคลินิกของคุณ</h2>
+            <p>เลือกแผนที่ตรงกับขนาดและความต้องการของคลินิก</p>
+          </div>
+          <div className="saas-pricing-grid">
+            {packages.map((pkg, i) => (
+              <div key={i} className={`saas-pricing-card ${pkg.featured ? 'featured' : ''}`}>
+                {pkg.featured && <span className="saas-pricing-badge">แนะนำ</span>}
+                <h3>{pkg.name}</h3>
+                <p className="saas-pricing-desc">{pkg.desc}</p>
+                <div className="saas-pricing-price">
+                  {pkg.price ? (
+                    <><span className="amount">{pkg.price}</span><span className="period"> THB/เดือน</span></>
+                  ) : (
+                    <span className="amount" style={{ fontSize: '1.5rem' }}>ติดต่อเรา</span>
+                  )}
+                </div>
+                <ul className="saas-pricing-feature-list">
+                  {pkg.features.map((f, j) => (
+                    <li key={j}><span className="check">✓</span> {f}</li>
+                  ))}
+                </ul>
+                <a href="/demo" className={`cta-btn ${pkg.featured ? '' : 'secondary'}`}>
+                  {pkg.price ? 'เริ่มต้นใช้งาน' : 'ติดต่อทีมขาย'}
+                </a>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      {/* Demo / Contact Section */}
+      <section className="saas-section" data-testid="saas-demo" id="saas-demo">
+        <div className="saas-demo-section" data-testid="saas-contact">
+          <div className="saas-demo-info">
+            <h3>พร้อมยกระดับคลินิกของคุณ?</h3>
+            <p>
+              กรอกข้อมูลเพื่อขอ demo ทีม FlowBiz จะติดต่อกลับเพื่อนัดสาธิตระบบ
+              และช่วยวางแผนการใช้งานที่เหมาะกับคลินิกของคุณ
+            </p>
+            <ul className="saas-demo-highlights">
+              <li><span className="icon">🎯</span> สาธิตระบบ CRM และ AI workflow จริง</li>
+              <li><span className="icon">💡</span> วิเคราะห์ปัญหาและแนะนำ solution ที่เหมาะสม</li>
+              <li><span className="icon">📊</span> ประเมิน ROI เบื้องต้นสำหรับคลินิกของคุณ</li>
+              <li><span className="icon">🚀</span> เริ่มต้น pilot ภายใน 14 วัน</li>
+            </ul>
+          </div>
+          <div className="saas-demo-form" data-testid="saas-demo-form">
+            {demoSubmitted ? (
+              <div className="saas-demo-success" data-testid="saas-demo-success">
+                <div className="success-icon">✅</div>
+                <h4>ขอบคุณที่สนใจ!</h4>
+                <p>Demo request captured locally. Backend integration will be added later.</p>
+              </div>
+            ) : (
+              <>
+                <h3>Request Demo</h3>
+                <form onSubmit={handleDemoSubmit}>
+                  <div className="saas-form-grid">
+                    <div className="saas-form-group">
+                      <label htmlFor="demo-clinic-name">ชื่อคลินิก</label>
+                      <input id="demo-clinic-name" type="text" className="saas-form-input" placeholder="เช่น ABC Beauty Clinic" value={demoForm.clinicName} onChange={(e) => setDemoForm({...demoForm, clinicName: e.target.value})} required />
+                    </div>
+                    <div className="saas-form-group">
+                      <label htmlFor="demo-contact-name">ชื่อผู้ติดต่อ</label>
+                      <input id="demo-contact-name" type="text" className="saas-form-input" placeholder="ชื่อ-นามสกุล" value={demoForm.contactName} onChange={(e) => setDemoForm({...demoForm, contactName: e.target.value})} required />
+                    </div>
+                    <div className="saas-form-group">
+                      <label htmlFor="demo-phone">เบอร์โทร / LINE ID</label>
+                      <input id="demo-phone" type="text" className="saas-form-input" placeholder="08x-xxx-xxxx" value={demoForm.phone} onChange={(e) => setDemoForm({...demoForm, phone: e.target.value})} />
+                    </div>
+                    <div className="saas-form-group">
+                      <label htmlFor="demo-email">Email</label>
+                      <input id="demo-email" type="email" className="saas-form-input" placeholder="email@clinic.com" value={demoForm.email} onChange={(e) => setDemoForm({...demoForm, email: e.target.value})} />
+                    </div>
+                    <div className="saas-form-group">
+                      <label htmlFor="demo-branches">จำนวนสาขา</label>
+                      <select id="demo-branches" className="saas-form-input" value={demoForm.branches} onChange={(e) => setDemoForm({...demoForm, branches: e.target.value})}>
+                        <option value="1">1 สาขา</option>
+                        <option value="2-3">2-3 สาขา</option>
+                        <option value="4-10">4-10 สาขา</option>
+                        <option value="10+">มากกว่า 10 สาขา</option>
+                      </select>
+                    </div>
+                    <div className="saas-form-group">
+                      <label htmlFor="demo-interest">สนใจเรื่อง</label>
+                      <select id="demo-interest" className="saas-form-input" value={demoForm.interest} onChange={(e) => setDemoForm({...demoForm, interest: e.target.value})}>
+                        <option value="general">ภาพรวมระบบ</option>
+                        <option value="crm">AI CRM</option>
+                        <option value="line">LINE Automation</option>
+                        <option value="multi-clinic">Multi-Clinic</option>
+                        <option value="pricing">Pricing & Pilot</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button type="submit" className="cta-btn" data-testid="saas-demo-submit">ส่งคำขอ Demo</button>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <div className="saas-section-alt">
+        <section className="saas-section" data-testid="saas-faq" id="saas-faq">
+          <div className="saas-section-header">
+            <span className="saas-eyebrow">FAQ</span>
+            <h2>คำถามที่พบบ่อย</h2>
+          </div>
+          <div className="saas-faq-list">
+            {faqs.map((faq, i) => (
+              <div key={i} className={`saas-faq-item ${openFaq === i ? 'open' : ''}`}>
+                <button className="saas-faq-question" onClick={() => setOpenFaq(openFaq === i ? null : i)}>
+                  <span>{faq.q}</span>
+                  <span className="saas-faq-arrow">▼</span>
+                </button>
+                <div className="saas-faq-answer">
+                  <div className="saas-faq-answer-inner">{faq.a}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      {/* Final CTA Section */}
+      <section className="saas-final-cta" data-testid="saas-final-cta" id="saas-final-cta">
+        <h2>พร้อมเปลี่ยนวิธีจัดการคลินิกของคุณ?</h2>
+        <p>เริ่มต้นใช้ FlowBiz Beauty วันนี้ AI เสนอ · คนอนุมัติ · มี Audit Trail</p>
+        <div className="saas-hero-actions">
+          <a href="/demo" className="cta-btn">Request Demo</a>
+          <a href="/pricing" className="cta-btn secondary">View Pricing</a>
+        </div>
+      </section>
+
     </div>
   );
 }
