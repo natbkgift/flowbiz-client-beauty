@@ -189,9 +189,9 @@ test('pre phase 10 every AppError code has a Thai user-facing message mapping', 
   assert.deepEqual(missing, []);
 });
 
-test('public content routes require explicit clinic context instead of defaulting tenants', () => {
-  assert.equal(resolvePublicClinicId(new URL('http://localhost/blog/posts?clinicId=1001')), 1001);
-  assert.throws(
+test('public content routes require explicit clinic context instead of defaulting tenants', async () => {
+  assert.equal(await resolvePublicClinicId(new URL('http://localhost/blog/posts?clinicId=1001')), 1001);
+  await assert.rejects(
     () => resolvePublicClinicId(new URL('http://localhost/blog/posts')),
     (error) => error.code === 'PUBLIC_CLINIC_REQUIRED'
   );
