@@ -3,16 +3,33 @@ const { AppError } = require('../../common/errors');
 const { recordAuditLog } = require('../audit/service');
 const { normalizeClinicSlug, assertValidClinicSlug } = require('./validation');
 const { hasPermission } = require('../rbac/service');
+const { loadConfig } = require('../../config');
 
 /**
  * Guard access specifically for platform administrators.
- * Verifies the user has explicit is_franchise_admin system flag from database.
+ * Verifies that the global ADMIN_CLINIC_API_ENABLED flag is true,
+ * the user's email exists in the PLATFORM_ADMIN_EMAILS allowlist,
+ * and the user has the is_franchise_admin system flag from database.
  */
 async function assertPlatformClinicManageAccess(context) {
   if (!context || !context.currentUser) {
     throw new AppError(401, 'AUTH_REQUIRED', 'Authentication is required.');
   }
 
+  const config = loadConfig();
+
+  // 1. Verify global administrative API enablement
+  if (!config.adminClinicApiEnabled) {
+    throw new AppError(403, 'PLATFORM_ADMIN_REQUIRED', 'Platform admin API is disabled.');
+  }
+
+  // 2. Verify platform admin email allowlist membership
+  const email = (context.currentUser.email || '').trim().toLowerCase();
+  if (!email || !config.platformAdminEmails.includes(email)) {
+    throw new AppError(403, 'PLATFORM_ADMIN_REQUIRED', 'Platform admin permission is required.');
+  }
+
+  // 3. Verify database system franchise admin status (defense-in-depth)
   const pool = getPool();
   const userRes = await pool.query(
     'select is_franchise_admin from users where id = $1 limit 1',
@@ -507,12 +524,24 @@ async function updateClinic(context, clinicId, payload) {
 
     if (Object.keys(websiteUpdates).length > 0) {
       const keys = Object.keys(websiteUpdates);
-      const setClause = keys.map((key, index) => `${key} = $${index + 2}`).join(', ');
-      const values = keys.map(key => websiteUpdates[key]);
+      const insertCols = ['clinic_id', 'website_status', 'default_locale', ...keys];
+      const insertValues = [parsedId, 'draft', 'th-TH', ...keys.map(key => websiteUpdates[key])];
+      const insertPlaceholders = insertCols.map((_, idx) => `$${idx + 1}`).join(', ');
+      
+      const updateClause = [...keys, 'updated_at'].map(key => {
+        if (key === 'updated_at') {
+          return 'updated_at = now()';
+        }
+        return `${key} = EXCLUDED.${key}`;
+      }).join(', ');
       
       await client.query(
-        `update clinic_website_settings set ${setClause}, updated_at = now() where clinic_id = $1`,
-        [parsedId, ...values]
+        `
+          insert into clinic_website_settings (${insertCols.join(', ')})
+          values (${insertPlaceholders})
+          on conflict (clinic_id) do update set ${updateClause}
+        `,
+        insertValues
       );
     }
 

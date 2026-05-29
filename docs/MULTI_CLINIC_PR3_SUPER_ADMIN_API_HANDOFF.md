@@ -126,18 +126,22 @@ All admin endpoints are exposed under `/admin/clinics` and require authenticatio
 
 ---
 
-## Permission Model
+## Permission Model (Strict Fail-Closed)
 
-Access to `/admin/clinics` routes is protected. We use a guarded helper function:
+Access to `/admin/clinics` routes is protected by a strict, multi-layered fail-closed security guard:
 ```js
-function assertPlatformClinicManageAccess(context) { ... }
+async function assertPlatformClinicManageAccess(context) { ... }
 ```
-Access is allowed if:
-1. The user has the explicit `tenant:manage` permission, or
-2. The user has the `owner` role.
 
-> [!WARNING]
-> This utilizes the existing RBAC context checks. Because standard clinic owners hold the `'owner'` role for their own clinics, this API endpoint behaves as a guarded internal/admin API. A dedicated platform-level RBAC model (e.g. `platform_admin` role) must be added in a subsequent PR before exposing this interface or these endpoints to external networks.
+Access is granted if and only if **all** of the following requirements are met:
+1. **Global Toggle Check**: `ADMIN_CLINIC_API_ENABLED` environment variable is explicitly set to `true`. If unset or set to `false`, all administrative clinic actions are denied with `403 PLATFORM_ADMIN_REQUIRED`.
+2. **Platform Allowlist Check**: The user's authenticated email is explicitly defined in `PLATFORM_ADMIN_EMAILS` (a comma-separated list of permitted emails parsed into an array). If the list is empty, or the user's email is not present, the request is denied with `403 PLATFORM_ADMIN_REQUIRED`.
+3. **Database Franchise Status Check**: The user's record in the database must have `is_franchise_admin = true` system-level flag. If `false`, the request is denied with `403 PLATFORM_ADMIN_REQUIRED`.
+
+> [!IMPORTANT]
+> **Production Defenses**:
+> - In Production, administrative controls strictly fail-closed by default (unless explicitly configured). This protects individual tenant scopes from unauthorized modifications by regular clinic owners or memberships.
+> - An unauthorized request results in a `403 PLATFORM_ADMIN_REQUIRED` error (Thai translation: `'ต้องมีสิทธิ์ผู้ดูแลระบบแพลตฟอร์มเพื่อดำเนินการนี้'`).
 
 ---
 
@@ -183,15 +187,23 @@ Input payload validation includes:
 ## Tests Added
 
 File: `tests/super_admin_clinic_api.test.js`
-- **Auth & Permissions**: Verifies anonymous calls are rejected with `401`, standard staff calls are rejected with `403`, and owner/admin calls succeed.
-- **Clinic Creation (Generated Slug)**: Verifies clinic onboarding generates a unique slug.
-- **Clinic Creation (Explicit Slug)**: Verifies custom slug creation.
+- **Auth & Permissions (Hardened)**:
+  - Verifies anonymous calls are rejected with `401 AUTH_REQUIRED`.
+  - Verifies standard staff calls are rejected with `403 PLATFORM_ADMIN_REQUIRED`.
+  - Verifies administrative requests succeed when global toggle is enabled, user email is allowlisted, and DB flag `is_franchise_admin` is true.
+  - Verifies that disabling `ADMIN_CLINIC_API_ENABLED` blocks administrative requests with `403`.
+  - Verifies that a user with `is_franchise_admin = true` but email not allowlisted is rejected with `403`.
+  - Verifies that an allowlisted email with DB flag `is_franchise_admin = false` is rejected with `403`.
+  - Verifies standard owner role context is strictly blocked with `403` if they lack explicit allowlisting and system flags.
+- **Clinic Onboarding (Generated Slug)**: Verifies clinic onboarding generates a unique slug.
+- **Clinic Onboarding (Explicit Slug)**: Verifies custom slug creation.
 - **Reserved Slugs**: Verifies setting a reserved slug is rejected with `RESERVED_CLINIC_SLUG`.
 - **Slug Conflicts**: Verifies duplicate slugs are rejected with `CLINIC_SLUG_CONFLICT`.
 - **Related Records & Rollbacks**: Verifies transaction integrity. Failed creation rollbacks all database operations, avoiding orphan website records.
 - **Listing and Pagination**: Verifies filtering by status, search queries, limit, and offset parameters.
 - **Clinic Detail Lookup**: Verifies clinic info, website settings, and homepage sections are returned successfully.
 - **Basic Updates**: Verifies partial update works for basic fields and website setting fields.
+- **Legacy Clinic Upsert Support**: Simulates a legacy clinic with no `clinic_website_settings` row and verifies that updating fields dynamically performs a database UPSERT, initializing default settings.
 - **Status Toggling**: Verifies deactivation shifts clinic status to `inactive` and automatically sets website status to `inactive`.
 - **Audit Logs**: Verifies `clinic.created`, `clinic.updated`, and `clinic.status_changed` write actions write audit records correctly.
 

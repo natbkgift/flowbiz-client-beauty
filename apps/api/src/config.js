@@ -90,6 +90,11 @@ function loadConfig() {
     aiRealGenerationEnabled: toBoolean(process.env.AI_REAL_GENERATION_ENABLED, false),
     geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
     openaiModel: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+    adminClinicApiEnabled: toBoolean(process.env.ADMIN_CLINIC_API_ENABLED, false),
+    platformAdminEmails: (process.env.PLATFORM_ADMIN_EMAILS || '')
+      .split(',')
+      .map(e => e.trim().toLowerCase())
+      .filter(Boolean),
     databaseUrl
   };
 }

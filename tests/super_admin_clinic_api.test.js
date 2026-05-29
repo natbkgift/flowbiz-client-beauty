@@ -6,6 +6,10 @@ const { AppError } = require('../apps/api/src/common/errors');
 const { json } = require('../apps/api/src/common/http');
 const { handleClinicRoutes } = require('../apps/api/src/modules/clinics/routes');
 
+// Set up environment configuration explicitly for tests
+process.env.ADMIN_CLINIC_API_ENABLED = 'true';
+process.env.PLATFORM_ADMIN_EMAILS = 'superadmin@flowbiz.local,test-allowed-admin@flowbiz.local,test-superadmin-allowed@flowbiz.local';
+
 function createMockResponse() {
   return {
     statusCode: null,
@@ -149,7 +153,7 @@ test('Super Admin Clinic API - Full Integration Tests', async (t) => {
     assert.equal(res2.statusCode, 403);
     assert.equal(res2.body.error.code, 'PLATFORM_ADMIN_REQUIRED');
 
-    // Super Admin request succeeds
+    // Super Admin request succeeds when allowed
     const res3 = await routeJson(handleClinicRoutes, {
       method: 'GET',
       path: '/admin/clinics',
@@ -157,6 +161,57 @@ test('Super Admin Clinic API - Full Integration Tests', async (t) => {
     });
     assert.equal(res3.statusCode, 200);
     assert.ok(Array.isArray(res3.body.items));
+
+    // A. Verify that global API disabled throws 403 PLATFORM_ADMIN_REQUIRED
+    process.env.ADMIN_CLINIC_API_ENABLED = 'false';
+    const resDisabled = await routeJson(handleClinicRoutes, {
+      method: 'GET',
+      path: '/admin/clinics',
+      authenticateRequest: superAdminAuth
+    });
+    assert.equal(resDisabled.statusCode, 403);
+    assert.equal(resDisabled.body.error.code, 'PLATFORM_ADMIN_REQUIRED');
+    // Restore state
+    process.env.ADMIN_CLINIC_API_ENABLED = 'true';
+
+    // B. Verify that user with is_franchise_admin=true but email not in allowlist throws 403
+    const notAllowlistedAuth = async () => ({
+      currentUser: { id: testUserId, email: 'non-admin@flowbiz.local' },
+      currentMembership: { role: 'owner', permissions: ['tenant.manage'] }
+    });
+    const resNotAllowlisted = await routeJson(handleClinicRoutes, {
+      method: 'GET',
+      path: '/admin/clinics',
+      authenticateRequest: notAllowlistedAuth
+    });
+    assert.equal(resNotAllowlisted.statusCode, 403);
+    assert.equal(resNotAllowlisted.body.error.code, 'PLATFORM_ADMIN_REQUIRED');
+
+    // C. Verify that user with allowlisted email but is_franchise_admin=false in database throws 403
+    const allowedEmailButNoDbFlagAuth = async () => ({
+      currentUser: { id: testStaffUserId, email: 'test-allowed-admin@flowbiz.local' },
+      currentMembership: { role: 'owner', permissions: [] }
+    });
+    const resNoDbFlag = await routeJson(handleClinicRoutes, {
+      method: 'GET',
+      path: '/admin/clinics',
+      authenticateRequest: allowedEmailButNoDbFlagAuth
+    });
+    assert.equal(resNoDbFlag.statusCode, 403);
+    assert.equal(resNoDbFlag.body.error.code, 'PLATFORM_ADMIN_REQUIRED');
+
+    // D. Verify that standard tenant owners with no platform privileges throw 403
+    const regularOwnerAuth = async () => ({
+      currentUser: { id: testStaffUserId, email: 'tenant-owner@flowbiz.local' },
+      currentMembership: { role: 'owner', permissions: ['tenant.manage'] }
+    });
+    const resRegularOwner = await routeJson(handleClinicRoutes, {
+      method: 'GET',
+      path: '/admin/clinics',
+      authenticateRequest: regularOwnerAuth
+    });
+    assert.equal(resRegularOwner.statusCode, 403);
+    assert.equal(resRegularOwner.body.error.code, 'PLATFORM_ADMIN_REQUIRED');
   });
 
   await t.test('2. Create clinic with generated slug', async () => {
@@ -317,6 +372,39 @@ test('Super Admin Clinic API - Full Integration Tests', async (t) => {
     const websiteSettings = await pool.query('select * from clinic_website_settings where clinic_id = $1', [clinicId]);
     assert.equal(websiteSettings.rows[0].public_display_name, 'Super Updated Brand');
     assert.equal(websiteSettings.rows[0].tagline, 'The best skin care center');
+  });
+
+  await t.test('8b. Update legacy clinic (upserts website settings if missing)', async () => {
+    // Delete the website settings record for the second clinic to simulate a legacy clinic
+    const legacyClinicId = createdClinicIds[1];
+    await pool.query('delete from clinic_website_settings where clinic_id = $1', [legacyClinicId]);
+    
+    // Verify no settings exist
+    const settingsBefore = await pool.query('select * from clinic_website_settings where clinic_id = $1', [legacyClinicId]);
+    assert.equal(settingsBefore.rowCount, 0);
+
+    // Perform partial update via PATCH API with website settings fields
+    const payload = {
+      name: `Legacy Clinic ${uniqueId}`,
+      publicDisplayName: 'Legacy Brand Upserted',
+      tagline: 'Upserted tagline!'
+    };
+
+    const res = await routeJson(handleClinicRoutes, {
+      method: 'PATCH',
+      path: `/admin/clinics/${legacyClinicId}`,
+      authenticateRequest: superAdminAuth,
+      body: payload
+    });
+
+    assert.equal(res.statusCode, 200);
+
+    // Verify that the website settings row has been successfully created (upserted)
+    const settingsAfter = await pool.query('select * from clinic_website_settings where clinic_id = $1', [legacyClinicId]);
+    assert.equal(settingsAfter.rowCount, 1);
+    assert.equal(settingsAfter.rows[0].public_display_name, 'Legacy Brand Upserted');
+    assert.equal(settingsAfter.rows[0].tagline, 'Upserted tagline!');
+    assert.equal(settingsAfter.rows[0].website_status, 'draft'); // default behavior
   });
 
   await t.test('9. Toggle clinic status', async () => {
