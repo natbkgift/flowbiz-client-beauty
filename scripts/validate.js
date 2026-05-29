@@ -129,7 +129,11 @@ const requiredPaths = [
   'tests/phase9_seo_web.test.js',
   'tests/phase9_blog_forum.test.js',
   'tests/clinic_website_schema.test.js',
-  'tests/clinic_slug_validation.test.js'
+  'tests/clinic_slug_validation.test.js',
+  'apps/api/src/modules/public-content/routes.js',
+  'apps/api/src/modules/public-content/clinic-resolver.js',
+  'tests/public_clinic_slug_resolver.test.js',
+  'docs/MULTI_CLINIC_PR5_PUBLIC_CLINIC_SLUG_RESOLVER_HANDOFF.md'
 ];
 
 function checkFiles() {
@@ -226,7 +230,10 @@ function checkSyntax() {
     'tests/phase9_seo_web.test.js',
     'tests/phase9_blog_forum.test.js',
     'tests/clinic_website_schema.test.js',
-    'tests/clinic_slug_validation.test.js'
+    'tests/clinic_slug_validation.test.js',
+    'apps/api/src/modules/public-content/routes.js',
+    'apps/api/src/modules/public-content/clinic-resolver.js',
+    'tests/public_clinic_slug_resolver.test.js'
   ];
 
   for (const file of jsFiles) {

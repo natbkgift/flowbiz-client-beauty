@@ -27,7 +27,7 @@ async function handleBlogRoutes(request, response, url, tools) {
       clinicId = context.currentClinic.id;
       canManageBlog = hasPermission(context, 'blog', 'manage');
     } catch (_) {
-      clinicId = resolvePublicClinicId(url);
+      clinicId = await resolvePublicClinicId(url);
     }
 
     const reqStatus = url.searchParams.get('status');
@@ -49,7 +49,7 @@ async function handleBlogRoutes(request, response, url, tools) {
       clinicId = context.currentClinic.id;
       canManageBlog = hasPermission(context, 'blog', 'manage');
     } catch (_) {
-      clinicId = resolvePublicClinicId(url);
+      clinicId = await resolvePublicClinicId(url);
     }
 
     // Wait! If slug is a number, is it possible they are calling PUT /blog/posts/:id?
