@@ -108,9 +108,11 @@ const THAI_ERROR_MESSAGES = {
   INTERNAL_SERVER_ERROR: 'ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง'
 };
 
+const THAI_ERROR_MESSAGES_MAP = new Map(Object.entries(THAI_ERROR_MESSAGES));
+
 function getThaiErrorMessage(code, fallback) {
-  if (typeof code === 'string' && Object.prototype.hasOwnProperty.call(THAI_ERROR_MESSAGES, code)) {
-    return THAI_ERROR_MESSAGES[code];
+  if (typeof code === 'string' && THAI_ERROR_MESSAGES_MAP.has(code)) {
+    return THAI_ERROR_MESSAGES_MAP.get(code);
   }
   return fallback || THAI_ERROR_MESSAGES.INTERNAL_SERVER_ERROR;
 }
