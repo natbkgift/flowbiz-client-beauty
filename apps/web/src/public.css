@@ -1689,34 +1689,39 @@ a {
   }
 }
 
-/* =========================================================================
-   Clinic Website Template V1 Styling (PR 8)
-   ========================================================================= */
+/* ============================================
+   Clinic Website Template V1 Styling
+   ============================================ */
 
 .clinic-template {
-  background-color: var(--clinic-bg, var(--bg-primary));
+  background-color: var(--bg-primary);
   color: var(--text-primary);
-  min-height: 100vh;
   font-family: var(--font-body);
-  transition: var(--transition-smooth);
+  display: flex;
+  flex-direction: column;
+  gap: 4rem;
+  padding-bottom: 4rem;
 }
 
-/* Unpublished Banner */
-.clinic-unpublished-notice-banner {
-  background: linear-gradient(90deg, rgba(212, 175, 55, 0.15) 0%, rgba(212, 175, 55, 0.3) 50%, rgba(212, 175, 55, 0.15) 100%);
-  border-bottom: 1px solid var(--gold-primary);
+/* Unpublished draft banner */
+.clinic-unpublished-banner {
+  background: rgba(212, 175, 55, 0.1);
+  border: 1px dashed var(--gold-primary);
   color: var(--gold-primary);
-  padding: 0.85rem 1.5rem;
+  padding: 1rem 2rem;
   text-align: center;
+  font-size: 0.95rem;
   font-weight: 600;
-  font-size: 0.9rem;
-  letter-spacing: 0.05em;
-  animation: pulse-glow 2.5s infinite ease-in-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  animation: pulse 2s infinite ease-in-out;
 }
 
-@keyframes pulse-glow {
-  0%, 100% { opacity: 0.9; text-shadow: 0 0 4px rgba(212,175,55,0.2); }
-  50% { opacity: 1; text-shadow: 0 0 12px rgba(212,175,55,0.6); }
+@keyframes pulse {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.6; }
 }
 
 /* Hero Section */
@@ -1728,84 +1733,116 @@ a {
   justify-content: center;
   padding: 6rem 2rem;
   text-align: center;
-  background: radial-gradient(circle at 50% 30%, rgba(212, 175, 55, 0.1) 0%, transparent 75%), var(--bg-primary);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--glass-border);
+  box-shadow: inset 0 -100px 150px var(--bg-primary);
 }
 
 .clinic-hero-container {
   max-width: 800px;
-  width: 100%;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
 }
 
 .clinic-logo-img {
-  max-width: 120px;
-  max-height: 120px;
-  margin-bottom: 2rem;
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
   border-radius: 50%;
   border: 2px solid var(--clinic-primary);
-  box-shadow: 0 0 20px rgba(212, 175, 55, 0.25);
-  object-fit: cover;
+  background: var(--bg-primary);
+  padding: 0.5rem;
+  box-shadow: 0 0 20px var(--gold-glow);
 }
 
-.clinic-hero-title {
+.clinic-logo-placeholder {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--clinic-secondary), var(--clinic-primary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  box-shadow: 0 0 20px var(--gold-glow);
+}
+
+.clinic-title {
+  font-family: var(--font-heading);
   font-size: 3.5rem;
   font-weight: 800;
   line-height: 1.2;
-  margin-bottom: 1.5rem;
-  background: linear-gradient(135deg, #ffffff 30%, var(--clinic-primary) 100%);
+  color: #ffffff;
+  background: linear-gradient(to right, #ffffff, var(--clinic-primary));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  text-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.1);
 }
 
-.clinic-hero-tagline {
+.clinic-tagline {
+  color: var(--clinic-primary);
+  font-family: var(--font-heading);
   font-size: 1.25rem;
-  color: var(--text-secondary);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  font-style: italic;
   max-width: 600px;
-  margin: 0 auto 2.5rem;
+}
+
+.clinic-hero-desc {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  max-width: 650px;
   line-height: 1.6;
 }
 
-.clinic-hero-actions {
+.clinic-hero-ctas {
   display: flex;
-  gap: 1.5rem;
+  gap: 1rem;
+  margin-top: 1rem;
   justify-content: center;
 }
 
+/* Custom buttons supporting brand theme */
 .clinic-btn-primary {
   background: linear-gradient(135deg, var(--clinic-primary) 0%, var(--clinic-accent) 100%) !important;
   color: var(--bg-primary) !important;
-  font-weight: 700 !important;
+  border: none !important;
 }
 
 .clinic-btn-primary:hover {
+  filter: brightness(1.1);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4) !important;
+  box-shadow: 0 4px 15px rgba(212, 175, 55, 0.4);
 }
 
 .clinic-btn-secondary {
-  background: transparent !important;
   color: var(--clinic-primary) !important;
   border: 1px solid var(--clinic-primary) !important;
-  box-shadow: none !important;
+  background: transparent !important;
 }
 
 .clinic-btn-secondary:hover {
   background: rgba(212, 175, 55, 0.08) !important;
-  color: #ffffff !important;
 }
 
 /* Sections */
-.clinic-section {
-  padding: 6rem 2rem;
+.clinic-template-section {
   max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
-  border-top: 1px solid rgba(255, 255, 255, 0.03);
+  padding: 4rem 2rem;
 }
 
 .clinic-section-header {
   text-align: center;
-  margin-bottom: 4rem;
+  margin-bottom: 3rem;
 }
 
 .clinic-eyebrow {
@@ -1815,246 +1852,274 @@ a {
   letter-spacing: 0.15em;
   font-weight: 700;
   display: block;
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.5rem;
 }
 
 .clinic-section-header h2 {
   font-size: 2.25rem;
   font-weight: 700;
-  margin-bottom: 1rem;
+  color: #ffffff;
 }
 
-.clinic-section-disclaimer {
-  color: var(--text-muted);
-  font-size: 0.85rem;
-  margin-top: 1rem;
-  font-style: italic;
+.clinic-placeholder-badge {
+  display: inline-block;
+  background: rgba(212, 175, 55, 0.05);
+  border: 1px dashed var(--clinic-primary);
+  color: var(--clinic-primary);
+  font-size: 0.8rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  margin-top: 0.75rem;
 }
 
-/* Grid & Cards */
-.clinic-grid {
+/* Grid layout & cards */
+.clinic-grid-cards {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 2rem;
 }
 
-.clinic-card {
-  background: var(--clinic-secondary);
+.clinic-glass-card {
+  background: var(--bg-secondary);
   border: 1px solid var(--glass-border);
   border-radius: 16px;
   padding: 2.5rem 2rem;
   transition: var(--transition-smooth);
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
-.clinic-card:hover {
+.clinic-glass-card:hover {
   transform: translateY(-5px);
   border-color: var(--clinic-primary);
-  box-shadow: 0 10px 25px rgba(212, 175, 55, 0.15);
+  box-shadow: 0 10px 25px rgba(212, 175, 55, 0.08);
 }
 
 .clinic-card-icon {
   font-size: 2rem;
   color: var(--clinic-primary);
-  margin-bottom: 1.5rem;
 }
 
-.clinic-card h3 {
-  font-size: 1.3rem;
-  margin-bottom: 1rem;
+.clinic-card-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #ffffff;
 }
 
-.clinic-card p {
+.clinic-card-subtitle {
+  font-size: 0.9rem;
+  color: var(--clinic-primary);
+  margin-top: -0.5rem;
+}
+
+.clinic-card-desc {
   color: var(--text-secondary);
   font-size: 0.95rem;
   line-height: 1.6;
 }
 
-/* Promotions Specific Card */
-.clinic-empty-promo-card {
-  background: var(--clinic-secondary);
-  border: 1px dashed var(--clinic-primary);
-  border-radius: 16px;
-  padding: 4rem 2rem;
+/* Fallback promotion card */
+.clinic-fallback-card {
   text-align: center;
+  background: var(--bg-secondary);
+  border: 1px dashed var(--glass-border);
+  padding: 3rem 2rem;
+  border-radius: 16px;
   max-width: 600px;
   margin: 0 auto;
 }
 
-.clinic-empty-promo-card h3 {
-  font-size: 1.4rem;
-  margin-bottom: 0.85rem;
-  color: var(--text-primary);
+.clinic-fallback-card .fallback-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
 }
 
-.clinic-empty-promo-card p {
+.clinic-fallback-card h4 {
+  font-size: 1.2rem;
+  margin-bottom: 0.75rem;
+  color: #ffffff;
+}
+
+.clinic-fallback-card p {
   color: var(--text-secondary);
   font-size: 0.95rem;
 }
 
-/* About Container */
-.clinic-about-container {
+/* About Block */
+.clinic-about-block {
+  background: linear-gradient(135deg, rgba(19, 21, 26, 0.8) 0%, rgba(21, 23, 28, 0.9) 100%);
+  border-radius: 20px;
+  border: 1px solid var(--glass-border);
+  padding: 4rem;
+}
+
+.clinic-about-content {
+  font-size: 1.15rem;
+  color: var(--text-secondary);
+  line-height: 1.8;
+  text-align: center;
   max-width: 800px;
   margin: 0 auto;
 }
 
-.clinic-about-text {
-  font-size: 1.15rem;
-  color: var(--text-secondary);
-  line-height: 1.8;
-  white-space: pre-line;
-}
-
-/* Contact Grid */
-.clinic-contact-grid {
+/* Contact & Location layout split */
+.clinic-template-grid-contact-location {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: 1fr 1fr;
   gap: 2rem;
-  max-width: 900px;
+  max-width: 1200px;
+  width: 100%;
   margin: 0 auto;
+  padding: 0 2rem;
 }
 
-.clinic-contact-card {
-  background: var(--clinic-secondary);
+.clinic-contact-block,
+.clinic-location-block {
+  background: var(--bg-secondary);
   border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  padding: 2rem;
-  text-align: center;
-  transition: var(--transition-smooth);
+  border-radius: 16px;
+  padding: 2.5rem !important;
 }
 
-.clinic-contact-card:hover {
-  border-color: var(--clinic-primary);
+.clinic-contact-block h3,
+.clinic-location-block h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1.5rem;
+  color: #ffffff;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 0.75rem;
 }
 
-.clinic-contact-card .icon {
-  font-size: 2rem;
-  display: block;
-  margin-bottom: 1rem;
+.clinic-contact-details {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
 }
 
-.clinic-contact-card h4 {
-  font-size: 1.1rem;
-  margin-bottom: 0.5rem;
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1rem;
 }
 
-.clinic-contact-card p a {
+.contact-item .icon {
+  font-size: 1.25rem;
+  color: var(--clinic-primary);
+}
+
+.contact-item a {
   color: var(--clinic-primary);
   font-weight: 600;
 }
 
-/* Location Layout */
-.clinic-location-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3rem;
-  align-items: center;
+.contact-item a:hover {
+  color: var(--clinic-accent);
+  text-decoration: underline;
 }
 
-.clinic-location-info {
-  padding-right: 2rem;
-}
-
-.clinic-location-info h3 {
-  font-size: 1.4rem;
-  margin-bottom: 1rem;
-}
-
-.clinic-address-text {
+.address-text {
   font-size: 1.05rem;
   color: var(--text-secondary);
-  line-height: 1.7;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
 }
 
-.clinic-map-embed {
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  border-radius: 12px;
-  overflow: hidden;
+.clinic-map-link-container {
+  margin-top: 1rem;
+}
+
+.clinic-map-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.95rem;
+  padding: 0.75rem 1.5rem;
 }
 
 /* Final CTA */
-.clinic-final-cta {
+.clinic-template-final-cta {
   text-align: center;
   padding: 6rem 2rem;
-  background: radial-gradient(ellipse at 50% 50%, rgba(212, 175, 55, 0.08) 0%, transparent 70%);
-  border-top: 1px solid rgba(255, 255, 255, 0.03);
+  background: radial-gradient(circle at 50% 50%, rgba(212, 175, 55, 0.05) 0%, transparent 70%);
+  border-top: 1px solid var(--glass-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
 }
 
-.clinic-final-cta h2 {
+.clinic-template-final-cta h2 {
   font-size: 2.5rem;
-  font-weight: 700;
-  margin-bottom: 1rem;
+  font-weight: 800;
+  color: #ffffff;
 }
 
-.clinic-final-cta p {
+.clinic-template-final-cta p {
   color: var(--text-secondary);
   font-size: 1.15rem;
-  margin-bottom: 2.5rem;
   max-width: 600px;
-  margin: 0 auto 2.5rem;
+  line-height: 1.6;
 }
 
-.clinic-final-cta-actions {
+.clinic-final-cta-buttons {
   display: flex;
-  gap: 1.5rem;
-  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
 }
 
-/* =========================================================================
-   Mobile Responsiveness for Clinic Website Template V1
-   ========================================================================= */
+/* Theme Preview container helper class */
+.clinic-theme-preview {
+  border: 1px solid var(--clinic-primary);
+  background: var(--clinic-secondary);
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+  .clinic-template-grid-contact-location {
+    grid-template-columns: 1fr;
+  }
+}
 
 @media (max-width: 768px) {
-  .clinic-hero-title {
+  .clinic-title {
     font-size: 2.5rem;
   }
-
-  .clinic-hero-tagline {
-    font-size: 1.05rem;
-  }
-
-  .clinic-hero-actions {
-    flex-direction: column;
-    align-items: stretch;
-    padding: 0 1.5rem;
-  }
-
-  .clinic-hero-actions button {
-    width: 100%;
-  }
-
-  .clinic-section {
+  
+  .clinic-template-hero {
+    min-height: auto;
     padding: 4rem 1.5rem;
   }
-
-  .clinic-section-header h2 {
-    font-size: 1.75rem;
+  
+  .clinic-about-block {
+    padding: 2rem;
   }
-
-  .clinic-location-container {
-    grid-template-columns: 1fr;
-    gap: 2.5rem;
+  
+  .clinic-template-section {
+    padding: 3rem 1.5rem;
   }
-
-  .clinic-location-info {
-    padding-right: 0;
-    text-align: center;
+  
+  .clinic-template-final-cta h2 {
+    font-size: 2rem;
   }
-
-  .clinic-final-cta h2 {
-    font-size: 1.75rem;
-  }
-
-  .clinic-final-cta-actions {
+  
+  .clinic-hero-ctas,
+  .clinic-final-cta-buttons {
     flex-direction: column;
     align-items: stretch;
-    padding: 0 1.5rem;
-  }
-
-  .clinic-final-cta-actions a,
-  .clinic-final-cta-actions button {
     width: 100%;
+    max-width: 320px;
+  }
+  
+  .clinic-hero-ctas button,
+  .clinic-final-cta-buttons button,
+  .clinic-final-cta-buttons a {
+    width: 100%;
+    text-align: center;
   }
 }
 
