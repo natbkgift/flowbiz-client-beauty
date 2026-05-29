@@ -908,3 +908,783 @@ a {
     width: 100%;
   }
 }
+
+/* ============================================
+   SaaS Landing Page Styles (PR 7)
+   ============================================ */
+
+/* SaaS Landing Wrapper */
+.saas-landing {
+  overflow-x: hidden;
+}
+
+/* SaaS Hero Section */
+.saas-hero {
+  position: relative;
+  min-height: 85vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6rem 2rem 4rem;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(212, 175, 55, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(212, 175, 55, 0.05) 0%, transparent 40%),
+    radial-gradient(ellipse at 50% 80%, rgba(170, 124, 17, 0.04) 0%, transparent 50%);
+  text-align: center;
+}
+
+.saas-hero-content {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.saas-hero-eyebrow {
+  display: inline-block;
+  color: var(--gold-primary);
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.2em;
+  margin-bottom: 1.25rem;
+  padding: 0.4rem 1.25rem;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  border-radius: 9999px;
+  background: rgba(212, 175, 55, 0.06);
+}
+
+.saas-hero h1 {
+  font-size: 3.75rem;
+  font-weight: 800;
+  line-height: 1.12;
+  margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, #ffffff 20%, var(--gold-primary) 80%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.saas-hero-sub {
+  font-size: 1.2rem;
+  color: var(--text-secondary);
+  margin-bottom: 2.5rem;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.7;
+}
+
+.saas-hero-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* SaaS Generic Section */
+.saas-section {
+  padding: 6rem 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.saas-section-alt {
+  background: rgba(212, 175, 55, 0.015);
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.saas-section-header {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.saas-section-header .saas-eyebrow {
+  color: var(--gold-primary);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+.saas-section-header h2 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.saas-section-header p {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* SaaS Grid */
+.saas-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.saas-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 2rem;
+}
+
+/* SaaS Feature Card */
+.saas-feature-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 2rem 1.75rem;
+  transition: var(--transition-smooth);
+  position: relative;
+  overflow: hidden;
+}
+
+.saas-feature-card:hover {
+  transform: translateY(-6px);
+  border-color: var(--glass-border-hover);
+  box-shadow: 0 12px 35px rgba(212, 175, 55, 0.1);
+}
+
+.saas-feature-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--gold-primary), transparent);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.saas-feature-card:hover::after {
+  opacity: 1;
+}
+
+.saas-feature-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(212, 175, 55, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.saas-feature-card h3 {
+  font-size: 1.15rem;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+.saas-feature-card p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* SaaS Pain Point Card */
+.saas-pain-card {
+  background: var(--bg-secondary);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  transition: var(--transition-smooth);
+}
+
+.saas-pain-card:hover {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.03);
+}
+
+.saas-pain-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.saas-pain-card h4 {
+  font-size: 1rem;
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
+
+.saas-pain-card p {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* SaaS How It Works - Flow Steps */
+.saas-flow-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1.5rem;
+  position: relative;
+}
+
+.saas-flow-step {
+  text-align: center;
+  position: relative;
+  padding: 1.5rem 1rem;
+}
+
+.saas-flow-step-number {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold-dark), var(--gold-primary));
+  color: var(--bg-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 1.1rem;
+  margin: 0 auto 1rem;
+}
+
+.saas-flow-step h4 {
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.saas-flow-step p {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* SaaS HITL Safety */
+.saas-safety-section {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.04) 0%, rgba(16, 185, 129, 0.04) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.15);
+  border-radius: 20px;
+  padding: 3.5rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3rem;
+  align-items: center;
+}
+
+.saas-safety-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 9999px;
+  color: #10b981;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 1.25rem;
+}
+
+.saas-safety-points {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.saas-safety-points li {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.saas-safety-points li .check {
+  color: #10b981;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+/* SaaS Pricing Cards */
+.saas-pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+  align-items: stretch;
+}
+
+.saas-pricing-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 2.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  transition: var(--transition-smooth);
+  position: relative;
+}
+
+.saas-pricing-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 35px rgba(212, 175, 55, 0.08);
+}
+
+.saas-pricing-card.featured {
+  border-color: var(--gold-primary);
+  background: linear-gradient(180deg, rgba(212, 175, 55, 0.06) 0%, var(--bg-secondary) 40%);
+}
+
+.saas-pricing-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, var(--gold-dark), var(--gold-primary));
+  color: var(--bg-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.3rem 1rem;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.saas-pricing-card h3 {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+}
+
+.saas-pricing-card .saas-pricing-desc {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.saas-pricing-price {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.saas-pricing-price .amount {
+  font-family: var(--font-heading);
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--gold-primary);
+}
+
+.saas-pricing-price .period {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  margin-left: 0.25rem;
+}
+
+.saas-pricing-feature-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+  flex-grow: 1;
+}
+
+.saas-pricing-feature-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.saas-pricing-feature-list li .check {
+  color: var(--gold-primary);
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+.saas-pricing-card .cta-btn {
+  width: 100%;
+  text-align: center;
+  margin-top: auto;
+}
+
+/* SaaS Demo Form */
+.saas-demo-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  align-items: flex-start;
+}
+
+.saas-demo-form {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 2.5rem;
+}
+
+.saas-demo-form h3 {
+  font-size: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.saas-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.saas-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.saas-form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.saas-form-group label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.saas-form-input {
+  width: 100%;
+  background: var(--bg-primary);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  color: var(--text-primary);
+  padding: 0.75rem 1rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  outline: none;
+  transition: var(--transition-smooth);
+}
+
+.saas-form-input:focus {
+  border-color: var(--gold-primary);
+  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+}
+
+.saas-form-input::placeholder {
+  color: var(--text-muted);
+}
+
+.saas-demo-form .cta-btn {
+  width: 100%;
+  margin-top: 1.5rem;
+  padding: 0.85rem 2rem;
+  font-size: 1rem;
+}
+
+.saas-demo-success {
+  text-align: center;
+  padding: 2rem;
+}
+
+.saas-demo-success .success-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.saas-demo-success h4 {
+  font-size: 1.25rem;
+  margin-bottom: 0.75rem;
+  color: #10b981;
+}
+
+.saas-demo-success p {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.saas-demo-info h3 {
+  font-size: 1.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.saas-demo-info p {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  line-height: 1.7;
+  margin-bottom: 1.5rem;
+}
+
+.saas-demo-highlights {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.saas-demo-highlights li {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.saas-demo-highlights li .icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+/* SaaS FAQ Accordion */
+.saas-faq-list {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.saas-faq-item {
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: var(--transition-smooth);
+}
+
+.saas-faq-item:hover {
+  border-color: var(--glass-border-hover);
+}
+
+.saas-faq-question {
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  font-weight: 600;
+  padding: 1.25rem 1.5rem;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  transition: var(--transition-smooth);
+}
+
+.saas-faq-question:hover {
+  color: var(--gold-primary);
+}
+
+.saas-faq-arrow {
+  transition: transform 0.3s ease;
+  color: var(--gold-primary);
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.saas-faq-item.open .saas-faq-arrow {
+  transform: rotate(180deg);
+}
+
+.saas-faq-answer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease, padding 0.35s ease;
+}
+
+.saas-faq-item.open .saas-faq-answer {
+  max-height: 300px;
+}
+
+.saas-faq-answer-inner {
+  padding: 0 1.5rem 1.25rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+/* SaaS Final CTA */
+.saas-final-cta {
+  text-align: center;
+  padding: 5rem 2rem;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(212, 175, 55, 0.08) 0%, transparent 60%);
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.saas-final-cta h2 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.saas-final-cta p {
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  margin-bottom: 2rem;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.saas-final-cta .saas-hero-actions {
+  margin-top: 0;
+}
+
+/* SaaS Platform Nav - extended links */
+.saas-nav-links {
+  display: flex;
+  gap: 1.75rem;
+  list-style: none;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.saas-nav-links a {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.saas-nav-links a:hover,
+.saas-nav-links a.active {
+  color: var(--gold-primary);
+  text-shadow: 0 0 8px var(--gold-glow);
+}
+
+/* SaaS Footer */
+.saas-footer-links {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.saas-footer-links a {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.saas-footer-links a:hover {
+  color: var(--gold-primary);
+}
+
+/* ============================================
+   SaaS Responsive Breakpoints
+   ============================================ */
+
+@media (max-width: 768px) {
+  .saas-hero h1 {
+    font-size: 2.5rem;
+  }
+
+  .saas-hero {
+    min-height: auto;
+    padding: 4rem 1.5rem 3rem;
+  }
+
+  .saas-hero-sub {
+    font-size: 1.05rem;
+  }
+
+  .saas-section {
+    padding: 4rem 1.5rem;
+  }
+
+  .saas-section-header h2 {
+    font-size: 2rem;
+  }
+
+  .saas-safety-section {
+    grid-template-columns: 1fr;
+    padding: 2rem;
+    gap: 2rem;
+  }
+
+  .saas-demo-section {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
+  }
+
+  .saas-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .saas-flow-steps {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+  }
+
+  .saas-final-cta h2 {
+    font-size: 2rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .saas-hero h1 {
+    font-size: 2rem;
+  }
+
+  .saas-hero-eyebrow {
+    font-size: 0.75rem;
+  }
+
+  .saas-grid,
+  .saas-pricing-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .saas-hero-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .saas-hero-actions .cta-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .saas-demo-form {
+    padding: 1.5rem;
+  }
+
+  .saas-section-header {
+    margin-bottom: 2.5rem;
+  }
+
+  .saas-section-header h2 {
+    font-size: 1.75rem;
+  }
+
+  .saas-pricing-card {
+    padding: 2rem 1.5rem;
+  }
+
+  .saas-faq-question {
+    font-size: 0.95rem;
+    padding: 1rem 1.25rem;
+  }
+}
