@@ -1121,8 +1121,8 @@ function ClinicServicesPreview({ homepageSections }) {
         {items.map((svc, idx) => (
           <div className="clinic-glass-card" key={idx}>
             <div className="clinic-card-icon">💉</div>
-            <h3 className="clinic-card-title">{svc.title}</h3>
-            <p className="clinic-card-desc">{svc.description}</p>
+            <h3 className="clinic-card-title">{svc?.title}</h3>
+            <p className="clinic-card-desc">{svc?.description}</p>
           </div>
         ))}
       </div>
