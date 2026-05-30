@@ -126,6 +126,15 @@ const THAI_ERROR_MESSAGES = {
   CROSS_TENANT_FORBIDDEN: 'ไม่มีสิทธิ์จัดการข้อมูลต่างคลินิก',
   INVALID_REORDER_PAYLOAD: 'ข้อมูลจัดเรียงลำดับไม่ถูกต้อง',
   INVALID_REORDER_ITEM: 'ข้อมูลแต่ละรายการจัดเรียงลำดับไม่ถูกต้อง',
+  OFFERING_NOT_FOUND: 'ไม่พบ offering ที่ต้องการ',
+  SERVICE_NOT_FOUND: 'ไม่พบบริการที่ต้องการ',
+  PROMOTION_NOT_FOUND: 'ไม่พบโปรโมชั่นที่ต้องการ',
+  PACKAGE_NOT_FOUND: 'ไม่พบแพ็กเกจที่ต้องการ',
+  INVALID_OFFERING_PAYLOAD: 'ข้อมูล offering ไม่ครบถ้วนหรือไม่ถูกต้อง',
+  INVALID_OFFERING_STATUS: 'สถานะ offering ไม่ถูกต้อง',
+  INVALID_PRICE_RANGE: 'ช่วงราคาไม่ถูกต้อง',
+  INVALID_OFFERING_URL: 'ลิงก์ offering ต้องเป็น http หรือ https เท่านั้น',
+  INVALID_OFFERING_METADATA: 'ข้อมูล metadata ต้องเป็น JSON object เท่านั้น',
   INTERNAL_SERVER_ERROR: 'ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง'
 };
 
