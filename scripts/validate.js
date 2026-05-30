@@ -139,7 +139,12 @@ const requiredPaths = [
   'tests/public_saas_landing.test.js',
   'docs/MULTI_CLINIC_PR7_FLOWBIZ_SAAS_LANDING_HANDOFF.md',
   'tests/public_clinic_template.test.js',
-  'docs/MULTI_CLINIC_PR8_CLINIC_WEBSITE_TEMPLATE_HANDOFF.md'
+  'docs/MULTI_CLINIC_PR8_CLINIC_WEBSITE_TEMPLATE_HANDOFF.md',
+  'apps/api/src/modules/clinic-website/service.js',
+  'apps/api/src/modules/clinic-website/routes.js',
+  'tests/clinic_website_admin_api.test.js',
+  'tests/clinic_website_admin_ui.test.js',
+  'docs/MULTI_CLINIC_PR9_CLINIC_WEBSITE_ADMIN_EDITOR_HANDOFF.md'
 ];
 
 function checkFiles() {
@@ -242,7 +247,11 @@ function checkSyntax() {
     'tests/public_clinic_slug_resolver.test.js',
     'tests/public_routing_split.test.js',
     'tests/public_saas_landing.test.js',
-    'tests/public_clinic_template.test.js'
+    'tests/public_clinic_template.test.js',
+    'apps/api/src/modules/clinic-website/service.js',
+    'apps/api/src/modules/clinic-website/routes.js',
+    'tests/clinic_website_admin_api.test.js',
+    'tests/clinic_website_admin_ui.test.js'
   ];
 
   for (const file of jsFiles) {
