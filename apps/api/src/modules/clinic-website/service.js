@@ -399,8 +399,8 @@ async function updateLocationSettings(clinicId, actorUserId, body) {
   const country = body.country !== undefined ? body.country : (existing?.country || 'Thailand');
   const googleMapUrl = body.googleMapUrl !== undefined ? body.googleMapUrl : (existing?.google_map_url || null);
   const googleMapEmbedUrl = body.googleMapEmbedUrl !== undefined ? body.googleMapEmbedUrl : (existing?.google_map_embed_url || null);
-  const latitude = body.latitude !== undefined ? body.latitude : (existing?.latitude || null);
-  const longitude = body.longitude !== undefined ? body.longitude : (existing?.longitude || null);
+  const latitude = body.latitude !== undefined ? body.latitude : (existing?.latitude ?? null);
+  const longitude = body.longitude !== undefined ? body.longitude : (existing?.longitude ?? null);
   const businessHours = body.businessHours !== undefined ? body.businessHours : (existing?.business_hours_json || {});
 
   validateSafeUrl(googleMapUrl, 'googleMapUrl');
