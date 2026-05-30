@@ -203,14 +203,14 @@ test('PR 8 - Clinic Website Template V1 tests', async (t) => {
     assert.equal(container.style.getPropertyValue('--clinic-secondary').trim(), '#00ff00');
     assert.equal(container.style.getPropertyValue('--clinic-accent').trim(), '#0000ff');
 
-    // Safe color verification - check that invalid colors are not applied (they should fallback)
+    // Safe color verification - check that non-hex colors (names, rgb, hsl, malicious payloads) are rejected
     const mockUnsafeResponse = {
       clinic: { id: 1001, name: 'Clinic Alpha', slug: 'clinic-alpha', status: 'active' },
       websiteSettings: { websiteStatus: 'active' },
       brandingSettings: {
-        primaryColor: 'javascript:alert(1)', // malicious css payload
-        secondaryColor: 'background: url(unsafe)',
-        accentColor: 'gold'
+        primaryColor: 'rgb(255, 0, 0)', // rgb format - rejected
+        secondaryColor: 'hsl(120, 100%, 50%)', // hsl format - rejected
+        accentColor: 'gold' // color name - rejected
       },
       contactSettings: {},
       locationSettings: {},
@@ -227,10 +227,10 @@ test('PR 8 - Clinic Website Template V1 tests', async (t) => {
 
     await waitFor(() => appUnsafe.document.querySelector('[data-testid="clinic-template"]'));
     const unsafeContainer = appUnsafe.document.querySelector('[data-testid="clinic-template"]');
-    // Unsafe colors must fallback to defaults, but accentColor with 'gold' is allowed
+    // Non-hex colors must fallback to default variables
     assert.equal(unsafeContainer.style.getPropertyValue('--clinic-primary').trim(), 'var(--gold-primary)');
     assert.equal(unsafeContainer.style.getPropertyValue('--clinic-secondary').trim(), 'var(--bg-secondary)');
-    assert.equal(unsafeContainer.style.getPropertyValue('--clinic-accent').trim(), 'gold');
+    assert.equal(unsafeContainer.style.getPropertyValue('--clinic-accent').trim(), 'var(--gold-hover)');
   });
 
   // Test 3: Homepage sections render

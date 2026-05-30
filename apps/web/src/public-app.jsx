@@ -916,12 +916,7 @@ function FlowBizSaasLandingPage({ activeSection = 'home' }) {
 // ----------------------------------------------------
 function isValidCssColor(color) {
   if (!color || typeof color !== 'string') return false;
-  const hexRegex = /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
-  const rgbRegex = /^rgba?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(,\s*[0-9.]+\s*)?\)$/i;
-  const hslRegex = /^hsla?\(\s*\d+\s*,\s*\d+%\s*,\s*\d+%\s*(,\s*[0-9.]+\s*)?\)$/i;
-  const colorNames = /^[a-z]+$/i;
-  const trimmed = color.trim();
-  return hexRegex.test(trimmed) || rgbRegex.test(trimmed) || hslRegex.test(trimmed) || (colorNames.test(trimmed) && trimmed.length < 20);
+  return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(color.trim());
 }
 
 function buildClinicThemeStyle(brandingSettings) {
@@ -1389,84 +1384,7 @@ function ClinicPublicShell({ clinicSlug }) {
   );
 }
 
-// ----------------------------------------------------
-// Page Component: Landing Page
-// ----------------------------------------------------
-function LandingPage() {
-  const services = [
-    { icon: '💉', title: 'Botox V-Shape', desc: 'ปรับหน้าเรียว ล็อกริ้วรอย หางตา หน้าผาก หรี่กล้ามเนื้อกรามอย่างเป็นธรรมชาติด้วยโบต็อกแท้ผ่านอย.' },
-    { icon: '✨', title: 'Dermal Fillers', desc: 'เติมเต็มร่องลึกใต้ตา ร่องแก้ม ปรับทรงคางและปากให้ฟูอิ่มน้ำ ปลอดภัย สลายหมด 100%' },
-    { icon: '💆‍♀️', title: 'Meso Bright & Glow', desc: 'ผลักวิตามินเข้มข้น สารอาหารสำคัญและคอลลาเจนเข้าสู่ชั้นผิวโดยตรง บูสต์ผิวขาวใสฉ่ำวาว' },
-    { icon: '⚡', title: 'Ultherapy Lift', desc: 'ยกกระชับระดับลึกถึงชั้น SMAS โดยไม่ต้องผ่าตัด กระตุ้นการสร้างคอลลาเจนใหม่ หน้าเรียวเหนียงหาย' }
-  ];
 
-  const promotions = [
-    { tag: 'โปรยอดนิยม', title: 'โบต็อกลดกราม + ลิฟต์กรอบหน้า (ไม่จำกัดยูนิต)', original: '9,900', price: '4,990', desc: 'ดูแลโดยแพทย์ผู้เชี่ยวชาญ แกะกล่องดึงยาต่อหน้า' },
-    { tag: 'ขายดีที่สุด', title: 'ฟิลเลอร์ใต้ตาเติมเต็มผิวฟู (Premium Brand 1cc)', original: '18,000', price: '11,900', desc: 'แก้ปัญหาร่องลึกใต้ตาคล้ำ ดูโทรม ให้กลับมาสดใสทันที' },
-    { tag: 'ฟื้นฟูผิว', title: 'Meso Glow หน้ากระจ่างใสสะกดสายตา 3 ครั้ง', original: '7,500', price: '2,900', desc: 'สูตรพิเศษเติมวิตามินเข้มข้น ผิวเด้งฉ่ำออร่าแบบเร่งด่วน' }
-  ];
-
-  return (
-    <div>
-      {/* Hero Section */}
-      <section className="hero">
-        <div className="hero-content">
-          <div className="hero-subtitle">คลินิกความงามและดูแลผิวระดับพรีเมียม</div>
-          <h1 className="hero-title">ที่สุดแห่งการดูแลผิวพรรณ<br/>และปรับรูปหน้าอย่างมีระดับ</h1>
-          <p className="hero-desc">
-            ยกระดับความสวยงามของผิวพรรณคุณอย่างปลอดภัย ด้วยเทคโนโลยีทางการแพทย์ที่ทันสมัยและทีมแพทย์ผู้ชำนาญการด้านหัตถการปรับรูปหน้า
-          </p>
-          <div className="hero-actions">
-            <button className="cta-btn" onClick={() => openExternalUrl('https://line.me')}>จองคิวรับสิทธิ์พิเศษ</button>
-            <a href="#/blog" className="cta-btn secondary">อ่านสาระความรู้ผิว</a>
-          </div>
-        </div>
-      </section>
-
-      {/* Services Section */}
-      <section className="section" style={{ borderTop: '1px solid rgba(255,255,255,0.03)' }}>
-        <div className="section-header">
-          <div className="section-subtitle">บริการดูแลเฉพาะทาง</div>
-          <h2 className="section-title">หัตถการความงามที่เชี่ยวชาญ</h2>
-        </div>
-        <div className="grid-cards">
-          {services.map((svc, i) => (
-            <div key={i} className="glass-card">
-              <div className="card-icon">{svc.icon}</div>
-              <h3 className="card-title">{svc.title}</h3>
-              <p className="card-desc">{svc.desc}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Promotions Section */}
-      <section className="section" style={{ borderTop: '1px solid rgba(255,255,255,0.03)', background: 'rgba(212, 175, 55, 0.01)' }}>
-        <div className="section-header">
-          <div className="section-subtitle">ข้อเสนอเฉพาะเดือนนี้</div>
-          <h2 className="section-title">โปรโมชั่นพิเศษประจำเดือนนี้</h2>
-        </div>
-        <div className="grid-cards">
-          {promotions.map((promo, i) => (
-            <div key={i} className="glass-card" style={{ borderTopColor: 'var(--gold-primary)' }}>
-              <span className="promo-badge">{promo.tag}</span>
-              <h3 className="card-title" style={{ marginTop: '1rem', minHeight: '3rem' }}>{promo.title}</h3>
-              <p className="card-desc">{promo.desc}</p>
-              <div className="promo-price-box">
-                <span className="promo-price">{promo.price}</span>
-                <span className="promo-currency">THB</span>
-                <span className="promo-original">{promo.original}.-</span>
-              </div>
-              <button className="cta-btn" style={{ width: '100%' }} onClick={() => openExternalUrl('https://line.me')}>
-                จองสิทธิ์โปรนี้ทาง LINE
-              </button>
-            </div>
-          ))}
-        </div>
-      </section>
-    </div>
-  );
-}
 
 // ----------------------------------------------------
 // Page Component: Blog List Page
