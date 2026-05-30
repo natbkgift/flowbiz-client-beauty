@@ -327,6 +327,19 @@ test('Clinic Website Admin API - Integration Tests', async (t) => {
 
     createdSectionId = createRes.body.id;
 
+    // Reject invalid section key (resulting in empty normalized key)
+    const invalidKeyRes = await routeJson(handleClinicWebsiteRoutes, {
+      method: 'POST',
+      path: '/admin/clinic-website/sections',
+      authenticateRequest: ownerAuthClinic1,
+      body: {
+        ...createPayload,
+        sectionKey: '!!!'
+      }
+    });
+    assert.equal(invalidKeyRes.statusCode, 400);
+    assert.equal(invalidKeyRes.body.error.code, 'INVALID_SECTION_KEY');
+
     // Update Section
     const updatePayload = {
       title: 'Our Premium Story',

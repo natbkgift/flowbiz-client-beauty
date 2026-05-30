@@ -116,6 +116,7 @@ const THAI_ERROR_MESSAGES = {
   INVALID_LONGITUDE: 'ค่าลองจิจูดต้องอยู่ระหว่าง -180 ถึง 180',
   INVALID_BUSINESS_HOURS: 'ข้อมูลเวลาทำการต้องเป็น JSON object เท่านั้น',
   MISSING_SECTION_KEY: 'กรุณาระบุคีย์ระบุสำหรับ Section',
+  INVALID_SECTION_KEY: 'คีย์ระบุสำหรับ Section ไม่ถูกต้อง',
   MISSING_SECTION_TYPE: 'กรุณาระบุประเภทสำหรับ Section',
   INVALID_SECTION_TYPE: 'ประเภท Section ไม่ถูกต้อง',
   INVALID_SECTION_STATUS: 'สถานะ Section ไม่ถูกต้อง',

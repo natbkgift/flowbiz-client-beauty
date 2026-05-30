@@ -495,6 +495,10 @@ async function createHomepageSection(clinicId, actorUserId, body) {
 
   const normalizedKey = normalizeSectionKey(sectionKey);
 
+  if (!normalizedKey) {
+    throw new AppError(400, 'INVALID_SECTION_KEY', 'Normalized section key must not be empty.');
+  }
+
   if (!sectionType) {
     throw new AppError(400, 'MISSING_SECTION_TYPE', 'sectionType is required.');
   }
@@ -578,6 +582,10 @@ async function updateHomepageSection(clinicId, actorUserId, sectionId, body) {
   const status = body.status !== undefined ? body.status : existing.status;
 
   const normalizedKey = normalizeSectionKey(sectionKey);
+
+  if (!normalizedKey) {
+    throw new AppError(400, 'INVALID_SECTION_KEY', 'Normalized section key must not be empty.');
+  }
 
   const allowedTypes = ['hero', 'trust_badges', 'services_preview', 'promotions_preview', 'about', 'location', 'final_cta', 'custom'];
   if (!allowedTypes.includes(sectionType)) {
@@ -686,27 +694,30 @@ async function reorderHomepageSections(clinicId, actorUserId, body) {
     throw new AppError(400, 'INVALID_REORDER_PAYLOAD', 'Sections must be an array of objects containing id and sortOrder.');
   }
 
-  for (const item of sections) {
-    if (item.id === undefined || item.id === null || item.sortOrder === undefined || item.sortOrder === null) {
-      throw new AppError(400, 'INVALID_REORDER_ITEM', 'Each reorder item must contain id and sortOrder.');
-    }
-
-    const updateRes = await pool.query(
-      'update clinic_homepage_sections set sort_order = $1, updated_at = now() where id = $2 and clinic_id = $3',
-      [Number(item.sortOrder), Number(item.id), clinicId]
-    );
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
     for (const item of sections) {
       if (item.id === undefined || item.id === null || item.sortOrder === undefined || item.sortOrder === null) {
         throw new AppError(400, 'INVALID_REORDER_ITEM', 'Each reorder item must contain id and sortOrder.');
       }
-      await client.query(
+
+      const updateRes = await client.query(
         'update clinic_homepage_sections set sort_order = $1, updated_at = now() where id = $2 and clinic_id = $3',
         [Number(item.sortOrder), Number(item.id), clinicId]
       );
+
+      if (updateRes.rowCount !== 1) {
+        const existsCheck = await client.query('select clinic_id from clinic_homepage_sections where id = $1 limit 1', [Number(item.id)]);
+        if (existsCheck.rowCount === 0) {
+          throw new AppError(404, 'SECTION_NOT_FOUND', `Section with ID ${item.id} not found.`);
+        } else {
+          throw new AppError(403, 'CROSS_TENANT_FORBIDDEN', `You do not have permission to access Section with ID ${item.id}.`);
+        }
+      }
     }
+
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');
