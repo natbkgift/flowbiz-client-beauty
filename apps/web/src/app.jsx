@@ -4961,7 +4961,7 @@ function ClinicWebsiteEditorPage() {
                     }}
                   />
                   {colorErrors.primaryColor && (
-                    <span style={{ color: 'var(--danger)', fontSize: '0.85rem' }} id="clinic-website-color-error" data-testid="clinic-website-color-error">
+                    <span style={{ color: 'var(--danger)', fontSize: '0.85rem' }} id="clinic-website-primary-color-error" data-testid="clinic-website-primary-color-error">
                       {colorErrors.primaryColor}
                     </span>
                   )}
