@@ -695,15 +695,24 @@ async function reorderHomepageSections(clinicId, actorUserId, body) {
       'update clinic_homepage_sections set sort_order = $1, updated_at = now() where id = $2 and clinic_id = $3',
       [Number(item.sortOrder), Number(item.id), clinicId]
     );
-
-    if (updateRes.rowCount !== 1) {
-      const existsCheck = await pool.query('select clinic_id from clinic_homepage_sections where id = $1 limit 1', [Number(item.id)]);
-      if (existsCheck.rowCount === 0) {
-        throw new AppError(404, 'SECTION_NOT_FOUND', `Section with ID ${item.id} not found.`);
-      } else {
-        throw new AppError(403, 'CROSS_TENANT_FORBIDDEN', `You do not have permission to access Section with ID ${item.id}.`);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    for (const item of sections) {
+      if (item.id === undefined || item.id === null || item.sortOrder === undefined || item.sortOrder === null) {
+        throw new AppError(400, 'INVALID_REORDER_ITEM', 'Each reorder item must contain id and sortOrder.');
       }
+      await client.query(
+        'update clinic_homepage_sections set sort_order = $1, updated_at = now() where id = $2 and clinic_id = $3',
+        [Number(item.sortOrder), Number(item.id), clinicId]
+      );
     }
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
   }
 
   await recordAuditLog({
