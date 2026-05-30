@@ -19,6 +19,7 @@ const ExecutionDebuggerContext = createContext(null);
 const NAV_ITEMS = [
   { key: 'dashboard', label: 'แดชบอร์ด', caption: 'ภาพรวมกิจกรรมคลินิก' },
   { key: 'clinics', label: 'จัดการคลินิก', caption: 'เพิ่ม แก้ไข และควบคุมคลินิก' },
+  { key: 'clinic-website', label: 'เว็บไซต์คลินิก', caption: 'ตั้งค่าเว็บ โลโก้ สี และหน้าแรก' },
   { key: 'unified-inbox', label: 'กล่องแชทรวม', caption: 'แชทโซเชียลและ AI co-pilot' },
   { key: 'roas-analytics', label: 'ROAS และสะสมแต้ม', caption: 'ค่าโฆษณา CAC และแนะนำเพื่อน' },
   { key: 'ai-agent-console', label: 'คอนโซล AI Agent', caption: 'กฎ Agent และคิว HITL' },
@@ -507,6 +508,33 @@ function createApiClient(apiBaseUrl) {
     },
     updateAdminClinicStatus(session, clinicId, body) {
       return request(`/admin/clinics/${clinicId}/status`, { ...session, method: 'PATCH', body });
+    },
+    getClinicWebsite(session) {
+      return request('/admin/clinic-website', session);
+    },
+    updateClinicWebsiteSettings(session, body) {
+      return request('/admin/clinic-website/settings', { ...session, method: 'PATCH', body });
+    },
+    updateClinicWebsiteBranding(session, body) {
+      return request('/admin/clinic-website/branding', { ...session, method: 'PATCH', body });
+    },
+    updateClinicWebsiteContact(session, body) {
+      return request('/admin/clinic-website/contact', { ...session, method: 'PATCH', body });
+    },
+    updateClinicWebsiteLocation(session, body) {
+      return request('/admin/clinic-website/location', { ...session, method: 'PATCH', body });
+    },
+    createClinicHomepageSection(session, body) {
+      return request('/admin/clinic-website/sections', { ...session, method: 'POST', body });
+    },
+    updateClinicHomepageSection(session, sectionId, body) {
+      return request(`/admin/clinic-website/sections/${sectionId}`, { ...session, method: 'PATCH', body });
+    },
+    deleteClinicHomepageSection(session, sectionId) {
+      return request(`/admin/clinic-website/sections/${sectionId}`, { ...session, method: 'DELETE' });
+    },
+    reorderClinicHomepageSections(session, body) {
+      return request('/admin/clinic-website/sections/reorder', { ...session, method: 'PATCH', body });
     }
   };
 }
@@ -4409,10 +4437,986 @@ function ClinicsPage() {
   );
 }
 
+function ClinicWebsiteEditorPage() {
+  const api = useApi();
+  const sessionOptions = useSessionRequestOptions();
+  const [activeTab, setActiveTab] = useState('general');
+  const [message, setMessage] = useState(null);
+  const [clinic, setClinic] = useState(null);
+
+  const [generalForm, setGeneralForm] = useState({
+    publicDisplayName: '',
+    tagline: '',
+    shortDescription: '',
+    websiteStatus: 'draft',
+    defaultLocale: 'th-TH'
+  });
+
+  const [brandingForm, setBrandingForm] = useState({
+    logoUrl: '',
+    faviconUrl: '',
+    heroImageUrl: '',
+    primaryColor: '',
+    secondaryColor: '',
+    accentColor: '',
+    fontFamily: ''
+  });
+
+  const [colorErrors, setColorErrors] = useState({
+    primaryColor: '',
+    secondaryColor: '',
+    accentColor: ''
+  });
+
+  const [contactForm, setContactForm] = useState({
+    phone: '',
+    email: '',
+    lineUrl: '',
+    lineOaId: '',
+    facebookUrl: '',
+    instagramUrl: '',
+    tiktokUrl: '',
+    websiteUrl: ''
+  });
+
+  const [locationForm, setLocationForm] = useState({
+    addressLine1: '',
+    addressLine2: '',
+    district: '',
+    province: '',
+    postalCode: '',
+    country: 'Thailand',
+    googleMapUrl: '',
+    googleMapEmbedUrl: '',
+    latitude: '',
+    longitude: '',
+    businessHoursStr: '{}'
+  });
+
+  const [sections, setSections] = useState([]);
+  const [newSection, setNewSection] = useState({
+    sectionKey: '',
+    sectionType: 'hero',
+    title: '',
+    subtitle: '',
+    contentStr: '{}',
+    status: 'draft'
+  });
+
+  const [state, setState] = usePageData(async () => {
+    return await api.getClinicWebsite(sessionOptions);
+  }, [api, sessionOptions]);
+
+  useEffect(() => {
+    if (state.status === 'ready' && state.data) {
+      const data = state.data;
+      setClinic(data.clinic);
+      setGeneralForm(data.websiteSettings || {});
+      setBrandingForm(data.brandingSettings || {});
+      setContactForm(data.contactSettings || {});
+      
+      const loc = data.locationSettings || {};
+      setLocationForm({
+        ...loc,
+        businessHoursStr: JSON.stringify(loc.businessHours || {}, null, 2)
+      });
+
+      setSections((data.homepageSections || []).map(s => ({
+        ...s,
+        contentStr: JSON.stringify(s.content || {}, null, 2)
+      })));
+    }
+  }, [state]);
+
+  if (state.status === 'loading' || state.status === 'idle') {
+    return <LoadingCard label="กำลังโหลดข้อมูลเว็บไซต์คลินิก..." />;
+  }
+
+  if (state.status === 'error') {
+    if (state.error?.status === 403) {
+      return (
+        <Card variant="notice" className="error-card" data-testid="clinic-website-permission-error" id="clinic-website-permission-error">
+          <h3 className="section-heading">ไม่มีสิทธิ์เข้าถึง</h3>
+          <p className="muted">คุณไม่มีสิทธิ์แก้ไขเว็บไซต์คลินิกนี้ กรุณาใช้บัญชี Clinic Owner หรือ Manager ของคลินิก</p>
+        </Card>
+      );
+    }
+    return <ErrorCard error={state.error} />;
+  }
+
+  const hexRegex = /^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+  function validateHex(val) {
+    if (!val) return true;
+    return hexRegex.test(val);
+  }
+
+  const handleSaveGeneral = async (e) => {
+    e.preventDefault();
+    setMessage(null);
+    try {
+      const result = await api.updateClinicWebsiteSettings(sessionOptions, generalForm);
+      setGeneralForm(result);
+      setMessage({ message: 'บันทึกข้อมูลทั่วไปสำเร็จ!', kind: 'success' });
+    } catch (err) {
+      setMessage({ message: err.message, kind: 'error' });
+    }
+  };
+
+  const handleSaveBranding = async (e) => {
+    e.preventDefault();
+    setMessage(null);
+
+    const isPrimaryValid = validateHex(brandingForm.primaryColor);
+    const isSecondaryValid = validateHex(brandingForm.secondaryColor);
+    const isAccentValid = validateHex(brandingForm.accentColor);
+
+    if (!isPrimaryValid || !isSecondaryValid || !isAccentValid) {
+      setColorErrors({
+        primaryColor: isPrimaryValid ? '' : 'รหัสสีต้องเป็น HEX เท่านั้น เช่น #0F766E',
+        secondaryColor: isSecondaryValid ? '' : 'รหัสสีต้องเป็น HEX เท่านั้น เช่น #E2E8F0',
+        accentColor: isAccentValid ? '' : 'รหัสสีต้องเป็น HEX เท่านั้น เช่น #F59E0B'
+      });
+      setMessage({ message: 'กรุณาแก้ไขรหัสสีให้ถูกต้องก่อนบันทึก', kind: 'error' });
+      return;
+    }
+
+    try {
+      const result = await api.updateClinicWebsiteBranding(sessionOptions, brandingForm);
+      setBrandingForm(result);
+      setMessage({ message: 'บันทึกข้อมูลการออกแบบสำเร็จ!', kind: 'success' });
+    } catch (err) {
+      setMessage({ message: err.message, kind: 'error' });
+    }
+  };
+
+  const handleSaveContact = async (e) => {
+    e.preventDefault();
+    setMessage(null);
+    try {
+      const result = await api.updateClinicWebsiteContact(sessionOptions, contactForm);
+      setContactForm(result);
+      setMessage({ message: 'บันทึกข้อมูลการติดต่อสำเร็จ!', kind: 'success' });
+    } catch (err) {
+      setMessage({ message: err.message, kind: 'error' });
+    }
+  };
+
+  const handleSaveLocation = async (e) => {
+    e.preventDefault();
+    setMessage(null);
+
+    let parsedHours = {};
+    try {
+      parsedHours = JSON.parse(locationForm.businessHoursStr);
+    } catch (e) {
+      setMessage({ message: 'รูปแบบเวลาทำการ JSON ไม่ถูกต้อง', kind: 'error' });
+      return;
+    }
+
+    try {
+      const result = await api.updateClinicWebsiteLocation(sessionOptions, {
+        ...locationForm,
+        businessHours: parsedHours
+      });
+      setLocationForm({
+        ...result,
+        businessHoursStr: JSON.stringify(result.businessHours, null, 2)
+      });
+      setMessage({ message: 'บันทึกข้อมูลที่ตั้งสำเร็จ!', kind: 'success' });
+    } catch (err) {
+      setMessage({ message: err.message, kind: 'error' });
+    }
+  };
+
+  const handleAddSection = async (e) => {
+    e.preventDefault();
+    setMessage(null);
+
+    let parsedContent = {};
+    try {
+      parsedContent = JSON.parse(newSection.contentStr);
+    } catch (e) {
+      alert('รูปแบบ JSON ของเนื้อหาไม่ถูกต้อง');
+      return;
+    }
+
+    if (parsedContent === null || typeof parsedContent !== 'object' || Array.isArray(parsedContent)) {
+      alert('เนื้อหา Section ต้องเป็น JSON object เท่านั้น');
+      return;
+    }
+
+    try {
+      await api.createClinicHomepageSection(sessionOptions, {
+        sectionKey: newSection.sectionKey,
+        sectionType: newSection.sectionType,
+        title: newSection.title,
+        subtitle: newSection.subtitle,
+        content: parsedContent,
+        status: newSection.status,
+        sortOrder: sections.length
+      });
+
+      const updated = await api.getClinicWebsite(sessionOptions);
+      setSections(updated.homepageSections.map(s => ({
+        ...s,
+        contentStr: JSON.stringify(s.content || {}, null, 2)
+      })));
+
+      setNewSection({
+        sectionKey: '',
+        sectionType: 'hero',
+        title: '',
+        subtitle: '',
+        contentStr: '{}',
+        status: 'draft'
+      });
+
+      setMessage({ message: 'เพิ่ม Section ใหม่สำเร็จ!', kind: 'success' });
+    } catch (err) {
+      setMessage({ message: err.message, kind: 'error' });
+    }
+  };
+
+  const handleSaveSection = async (section) => {
+    setMessage(null);
+
+    let parsedContent = {};
+    try {
+      parsedContent = JSON.parse(section.contentStr);
+    } catch (e) {
+      alert('รูปแบบ JSON ของเนื้อหาไม่ถูกต้อง');
+      return;
+    }
+
+    if (parsedContent === null || typeof parsedContent !== 'object' || Array.isArray(parsedContent)) {
+      alert('เนื้อหา Section ต้องเป็น JSON object เท่านั้น');
+      return;
+    }
+
+    try {
+      await api.updateClinicHomepageSection(sessionOptions, section.id, {
+        sectionKey: section.sectionKey,
+        sectionType: section.sectionType,
+        title: section.title,
+        subtitle: section.subtitle,
+        content: parsedContent,
+        sortOrder: section.sortOrder,
+        status: section.status
+      });
+
+      setMessage({ message: `บันทึก Section '${section.sectionKey}' สำเร็จ!`, kind: 'success' });
+    } catch (err) {
+      setMessage({ message: err.message, kind: 'error' });
+    }
+  };
+
+  const handleDeleteSection = async (sectionId) => {
+    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบ Section นี้?')) return;
+    setMessage(null);
+
+    try {
+      await api.deleteClinicHomepageSection(sessionOptions, sectionId);
+
+      const updated = await api.getClinicWebsite(sessionOptions);
+      setSections(updated.homepageSections.map(s => ({
+        ...s,
+        contentStr: JSON.stringify(s.content || {}, null, 2)
+      })));
+
+      setMessage({ message: 'ลบ Section สำเร็จ!', kind: 'success' });
+    } catch (err) {
+      setMessage({ message: err.message, kind: 'error' });
+    }
+  };
+
+  const handleMoveUp = async (index) => {
+    if (index === 0) return;
+    setMessage(null);
+
+    const reordered = [...sections];
+    const temp = reordered[index];
+    reordered[index] = reordered[index - 1];
+    reordered[index - 1] = temp;
+
+    const payload = reordered.map((s, idx) => ({
+      id: s.id,
+      sortOrder: idx
+    }));
+
+    try {
+      await api.reorderClinicHomepageSections(sessionOptions, { sections: payload });
+      
+      const updated = await api.getClinicWebsite(sessionOptions);
+      setSections(updated.homepageSections.map(s => ({
+        ...s,
+        contentStr: JSON.stringify(s.content || {}, null, 2)
+      })));
+
+      setMessage({ message: 'จัดเรียง Section สำเร็จ!', kind: 'success' });
+    } catch (err) {
+      setMessage({ message: err.message, kind: 'error' });
+    }
+  };
+
+  const handleMoveDown = async (index) => {
+    if (index === sections.length - 1) return;
+    setMessage(null);
+
+    const reordered = [...sections];
+    const temp = reordered[index];
+    reordered[index] = reordered[index + 1];
+    reordered[index + 1] = temp;
+
+    const payload = reordered.map((s, idx) => ({
+      id: s.id,
+      sortOrder: idx
+    }));
+
+    try {
+      await api.reorderClinicHomepageSections(sessionOptions, { sections: payload });
+      
+      const updated = await api.getClinicWebsite(sessionOptions);
+      setSections(updated.homepageSections.map(s => ({
+        ...s,
+        contentStr: JSON.stringify(s.content || {}, null, 2)
+      })));
+
+      setMessage({ message: 'จัดเรียง Section สำเร็จ!', kind: 'success' });
+    } catch (err) {
+      setMessage({ message: err.message, kind: 'error' });
+    }
+  };
+
+  return (
+    <PageShell
+      title="ตั้งค่าเว็บไซต์คลินิก"
+      intro="จัดการหน้าตา โลโก้ สีแบรนด์ ข้อมูลติดต่อ สถานที่ตั้ง และโครงสร้างหน้าแรกของคลินิก"
+      actions={
+        clinic?.slug ? (
+          <a
+            href={`/${clinic.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="secondary-button"
+            id="clinic-website-preview-link"
+            data-testid="clinic-website-preview-link"
+            style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+          >
+            ดูหน้าเว็บคลินิก
+          </a>
+        ) : null
+      }
+    >
+      <div className="clinic-website-page" id="clinic-website-page" data-testid="clinic-website-page">
+        <StatusBanner state={message} />
+
+        <div className="blog-editor-tabs" style={{ marginBottom: '20px' }}>
+          <button
+            type="button"
+            className={`primary-button ${activeTab === 'general' ? '' : 'ghost-button'}`}
+            onClick={() => setActiveTab('general')}
+          >
+            ทั่วไป
+          </button>
+          <button
+            type="button"
+            className={`primary-button ${activeTab === 'branding' ? '' : 'ghost-button'}`}
+            onClick={() => setActiveTab('branding')}
+          >
+            การออกแบบ (Branding)
+          </button>
+          <button
+            type="button"
+            className={`primary-button ${activeTab === 'contact' ? '' : 'ghost-button'}`}
+            onClick={() => setActiveTab('contact')}
+          >
+            การติดต่อ (Contact)
+          </button>
+          <button
+            type="button"
+            className={`primary-button ${activeTab === 'location' ? '' : 'ghost-button'}`}
+            onClick={() => setActiveTab('location')}
+          >
+            สถานที่และเวลาทำการ
+          </button>
+          <button
+            type="button"
+            className={`primary-button ${activeTab === 'sections' ? '' : 'ghost-button'}`}
+            onClick={() => setActiveTab('sections')}
+          >
+            ส่วนของหน้าแรก (Homepage Sections)
+          </button>
+        </div>
+
+        <Card variant="section" className="section-card">
+          {activeTab === 'general' && (
+            <form id="clinic-website-general-form" data-testid="clinic-website-general-form" onSubmit={handleSaveGeneral}>
+              <div className="form-grid">
+                <div className="field">
+                  <label htmlFor="clinic-website-display-name">ชื่อที่ใช้แสดงบนหน้าเว็บ (Public Display Name)</label>
+                  <input
+                    type="text"
+                    id="clinic-website-display-name"
+                    data-testid="clinic-website-display-name"
+                    value={generalForm.publicDisplayName || ''}
+                    onChange={(e) => setGeneralForm({ ...generalForm, publicDisplayName: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="clinic-website-tagline">สโลแกน (Tagline)</label>
+                  <input
+                    type="text"
+                    id="clinic-website-tagline"
+                    data-testid="clinic-website-tagline"
+                    value={generalForm.tagline || ''}
+                    onChange={(e) => setGeneralForm({ ...generalForm, tagline: e.target.value })}
+                  />
+                </div>
+                <div className="field field-span-2">
+                  <label htmlFor="clinic-website-short-description">คำอธิบายคลินิกแบบย่อ (Short Description)</label>
+                  <textarea
+                    id="clinic-website-short-description"
+                    data-testid="clinic-website-short-description"
+                    value={generalForm.shortDescription || ''}
+                    onChange={(e) => setGeneralForm({ ...generalForm, shortDescription: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="clinic-website-status">สถานะเว็บไซต์ (Website Status)</label>
+                  <select
+                    id="clinic-website-status"
+                    data-testid="clinic-website-status"
+                    value={generalForm.websiteStatus || 'draft'}
+                    onChange={(e) => setGeneralForm({ ...generalForm, websiteStatus: e.target.value })}
+                  >
+                    <option value="draft">ร่าง (Draft)</option>
+                    <option value="active">เผยแพร่สด (Active)</option>
+                    <option value="inactive">ปิดใช้งานชั่วคราว (Inactive)</option>
+                    <option value="suspended">ระงับ (Suspended)</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="clinic-website-locale">ภาษาเริ่มต้น (Default Locale)</label>
+                  <select
+                    id="clinic-website-locale"
+                    data-testid="clinic-website-locale"
+                    value={generalForm.defaultLocale || 'th-TH'}
+                    onChange={(e) => setGeneralForm({ ...generalForm, defaultLocale: e.target.value })}
+                  >
+                    <option value="th-TH">ไทย (th-TH)</option>
+                    <option value="en-US">English (en-US)</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ marginTop: '20px' }}>
+                <Button type="submit" id="clinic-website-save-general" data-testid="clinic-website-save-general">
+                  บันทึกข้อมูลทั่วไป
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {activeTab === 'branding' && (
+            <form id="clinic-website-branding-form" data-testid="clinic-website-branding-form" onSubmit={handleSaveBranding}>
+              <div className="form-grid">
+                <div className="field">
+                  <label htmlFor="clinic-website-logo-url">Logo URL</label>
+                  <input
+                    type="text"
+                    id="clinic-website-logo-url"
+                    data-testid="clinic-website-logo-url"
+                    value={brandingForm.logoUrl || ''}
+                    onChange={(e) => setBrandingForm({ ...brandingForm, logoUrl: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label>Favicon URL</label>
+                  <input
+                    type="text"
+                    value={brandingForm.faviconUrl || ''}
+                    onChange={(e) => setBrandingForm({ ...brandingForm, faviconUrl: e.target.value })}
+                  />
+                </div>
+                <div className="field field-span-2">
+                  <label htmlFor="clinic-website-hero-image-url">Hero Image URL</label>
+                  <input
+                    type="text"
+                    id="clinic-website-hero-image-url"
+                    data-testid="clinic-website-hero-image-url"
+                    value={brandingForm.heroImageUrl || ''}
+                    onChange={(e) => setBrandingForm({ ...brandingForm, heroImageUrl: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="clinic-website-primary-color">สีหลัก (Primary Color - HEX เท่านั้น)</label>
+                  <input
+                    type="text"
+                    id="clinic-website-primary-color"
+                    data-testid="clinic-website-primary-color"
+                    value={brandingForm.primaryColor || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setBrandingForm({ ...brandingForm, primaryColor: val });
+                      setColorErrors(prev => ({ ...prev, primaryColor: validateHex(val) ? '' : 'รหัสสีต้องเป็น HEX เท่านั้น เช่น #0F766E' }));
+                    }}
+                  />
+                  {colorErrors.primaryColor && (
+                    <span style={{ color: 'var(--danger)', fontSize: '0.85rem' }} id="clinic-website-color-error" data-testid="clinic-website-color-error">
+                      {colorErrors.primaryColor}
+                    </span>
+                  )}
+                </div>
+                <div className="field">
+                  <label htmlFor="clinic-website-secondary-color">สีรอง (Secondary Color - HEX เท่านั้น)</label>
+                  <input
+                    type="text"
+                    id="clinic-website-secondary-color"
+                    data-testid="clinic-website-secondary-color"
+                    value={brandingForm.secondaryColor || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setBrandingForm({ ...brandingForm, secondaryColor: val });
+                      setColorErrors(prev => ({ ...prev, secondaryColor: validateHex(val) ? '' : 'รหัสสีต้องเป็น HEX เท่านั้น เช่น #E2E8F0' }));
+                    }}
+                  />
+                  {colorErrors.secondaryColor && (
+                    <span style={{ color: 'var(--danger)', fontSize: '0.85rem' }} id="clinic-website-color-error" data-testid="clinic-website-color-error">
+                      {colorErrors.secondaryColor}
+                    </span>
+                  )}
+                </div>
+                <div className="field">
+                  <label htmlFor="clinic-website-accent-color">สีเน้น (Accent Color - HEX เท่านั้น)</label>
+                  <input
+                    type="text"
+                    id="clinic-website-accent-color"
+                    data-testid="clinic-website-accent-color"
+                    value={brandingForm.accentColor || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setBrandingForm({ ...brandingForm, accentColor: val });
+                      setColorErrors(prev => ({ ...prev, accentColor: validateHex(val) ? '' : 'รหัสสีต้องเป็น HEX เท่านั้น เช่น #F59E0B' }));
+                    }}
+                  />
+                  {colorErrors.accentColor && (
+                    <span style={{ color: 'var(--danger)', fontSize: '0.85rem' }} id="clinic-website-color-error" data-testid="clinic-website-color-error">
+                      {colorErrors.accentColor}
+                    </span>
+                  )}
+                </div>
+                <div className="field">
+                  <label>Font Family</label>
+                  <input
+                    type="text"
+                    value={brandingForm.fontFamily || ''}
+                    onChange={(e) => setBrandingForm({ ...brandingForm, fontFamily: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div style={{ marginTop: '20px' }}>
+                <Button
+                  type="submit"
+                  id="clinic-website-save-branding"
+                  data-testid="clinic-website-save-branding"
+                  disabled={!!(colorErrors.primaryColor || colorErrors.secondaryColor || colorErrors.accentColor)}
+                >
+                  บันทึกการออกแบบ
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {activeTab === 'contact' && (
+            <form id="clinic-website-contact-form" data-testid="clinic-website-contact-form" onSubmit={handleSaveContact}>
+              <div className="form-grid">
+                <div className="field">
+                  <label htmlFor="clinic-website-phone">เบอร์โทรศัพท์ (Phone)</label>
+                  <input
+                    type="text"
+                    id="clinic-website-phone"
+                    data-testid="clinic-website-phone"
+                    value={contactForm.phone || ''}
+                    onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="clinic-website-email">อีเมล (Email)</label>
+                  <input
+                    type="email"
+                    id="clinic-website-email"
+                    data-testid="clinic-website-email"
+                    value={contactForm.email || ''}
+                    onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="clinic-website-line-url">LINE URL</label>
+                  <input
+                    type="text"
+                    id="clinic-website-line-url"
+                    data-testid="clinic-website-line-url"
+                    value={contactForm.lineUrl || ''}
+                    onChange={(e) => setContactForm({ ...contactForm, lineUrl: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label>LINE OA ID</label>
+                  <input
+                    type="text"
+                    value={contactForm.lineOaId || ''}
+                    onChange={(e) => setContactForm({ ...contactForm, lineOaId: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label>Facebook URL</label>
+                  <input
+                    type="text"
+                    value={contactForm.facebookUrl || ''}
+                    onChange={(e) => setContactForm({ ...contactForm, facebookUrl: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label>Instagram URL</label>
+                  <input
+                    type="text"
+                    value={contactForm.instagramUrl || ''}
+                    onChange={(e) => setContactForm({ ...contactForm, instagramUrl: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label>TikTok URL</label>
+                  <input
+                    type="text"
+                    value={contactForm.tiktokUrl || ''}
+                    onChange={(e) => setContactForm({ ...contactForm, tiktokUrl: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label>Website URL</label>
+                  <input
+                    type="text"
+                    value={contactForm.websiteUrl || ''}
+                    onChange={(e) => setContactForm({ ...contactForm, websiteUrl: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div style={{ marginTop: '20px' }}>
+                <Button type="submit" id="clinic-website-save-contact" data-testid="clinic-website-save-contact">
+                  บันทึกข้อมูลการติดต่อ
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {activeTab === 'location' && (
+            <form id="clinic-website-location-form" data-testid="clinic-website-location-form" onSubmit={handleSaveLocation}>
+              <div className="form-grid">
+                <div className="field">
+                  <label htmlFor="clinic-website-address-line1">ที่อยู่ บรรทัด 1 (Address Line 1)</label>
+                  <input
+                    type="text"
+                    id="clinic-website-address-line1"
+                    data-testid="clinic-website-address-line1"
+                    value={locationForm.addressLine1 || ''}
+                    onChange={(e) => setLocationForm({ ...locationForm, addressLine1: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label>ที่อยู่ บรรทัด 2 (Address Line 2)</label>
+                  <input
+                    type="text"
+                    value={locationForm.addressLine2 || ''}
+                    onChange={(e) => setLocationForm({ ...locationForm, addressLine2: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label>เขต/อำเภอ (District)</label>
+                  <input
+                    type="text"
+                    value={locationForm.district || ''}
+                    onChange={(e) => setLocationForm({ ...locationForm, district: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="clinic-website-province">จังหวัด (Province)</label>
+                  <input
+                    type="text"
+                    id="clinic-website-province"
+                    data-testid="clinic-website-province"
+                    value={locationForm.province || ''}
+                    onChange={(e) => setLocationForm({ ...locationForm, province: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label>รหัสไปรษณีย์ (Postal Code)</label>
+                  <input
+                    type="text"
+                    value={locationForm.postalCode || ''}
+                    onChange={(e) => setLocationForm({ ...locationForm, postalCode: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label>ประเทศ (Country)</label>
+                  <input
+                    type="text"
+                    value={locationForm.country || 'Thailand'}
+                    onChange={(e) => setLocationForm({ ...locationForm, country: e.target.value })}
+                  />
+                </div>
+                <div className="field field-span-2">
+                  <label htmlFor="clinic-website-google-map-url">Google Map Link URL</label>
+                  <input
+                    type="text"
+                    id="clinic-website-google-map-url"
+                    data-testid="clinic-website-google-map-url"
+                    value={locationForm.googleMapUrl || ''}
+                    onChange={(e) => setLocationForm({ ...locationForm, googleMapUrl: e.target.value })}
+                  />
+                </div>
+                <div className="field field-span-2">
+                  <label>Google Map Embed URL</label>
+                  <input
+                    type="text"
+                    value={locationForm.googleMapEmbedUrl || ''}
+                    onChange={(e) => setLocationForm({ ...locationForm, googleMapEmbedUrl: e.target.value })}
+                  />
+                </div>
+                <div className="field">
+                  <label>Latitude</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={locationForm.latitude != null ? locationForm.latitude : ''}
+                    onChange={(e) => setLocationForm({ ...locationForm, latitude: e.target.value === '' ? '' : Number(e.target.value) })}
+                  />
+                </div>
+                <div className="field">
+                  <label>Longitude</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={locationForm.longitude != null ? locationForm.longitude : ''}
+                    onChange={(e) => setLocationForm({ ...locationForm, longitude: e.target.value === '' ? '' : Number(e.target.value) })}
+                  />
+                </div>
+                <div className="field field-span-2">
+                  <label>เวลาทำการ (Business Hours JSON)</label>
+                  <textarea
+                    style={{ fontFamily: 'monospace', minHeight: '120px' }}
+                    value={locationForm.businessHoursStr || '{}'}
+                    onChange={(e) => setLocationForm({ ...locationForm, businessHoursStr: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div style={{ marginTop: '20px' }}>
+                <Button type="submit" id="clinic-website-save-location" data-testid="clinic-website-save-location">
+                  บันทึกที่ตั้งและเวลา
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {activeTab === 'sections' && (
+            <div className="clinic-website-sections" id="clinic-website-sections" data-testid="clinic-website-sections">
+              <h3 className="section-heading compact-gap">เพิ่ม Section ใหม่</h3>
+              <form id="clinic-website-add-section" data-testid="clinic-website-add-section" onSubmit={handleAddSection} style={{ marginBottom: '30px', borderBottom: '1px solid var(--border)', paddingBottom: '20px' }}>
+                <div className="form-grid">
+                  <div className="field">
+                    <label>คีย์ระบุ (Section Key - ภาษาอังกฤษ เช่น my_hero)</label>
+                    <input
+                      type="text"
+                      value={newSection.sectionKey}
+                      onChange={(e) => setNewSection({ ...newSection, sectionKey: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="field">
+                    <label>ประเภท (Section Type)</label>
+                    <select
+                      value={newSection.sectionType}
+                      onChange={(e) => setNewSection({ ...newSection, sectionType: e.target.value })}
+                    >
+                      <option value="hero">Hero</option>
+                      <option value="trust_badges">Trust Badges</option>
+                      <option value="services_preview">Services Preview</option>
+                      <option value="promotions_preview">Promotions Preview</option>
+                      <option value="about">About</option>
+                      <option value="location">Location</option>
+                      <option value="final_cta">Final CTA</option>
+                      <option value="custom">Custom</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <label>หัวข้อหลัก (Title)</label>
+                    <input
+                      type="text"
+                      value={newSection.title}
+                      onChange={(e) => setNewSection({ ...newSection, title: e.target.value })}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>หัวข้อย่อย (Subtitle)</label>
+                    <input
+                      type="text"
+                      value={newSection.subtitle}
+                      onChange={(e) => setNewSection({ ...newSection, subtitle: e.target.value })}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>สถานะ (Status)</label>
+                    <select
+                      value={newSection.status}
+                      onChange={(e) => setNewSection({ ...newSection, status: e.target.value })}
+                    >
+                      <option value="draft">ร่าง (Draft)</option>
+                      <option value="published">เผยแพร่ (Published)</option>
+                      <option value="hidden">ซ่อน (Hidden)</option>
+                    </select>
+                  </div>
+                  <div className="field field-span-2">
+                    <label>เนื้อหาโครงสร้างข้อมูล (Content JSON - ต้องเป็น Object เท่านั้น)</label>
+                    <textarea
+                      style={{ fontFamily: 'monospace', minHeight: '100px' }}
+                      value={newSection.contentStr}
+                      onChange={(e) => setNewSection({ ...newSection, contentStr: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div style={{ marginTop: '16px' }}>
+                  <Button type="submit">เพิ่ม Section</Button>
+                </div>
+              </form>
+
+              <h3 className="section-heading compact-gap">จัดการและจัดเรียง Section ล่าสุด</h3>
+              {sections.length === 0 ? (
+                <EmptyState title="ไม่มี Section หน้าแรก" message="เริ่มสร้าง Section ด้านบนเพื่อปรับแต่งโครงสร้างหน้าแรกของคุณ" />
+              ) : (
+                <div className="timeline-list">
+                  {sections.map((section, idx) => (
+                    <div
+                      key={section.id}
+                      className="timeline-item"
+                      data-testid={`clinic-website-section-row-${section.id}`}
+                      style={{ background: 'rgba(0, 0, 0, 0.01)', padding: '16px', borderRadius: '16px', border: '1px solid var(--border)', marginBottom: '14px' }}
+                    >
+                      <div className="split-header" style={{ marginBottom: '10px' }}>
+                        <div>
+                          <strong>{section.sectionKey}</strong> <span className="pill">{section.sectionType}</span>
+                        </div>
+                        <div className="inline-actions" style={{ display: 'inline-flex', gap: '6px' }}>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => handleMoveUp(idx)}
+                            disabled={idx === 0}
+                            style={{ padding: '4px 8px', borderRadius: '8px' }}
+                          >
+                            ขึ้น
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary-button"
+                            onClick={() => handleMoveDown(idx)}
+                            disabled={idx === sections.length - 1}
+                            style={{ padding: '4px 8px', borderRadius: '8px' }}
+                          >
+                            ลง
+                          </button>
+                          <button
+                            type="button"
+                            className="danger-button"
+                            onClick={() => handleDeleteSection(section.id)}
+                            style={{ padding: '4px 8px', borderRadius: '8px' }}
+                          >
+                            ลบ
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="form-grid">
+                        <div className="field">
+                          <label>หัวข้อหลัก (Title)</label>
+                          <input
+                            type="text"
+                            id={`clinic-website-section-title-${section.id}`}
+                            data-testid={`clinic-website-section-title-${section.id}`}
+                            value={section.title || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSections(sections.map(s => s.id === section.id ? { ...s, title: val } : s));
+                            }}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>หัวข้อย่อย (Subtitle)</label>
+                          <input
+                            type="text"
+                            value={section.subtitle || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSections(sections.map(s => s.id === section.id ? { ...s, subtitle: val } : s));
+                            }}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>สถานะ (Status)</label>
+                          <select
+                            id={`clinic-website-section-status-${section.id}`}
+                            data-testid={`clinic-website-section-status-${section.id}`}
+                            value={section.status}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSections(sections.map(s => s.id === section.id ? { ...s, status: val } : s));
+                            }}
+                          >
+                            <option value="draft">ร่าง (Draft)</option>
+                            <option value="published">เผยแพร่ (Published)</option>
+                            <option value="hidden">ซ่อน (Hidden)</option>
+                          </select>
+                        </div>
+                        <div className="field field-span-2">
+                          <label>เนื้อหาโครงสร้างข้อมูล (Content JSON)</label>
+                          <textarea
+                            style={{ fontFamily: 'monospace', minHeight: '120px' }}
+                            id={`clinic-website-section-content-${section.id}`}
+                            data-testid={`clinic-website-section-content-${section.id}`}
+                            value={section.contentStr}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setSections(sections.map(s => s.id === section.id ? { ...s, contentStr: val } : s));
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div style={{ marginTop: '12px' }}>
+                        <Button
+                          type="button"
+                          id={`clinic-website-section-save-${section.id}`}
+                          data-testid={`clinic-website-section-save-${section.id}`}
+                          onClick={() => handleSaveSection(section)}
+                        >
+                          บันทึกการเปลี่ยนแปลงของ Section
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      </div>
+    </PageShell>
+  );
+}
+
 function renderPage(route) {
   switch (route?.key) {
     case 'clinics':
       return <ClinicsPage />;
+    case 'clinic-website':
+      return <ClinicWebsiteEditorPage />;
     case 'unified-inbox':
       return <UnifiedInboxPage />;
     case 'roas-analytics':
