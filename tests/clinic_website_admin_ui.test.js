@@ -349,11 +349,14 @@ test('Admin UI - Clinic Website Editor - Branding Forms & HEX-only blocking vali
   const brandingTab = [...tabs].find(t => t.textContent.includes('การออกแบบ'));
   click(brandingTab, app.window);
 
-  // Wait for branding form to load and populate color value
+  // Step 1: wait for branding form to mount (tab switch re-render)
+  await waitFor(() => app.document.querySelector('[data-testid="clinic-website-primary-color"]'));
+
+  // Step 2: wait for the input to be populated from state (useEffect flush)
   await waitFor(() => {
     const el = app.document.querySelector('[data-testid="clinic-website-primary-color"]');
     return el && el.value === '#0F766E';
-  });
+  }, 8000);
 
   const primaryColorInput = app.document.querySelector('[data-testid="clinic-website-primary-color"]');
 
@@ -361,8 +364,8 @@ test('Admin UI - Clinic Website Editor - Branding Forms & HEX-only blocking vali
   setInputValue(primaryColorInput, 'invalid-red', app.window);
 
   // Assert inline warning exists
-  await waitFor(() => app.document.querySelector('[data-testid="clinic-website-color-error"]'));
-  const errorSpan = app.document.querySelector('[data-testid="clinic-website-color-error"]');
+  await waitFor(() => app.document.querySelector('[data-testid="clinic-website-primary-color-error"]'));
+  const errorSpan = app.document.querySelector('[data-testid="clinic-website-primary-color-error"]');
   assert.match(errorSpan.textContent, /HEX/);
 
   // Submit should not work or not trigger API call

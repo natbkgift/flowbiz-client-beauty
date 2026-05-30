@@ -4980,7 +4980,7 @@ function ClinicWebsiteEditorPage() {
                     }}
                   />
                   {colorErrors.secondaryColor && (
-                    <span style={{ color: 'var(--danger)', fontSize: '0.85rem' }} id="clinic-website-color-error" data-testid="clinic-website-color-error">
+                    <span style={{ color: 'var(--danger)', fontSize: '0.85rem' }} id="clinic-website-secondary-color-error" data-testid="clinic-website-secondary-color-error">
                       {colorErrors.secondaryColor}
                     </span>
                   )}
@@ -4999,7 +4999,7 @@ function ClinicWebsiteEditorPage() {
                     }}
                   />
                   {colorErrors.accentColor && (
-                    <span style={{ color: 'var(--danger)', fontSize: '0.85rem' }} id="clinic-website-color-error" data-testid="clinic-website-color-error">
+                    <span style={{ color: 'var(--danger)', fontSize: '0.85rem' }} id="clinic-website-accent-color-error" data-testid="clinic-website-accent-color-error">
                       {colorErrors.accentColor}
                     </span>
                   )}
