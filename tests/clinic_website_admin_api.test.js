@@ -128,6 +128,12 @@ test('Clinic Website Admin API - Integration Tests', async (t) => {
     currentMembership: { role: 'owner', permissions: [] }
   });
 
+  const ownerAuthClinic2 = async () => ({
+    currentUser: { id: testOwnerUserId, email: `owner-${uniqueId}@flowbiz.local` },
+    currentClinic: { id: testClinicId2, slug: `test-clinic-b-${uniqueId}` },
+    currentMembership: { role: 'owner', permissions: [] }
+  });
+
   const staffAuthClinic1 = async () => ({
     currentUser: { id: testStaffUserId, email: `staff-${uniqueId}@flowbiz.local` },
     currentClinic: { id: testClinicId1, slug: `test-clinic-a-${uniqueId}` },
@@ -354,6 +360,54 @@ test('Clinic Website Admin API - Integration Tests', async (t) => {
 
     assert.equal(reorderRes.statusCode, 200);
     assert.equal(reorderRes.body.success, true);
+
+    // A. Reorder non-existent section ID (404)
+    const reorder404Res = await routeJson(handleClinicWebsiteRoutes, {
+      method: 'PATCH',
+      path: '/admin/clinic-website/sections/reorder',
+      authenticateRequest: ownerAuthClinic1,
+      body: {
+        sections: [
+          { id: 999999, sortOrder: 1 }
+        ]
+      }
+    });
+    assert.equal(reorder404Res.statusCode, 404);
+    assert.equal(reorder404Res.body.error.code, 'SECTION_NOT_FOUND');
+
+    // B. Reorder cross-tenant section ID (403)
+    const reorder403Res = await routeJson(handleClinicWebsiteRoutes, {
+      method: 'PATCH',
+      path: '/admin/clinic-website/sections/reorder',
+      authenticateRequest: ownerAuthClinic2, // Clinic 2 tries to reorder Clinic 1's section
+      body: {
+        sections: [
+          { id: createdSectionId, sortOrder: 2 }
+        ]
+      }
+    });
+    assert.equal(reorder403Res.statusCode, 403);
+    assert.equal(reorder403Res.body.error.code, 'CROSS_TENANT_FORBIDDEN');
+
+    // C. DELETE section API test
+    const deleteRes = await routeJson(handleClinicWebsiteRoutes, {
+      method: 'DELETE',
+      path: `/admin/clinic-website/sections/${createdSectionId}`,
+      authenticateRequest: ownerAuthClinic1
+    });
+    assert.equal(deleteRes.statusCode, 200);
+    assert.equal(deleteRes.body.success, true);
+
+    // Assert section was actually deleted from database
+    const dbCheck = await pool.query('select 1 from clinic_homepage_sections where id = $1', [createdSectionId]);
+    assert.equal(dbCheck.rowCount, 0);
+
+    // Assert audit log has clinic_section.deleted
+    const auditCheck = await pool.query(
+      'select target_id from audit_logs where clinic_id = $1 and action_type = $2 limit 1',
+      [testClinicId1, 'clinic_section.deleted']
+    );
+    assert.equal(auditCheck.rowCount, 1);
   });
 
   await t.test('10. Staff without permission gets 403 on write', async () => {

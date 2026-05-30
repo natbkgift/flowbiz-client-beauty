@@ -245,7 +245,12 @@ async function updateWebsiteSettings(clinicId, actorUserId, body) {
     entityId: clinicId,
     actionType: 'clinic_website.updated',
     actorUserId,
-    contextJson: { websiteSettings: body }
+    contextJson: {
+      summary: {
+        changedFields: Object.keys(body),
+        source: 'clinic_website_admin_api'
+      }
+    }
   });
 
   return serializeWebsiteSettings(result.rows[0]);
@@ -300,7 +305,12 @@ async function updateBrandingSettings(clinicId, actorUserId, body) {
     entityId: clinicId,
     actionType: 'clinic_branding.updated',
     actorUserId,
-    contextJson: { brandingSettings: body }
+    contextJson: {
+      summary: {
+        changedFields: Object.keys(body),
+        source: 'clinic_website_admin_api'
+      }
+    }
   });
 
   return serializeBrandingSettings(result.rows[0]);
@@ -364,7 +374,12 @@ async function updateContactSettings(clinicId, actorUserId, body) {
     entityId: clinicId,
     actionType: 'clinic_contact.updated',
     actorUserId,
-    contextJson: { contactSettings: body }
+    contextJson: {
+      summary: {
+        changedFields: Object.keys(body),
+        source: 'clinic_website_admin_api'
+      }
+    }
   });
 
   return serializeContactSettings(result.rows[0]);
@@ -452,7 +467,12 @@ async function updateLocationSettings(clinicId, actorUserId, body) {
     entityId: clinicId,
     actionType: 'clinic_location.updated',
     actorUserId,
-    contextJson: { locationSettings: body }
+    contextJson: {
+      summary: {
+        changedFields: Object.keys(body),
+        source: 'clinic_website_admin_api'
+      }
+    }
   });
 
   return serializeLocationSettings(result.rows[0]);
@@ -518,7 +538,14 @@ async function createHomepageSection(clinicId, actorUserId, body) {
     entityId: createdSection.id,
     actionType: 'clinic_section.created',
     actorUserId,
-    contextJson: { section: createdSection }
+    contextJson: {
+      summary: {
+        sectionId: createdSection.id,
+        sectionKey: createdSection.sectionKey,
+        changedFields: Object.keys(body),
+        source: 'clinic_website_admin_api'
+      }
+    }
   });
 
   return createdSection;
@@ -599,7 +626,14 @@ async function updateHomepageSection(clinicId, actorUserId, sectionId, body) {
     entityId: updatedSection.id,
     actionType: 'clinic_section.updated',
     actorUserId,
-    contextJson: { section: updatedSection }
+    contextJson: {
+      summary: {
+        sectionId: updatedSection.id,
+        sectionKey: updatedSection.sectionKey,
+        changedFields: Object.keys(body),
+        source: 'clinic_website_admin_api'
+      }
+    }
   });
 
   return updatedSection;
@@ -631,7 +665,14 @@ async function deleteHomepageSection(clinicId, actorUserId, sectionId) {
     entityId: Number(sectionId),
     actionType: 'clinic_section.deleted',
     actorUserId,
-    contextJson: { sectionKey: existing.section_key }
+    contextJson: {
+      summary: {
+        sectionId: Number(sectionId),
+        sectionKey: existing.section_key,
+        changedFields: ['deleted'],
+        source: 'clinic_website_admin_api'
+      }
+    }
   });
 
   return { success: true };
@@ -650,10 +691,19 @@ async function reorderHomepageSections(clinicId, actorUserId, body) {
       throw new AppError(400, 'INVALID_REORDER_ITEM', 'Each reorder item must contain id and sortOrder.');
     }
 
-    await pool.query(
+    const updateRes = await pool.query(
       'update clinic_homepage_sections set sort_order = $1, updated_at = now() where id = $2 and clinic_id = $3',
       [Number(item.sortOrder), Number(item.id), clinicId]
     );
+
+    if (updateRes.rowCount !== 1) {
+      const existsCheck = await pool.query('select clinic_id from clinic_homepage_sections where id = $1 limit 1', [Number(item.id)]);
+      if (existsCheck.rowCount === 0) {
+        throw new AppError(404, 'SECTION_NOT_FOUND', `Section with ID ${item.id} not found.`);
+      } else {
+        throw new AppError(403, 'CROSS_TENANT_FORBIDDEN', `You do not have permission to access Section with ID ${item.id}.`);
+      }
+    }
   }
 
   await recordAuditLog({
@@ -662,7 +712,13 @@ async function reorderHomepageSections(clinicId, actorUserId, body) {
     entityId: clinicId,
     actionType: 'clinic_sections.reordered',
     actorUserId,
-    contextJson: { reordered: sections }
+    contextJson: {
+      summary: {
+        changedFields: ['reordered'],
+        reorderedSections: (sections || []).map(s => ({ id: s.id, sortOrder: s.sortOrder })),
+        source: 'clinic_website_admin_api'
+      }
+    }
   });
 
   return { success: true };
