@@ -404,7 +404,7 @@ test('Clinic Website Admin API - Integration Tests', async (t) => {
 
     // Assert audit log has clinic_section.deleted
     const auditCheck = await pool.query(
-      'select target_id from audit_logs where clinic_id = $1 and action_type = $2 limit 1',
+      'select entity_id from audit_logs where clinic_id = $1 and action_type = $2 limit 1',
       [testClinicId1, 'clinic_section.deleted']
     );
     assert.equal(auditCheck.rowCount, 1);
