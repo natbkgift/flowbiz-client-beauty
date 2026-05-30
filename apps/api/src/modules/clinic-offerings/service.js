@@ -1174,10 +1174,23 @@ async function reorderPackageServices(clinicId, actorUserId, packageId, body) {
         throw new AppError(400, 'INVALID_REORDER_ITEM', 'Each reorder item must have serviceId and sortOrder.');
       }
 
-      await client.query(
+      const updateRes = await client.query(
         'update clinic_package_services set sort_order = $1 where package_id = $2 and service_id = $3 and clinic_id = $4',
         [Number(item.sortOrder), Number(packageId), Number(item.serviceId), clinicId]
       );
+
+      if (updateRes.rowCount !== 1) {
+        const existsCheck = await client.query(
+          'select clinic_id from clinic_package_services where package_id = $1 and service_id = $2 limit 1',
+          [Number(packageId), Number(item.serviceId)]
+        );
+
+        if (existsCheck.rowCount === 0) {
+          throw new AppError(404, 'PACKAGE_SERVICE_NOT_FOUND', `Service link with ID ${item.serviceId} not found in this package.`);
+        }
+
+        throw new AppError(403, 'CROSS_TENANT_FORBIDDEN', `You do not have permission to reorder Service with ID ${item.serviceId} in this package.`);
+      }
     }
 
     await client.query('COMMIT');

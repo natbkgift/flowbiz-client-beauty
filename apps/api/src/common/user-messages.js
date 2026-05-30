@@ -130,6 +130,7 @@ const THAI_ERROR_MESSAGES = {
   SERVICE_NOT_FOUND: 'ไม่พบบริการที่ต้องการ',
   PROMOTION_NOT_FOUND: 'ไม่พบโปรโมชั่นที่ต้องการ',
   PACKAGE_NOT_FOUND: 'ไม่พบแพ็กเกจที่ต้องการ',
+  PACKAGE_SERVICE_NOT_FOUND: 'ไม่พบบริการในแพ็กเกจที่ต้องการ',
   INVALID_OFFERING_PAYLOAD: 'ข้อมูล offering ไม่ครบถ้วนหรือไม่ถูกต้อง',
   INVALID_OFFERING_STATUS: 'สถานะ offering ไม่ถูกต้อง',
   INVALID_PRICE_RANGE: 'ช่วงราคาไม่ถูกต้อง',

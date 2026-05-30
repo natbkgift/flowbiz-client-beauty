@@ -477,6 +477,85 @@ test('Clinic Offerings Admin API - Integration Tests', async (t) => {
     await pool.query('delete from clinic_services where id = $1', [crossServiceId]);
   });
 
+  await t.test('14b. Owner can add and reorder a package service link', async () => {
+    const addRes = await routeJson(handleClinicOfferingsRoutes, {
+      method: 'POST',
+      path: `/admin/clinic-offerings/packages/${createdPackageId}/services`,
+      authenticateRequest: ownerAuthClinic1,
+      body: { serviceId: createdServiceId, quantity: 1, sortOrder: 1 }
+    });
+    assert.equal(addRes.statusCode, 201);
+    assert.equal(addRes.body.serviceId, createdServiceId);
+
+    const reorderRes = await routeJson(handleClinicOfferingsRoutes, {
+      method: 'PATCH',
+      path: `/admin/clinic-offerings/packages/${createdPackageId}/services/reorder`,
+      authenticateRequest: ownerAuthClinic1,
+      body: { items: [{ serviceId: createdServiceId, sortOrder: 7 }] }
+    });
+    assert.equal(reorderRes.statusCode, 200);
+    assert.equal(reorderRes.body.success, true);
+
+    const dbCheck = await pool.query(
+      'select sort_order from clinic_package_services where clinic_id = $1 and package_id = $2 and service_id = $3',
+      [testClinicId1, createdPackageId, createdServiceId]
+    );
+    assert.equal(dbCheck.rowCount, 1);
+    assert.equal(Number(dbCheck.rows[0].sort_order), 7);
+  });
+
+  await t.test('14c. Reorder missing package service link returns 404', async () => {
+    const svcRes = await pool.query(
+      `insert into clinic_services (clinic_id, service_key, name, slug, status)
+       values ($1, $2, $3, $4, 'active') returning id`,
+      [testClinicId1, `svc-unlinked-${uniqueId}`, `Unlinked Service ${uniqueId}`, `unlinked-svc-${uniqueId}`]
+    );
+    const unlinkedServiceId = Number(svcRes.rows[0].id);
+
+    const res = await routeJson(handleClinicOfferingsRoutes, {
+      method: 'PATCH',
+      path: `/admin/clinic-offerings/packages/${createdPackageId}/services/reorder`,
+      authenticateRequest: ownerAuthClinic1,
+      body: { items: [{ serviceId: unlinkedServiceId, sortOrder: 2 }] }
+    });
+
+    assert.equal(res.statusCode, 404);
+    assert.equal(res.body.error.code, 'PACKAGE_SERVICE_NOT_FOUND');
+
+    await pool.query('delete from clinic_services where id = $1', [unlinkedServiceId]);
+  });
+
+  await t.test('14d. Reorder cross-tenant package service link returns 403', async () => {
+    const svcRes = await pool.query(
+      `insert into clinic_services (clinic_id, service_key, name, slug, status)
+       values ($1, $2, $3, $4, 'active') returning id`,
+      [testClinicId2, `svc-cross-link-${uniqueId}`, `Cross Link Service ${uniqueId}`, `cross-link-svc-${uniqueId}`]
+    );
+    const crossServiceId = Number(svcRes.rows[0].id);
+
+    await pool.query(
+      `insert into clinic_package_services (clinic_id, package_id, service_id, quantity, sort_order)
+       values ($1, $2, $3, 1, 1)`,
+      [testClinicId2, createdPackageId, crossServiceId]
+    );
+
+    const res = await routeJson(handleClinicOfferingsRoutes, {
+      method: 'PATCH',
+      path: `/admin/clinic-offerings/packages/${createdPackageId}/services/reorder`,
+      authenticateRequest: ownerAuthClinic1,
+      body: { items: [{ serviceId: crossServiceId, sortOrder: 2 }] }
+    });
+
+    assert.equal(res.statusCode, 403);
+    assert.equal(res.body.error.code, 'CROSS_TENANT_FORBIDDEN');
+
+    await pool.query(
+      'delete from clinic_package_services where clinic_id = $1 and package_id = $2 and service_id = $3',
+      [testClinicId2, createdPackageId, crossServiceId]
+    );
+    await pool.query('delete from clinic_services where id = $1', [crossServiceId]);
+  });
+
   // -------------------------------------------------------------------------
   // 15. Body clinicId/clinic_id rejected
   // -------------------------------------------------------------------------
