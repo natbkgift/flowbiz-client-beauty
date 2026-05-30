@@ -4636,7 +4636,7 @@ function ClinicWebsiteEditorPage() {
     try {
       parsedContent = JSON.parse(newSection.contentStr);
     } catch (e) {
-      alert('รูปแบบ JSON ของเนื้อหาไม่ถูกต้อง');
+      setMessage({ message: 'รูปแบบ JSON ของเนื้อหาไม่ถูกต้อง', kind: 'error' });
       return;
     }
 
