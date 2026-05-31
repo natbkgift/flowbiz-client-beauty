@@ -136,6 +136,12 @@ const THAI_ERROR_MESSAGES = {
   INVALID_PRICE_RANGE: 'ช่วงราคาไม่ถูกต้อง',
   INVALID_OFFERING_URL: 'ลิงก์ offering ต้องเป็น http หรือ https เท่านั้น',
   INVALID_OFFERING_METADATA: 'ข้อมูล metadata ต้องเป็น JSON object เท่านั้น',
+  INVALID_PUBLIC_LEAD_PAYLOAD: 'ข้อมูลลงทะเบียนไม่ครบถ้วนหรือไม่ถูกต้อง',
+  CONSENT_REQUIRED: 'กรุณายอมรับเงื่อนไขการติดต่อกลับก่อนส่งข้อมูล',
+  CONTACT_REQUIRED: 'กรุณาระบุเบอร์โทรศัพท์ อีเมล หรือ LINE ID อย่างน้อยหนึ่งช่องทาง',
+  INVALID_PUBLIC_LEAD_EMAIL: 'รูปแบบอีเมลสำหรับติดต่อกลับไม่ถูกต้อง',
+  INVALID_INTEREST: 'บริการ โปรโมชั่น หรือแพ็กเกจที่เลือกไม่พร้อมใช้งาน',
+  PUBLIC_LEAD_RATE_LIMITED: 'มีการส่งข้อมูลบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่',
   INTERNAL_SERVER_ERROR: 'ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง'
 };
 

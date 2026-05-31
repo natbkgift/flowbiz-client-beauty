@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import DOMPurify from 'dompurify';
 
@@ -146,6 +146,21 @@ async function getPublicClinicPackages(slug) {
   }
   const payload = await response.json();
   return Array.isArray(payload.items) ? payload.items : [];
+}
+
+async function submitPublicClinicLead(slug, payload) {
+  const response = await fetch(`${API_BASE}/public/clinics/${encodeURIComponent(slug)}/leads`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const code = data?.error?.code || 'PUBLIC_LEAD_SUBMIT_FAILED';
+    const message = data?.error?.message || 'ส่งข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+    throw new Error(`${code}: ${message}`);
+  }
+  return data;
 }
 
 async function apiFetch(path, options = {}) {
@@ -1007,6 +1022,22 @@ function ClinicWebsiteTemplate({ data, clinicSlug, offerings = {}, offeringsStat
   } = data;
 
   const themeStyle = buildClinicThemeStyle(brandingSettings);
+  const leadFormRef = useRef(null);
+  const [selectedInterest, setSelectedInterest] = useState({ interestType: 'general', interestId: '' });
+
+  const handleInterestSelect = (interestType, interestId) => {
+    setSelectedInterest({ interestType, interestId: String(interestId || '') });
+    window.requestAnimationFrame(() => {
+      const formNode = leadFormRef.current;
+      if (formNode?.scrollIntoView) {
+        formNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      const messageInput = formNode?.querySelector?.('[data-testid="clinic-lead-message"]');
+      if (messageInput?.focus) {
+        messageInput.focus();
+      }
+    });
+  };
 
   // Frontend re-filtering of hidden sections
   const activeSections = (homepageSections || []).filter(sec => sec && sec.status !== 'hidden');
@@ -1050,11 +1081,29 @@ function ClinicWebsiteTemplate({ data, clinicSlug, offerings = {}, offeringsStat
         </div>
       ) : null}
 
-      <ClinicServicesPreview homepageSections={activeSections} services={offerings.services || []} />
+      <ClinicServicesPreview
+        homepageSections={activeSections}
+        services={offerings.services || []}
+        onInterestSelect={handleInterestSelect}
+      />
 
-      <ClinicPromotionsPreview homepageSections={activeSections} promotions={offerings.promotions || []} />
+      <ClinicPromotionsPreview
+        homepageSections={activeSections}
+        promotions={offerings.promotions || []}
+        onInterestSelect={handleInterestSelect}
+      />
 
-      <ClinicPackagesPreview homepageSections={activeSections} packages={offerings.packages || []} />
+      <ClinicPackagesPreview
+        homepageSections={activeSections}
+        packages={offerings.packages || []}
+        onInterestSelect={handleInterestSelect}
+      />
+
+      <ClinicLeadCaptureForm
+        ref={leadFormRef}
+        clinicSlug={clinicSlug}
+        selectedInterest={selectedInterest}
+      />
 
       <ClinicAboutSection websiteSettings={websiteSettings} />
 
@@ -1161,7 +1210,7 @@ function ClinicTrustSection({ homepageSections }) {
   );
 }
 
-function ClinicServicesPreview({ homepageSections, services = [] }) {
+function ClinicServicesPreview({ homepageSections, services = [], onInterestSelect }) {
   const serviceSec = homepageSections.find(s => s.sectionType === 'services_preview' || s.sectionKey === 'services_preview');
   
   let items = [];
@@ -1203,6 +1252,16 @@ function ClinicServicesPreview({ homepageSections, services = [] }) {
             <p className="clinic-card-desc">{plainOfferingText(hasApiItems ? (svc?.shortDescription || svc?.category || '') : svc?.description)}</p>
             {hasApiItems ? <p className="clinic-offering-price">{formatPublicServicePrice(svc)}</p> : null}
             {hasApiItems && svc?.durationMinutes != null ? <p className="clinic-card-desc">{svc.durationMinutes} นาที</p> : null}
+            {hasApiItems ? (
+              <button
+                type="button"
+                className="cta-btn secondary clinic-card-cta"
+                data-testid={`clinic-template-service-interest-${svc.id}`}
+                onClick={() => onInterestSelect?.('service', svc.id)}
+              >
+                สนใจบริการนี้
+              </button>
+            ) : null}
           </div>
         ))}
       </div>
@@ -1210,7 +1269,7 @@ function ClinicServicesPreview({ homepageSections, services = [] }) {
   );
 }
 
-function ClinicPromotionsPreview({ homepageSections, promotions = [] }) {
+function ClinicPromotionsPreview({ homepageSections, promotions = [], onInterestSelect }) {
   const promoSec = homepageSections.find(s => s.sectionType === 'promotions_preview' || s.sectionKey === 'promotions_preview');
 
   let items = [];
@@ -1253,6 +1312,16 @@ function ClinicPromotionsPreview({ homepageSections, promotions = [] }) {
                   {promo.ctaLabel || 'ดูรายละเอียด'}
                 </button>
               ) : null}
+              {hasApiItems ? (
+                <button
+                  type="button"
+                  className="cta-btn secondary clinic-card-cta"
+                  data-testid={`clinic-template-promotion-interest-${promo.id}`}
+                  onClick={() => onInterestSelect?.('promotion', promo.id)}
+                >
+                  สนใจโปรโมชั่นนี้
+                </button>
+              ) : null}
             </div>
           ))}
         </div>
@@ -1261,7 +1330,7 @@ function ClinicPromotionsPreview({ homepageSections, promotions = [] }) {
   );
 }
 
-function ClinicPackagesPreview({ homepageSections, packages = [] }) {
+function ClinicPackagesPreview({ homepageSections, packages = [], onInterestSelect }) {
   const packageSec = homepageSections.find(s => s.sectionType === 'packages_preview' || s.sectionKey === 'packages_preview');
   let items = [];
   const hasApiItems = Array.isArray(packages) && packages.length > 0;
@@ -1293,12 +1362,247 @@ function ClinicPackagesPreview({ homepageSections, packages = [] }) {
             <h3 className="clinic-card-title">{plainOfferingText(hasApiItems ? pkg?.name : pkg?.title)}</h3>
             <p className="clinic-card-desc">{plainOfferingText(hasApiItems ? (pkg?.summary || '') : pkg?.description)}</p>
             {hasApiItems ? <p className="clinic-offering-price">{formatPublicPackagePrice(pkg)}</p> : null}
+            {hasApiItems ? (
+              <button
+                type="button"
+                className="cta-btn secondary clinic-card-cta"
+                data-testid={`clinic-template-package-interest-${pkg.id}`}
+                onClick={() => onInterestSelect?.('package', pkg.id)}
+              >
+                สนใจแพ็กเกจนี้
+              </button>
+            ) : null}
           </div>
         ))}
       </div>
     </section>
   );
 }
+
+const ClinicLeadCaptureForm = React.forwardRef(function ClinicLeadCaptureForm({ clinicSlug, selectedInterest }, ref) {
+  const [form, setForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    lineId: '',
+    interestType: 'general',
+    interestId: '',
+    message: '',
+    consentAccepted: false,
+    honeypot: ''
+  });
+  const [status, setStatus] = useState({ kind: 'idle', message: '' });
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!selectedInterest) return;
+    setForm((prev) => ({
+      ...prev,
+      interestType: selectedInterest.interestType || 'general',
+      interestId: selectedInterest.interestId || ''
+    }));
+  }, [selectedInterest]);
+
+  const updateField = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    if (status.kind === 'error') {
+      setStatus({ kind: 'idle', message: '' });
+    }
+  };
+
+  const validate = () => {
+    if (!form.consentAccepted) {
+      return 'กรุณายอมรับเงื่อนไขการติดต่อกลับก่อนส่งข้อมูล';
+    }
+    if (!form.phone.trim() && !form.email.trim() && !form.lineId.trim()) {
+      return 'กรุณาระบุเบอร์โทรศัพท์ อีเมล หรือ LINE ID อย่างน้อยหนึ่งช่องทาง';
+    }
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      return 'รูปแบบอีเมลไม่ถูกต้อง';
+    }
+    if (form.message.length > 1000) {
+      return 'ข้อความต้องไม่เกิน 1000 ตัวอักษร';
+    }
+    if (form.honeypot.trim()) {
+      return 'ส่งข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+    }
+    return null;
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (submitting) return;
+
+    const validationError = validate();
+    if (validationError) {
+      setStatus({ kind: 'error', message: validationError });
+      return;
+    }
+
+    setSubmitting(true);
+    setStatus({ kind: 'idle', message: '' });
+    const payload = {
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      email: form.email.trim(),
+      lineId: form.lineId.trim(),
+      interestType: form.interestType,
+      interestId: form.interestId ? Number(form.interestId) : undefined,
+      message: form.message.trim(),
+      source: 'clinic_public_website',
+      consentAccepted: form.consentAccepted,
+      honeypot: form.honeypot
+    };
+
+    try {
+      const result = await submitPublicClinicLead(clinicSlug, payload);
+      setStatus({
+        kind: 'success',
+        message: result?.message || 'ขอบคุณค่ะ ทีมงานจะติดต่อกลับโดยเร็วที่สุด'
+      });
+      setForm({
+        name: '',
+        phone: '',
+        email: '',
+        lineId: '',
+        interestType: 'general',
+        interestId: '',
+        message: '',
+        consentAccepted: false,
+        honeypot: ''
+      });
+    } catch (error) {
+      setStatus({
+        kind: 'error',
+        message: error.message.replace(/^[A-Z_]+:\s*/, '') || 'ส่งข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <section className="clinic-template-section clinic-lead-capture-section" data-testid="clinic-lead-form-section" ref={ref}>
+      <div className="clinic-section-header">
+        <span className="clinic-eyebrow">Consultation</span>
+        <h2>ปรึกษาฟรี / ให้ทีมงานติดต่อกลับ</h2>
+      </div>
+      <form className="clinic-lead-form" data-testid="clinic-lead-form" onSubmit={handleSubmit}>
+        {status.kind === 'success' ? (
+          <div className="clinic-lead-alert success" data-testid="clinic-lead-success">{status.message}</div>
+        ) : null}
+        {status.kind === 'error' ? (
+          <div className="clinic-lead-alert error" data-testid="clinic-lead-error">{status.message}</div>
+        ) : null}
+
+        <label className="clinic-lead-field">
+          <span>ชื่อ</span>
+          <input
+            data-testid="clinic-lead-name"
+            value={form.name}
+            maxLength={120}
+            onChange={(event) => updateField('name', event.target.value)}
+            autoComplete="name"
+          />
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>เบอร์โทรศัพท์</span>
+          <input
+            data-testid="clinic-lead-phone"
+            value={form.phone}
+            maxLength={40}
+            onChange={(event) => updateField('phone', event.target.value)}
+            autoComplete="tel"
+          />
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>อีเมล</span>
+          <input
+            data-testid="clinic-lead-email"
+            type="email"
+            value={form.email}
+            maxLength={160}
+            onChange={(event) => updateField('email', event.target.value)}
+            autoComplete="email"
+          />
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>LINE ID</span>
+          <input
+            data-testid="clinic-lead-line-id"
+            value={form.lineId}
+            maxLength={80}
+            onChange={(event) => updateField('lineId', event.target.value)}
+            autoComplete="off"
+          />
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>ประเภทความสนใจ</span>
+          <select
+            data-testid="clinic-lead-interest-type"
+            value={form.interestType}
+            onChange={(event) => updateField('interestType', event.target.value)}
+          >
+            <option value="general">ปรึกษาทั่วไป</option>
+            <option value="service">บริการ</option>
+            <option value="promotion">โปรโมชั่น</option>
+            <option value="package">แพ็กเกจ</option>
+          </select>
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>รหัสบริการ/โปร/แพ็กเกจ</span>
+          <input
+            data-testid="clinic-lead-interest-id"
+            type="number"
+            min="1"
+            value={form.interestId}
+            onChange={(event) => updateField('interestId', event.target.value)}
+          />
+        </label>
+
+        <label className="clinic-lead-field clinic-lead-field-wide">
+          <span>ข้อความถึงทีมงาน</span>
+          <textarea
+            data-testid="clinic-lead-message"
+            value={form.message}
+            maxLength={1000}
+            onChange={(event) => updateField('message', event.target.value)}
+            rows={4}
+          />
+        </label>
+
+        <input
+          data-testid="clinic-lead-honeypot"
+          className="clinic-lead-honeypot"
+          tabIndex="-1"
+          autoComplete="off"
+          value={form.honeypot}
+          onChange={(event) => updateField('honeypot', event.target.value)}
+          aria-hidden="true"
+        />
+
+        <label className="clinic-lead-consent clinic-lead-field-wide">
+          <input
+            data-testid="clinic-lead-consent"
+            type="checkbox"
+            checked={form.consentAccepted}
+            onChange={(event) => updateField('consentAccepted', event.target.checked)}
+          />
+          <span>ยินยอมให้คลินิกติดต่อกลับตามข้อมูลที่ระบุไว้</span>
+        </label>
+
+        <button className="cta-btn clinic-btn-primary clinic-lead-submit" data-testid="clinic-lead-submit" type="submit" disabled={submitting}>
+          {submitting ? 'กำลังส่งข้อมูล...' : 'ส่งข้อมูลให้ทีมงานติดต่อกลับ'}
+        </button>
+      </form>
+    </section>
+  );
+});
 
 function ClinicAboutSection({ websiteSettings }) {
   const shortDesc = websiteSettings?.shortDescription || '';
