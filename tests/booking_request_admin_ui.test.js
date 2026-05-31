@@ -130,6 +130,7 @@ function bookingRoutes(session = createSessionFixture(), overrides = {}) {
     'GET /auth/me': { status: 200, body: session },
     'GET /admin/booking-requests': overrides.list || { status: 200, body: { items: bookingItems, total: 1, limit: 50, offset: 0 } },
     'GET /admin/booking-requests/11': overrides.detail || { status: 200, body: bookingDetail() },
+    'GET /admin/booking-requests/11/slot-offers': overrides.slotOffers || { status: 200, body: { items: [] } },
     ...overrides.extra
   };
 }

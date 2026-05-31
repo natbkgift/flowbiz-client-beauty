@@ -611,6 +611,15 @@ function createApiClient(apiBaseUrl) {
     updateBookingRequestSlotStatus(session, requestId, body) {
       return request(`/admin/booking-requests/${requestId}/slot-status`, { ...session, method: 'PATCH', body });
     },
+    listBookingSlotOffers(session, requestId) {
+      return request(`/admin/booking-requests/${requestId}/slot-offers`, session);
+    },
+    createBookingSlotOffer(session, requestId, body) {
+      return request(`/admin/booking-requests/${requestId}/slot-offers`, { ...session, method: 'POST', body });
+    },
+    updateBookingSlotOfferStatus(session, requestId, offerId, body) {
+      return request(`/admin/booking-requests/${requestId}/slot-offers/${offerId}/status`, { ...session, method: 'PATCH', body });
+    },
     addBookingRequestNote(session, requestId, body) {
       return request(`/admin/booking-requests/${requestId}/notes`, { ...session, method: 'POST', body });
     }
@@ -6401,6 +6410,24 @@ const BOOKING_URGENCY_OPTIONS = [
   { value: 'urgent', label: 'เร่งด่วน' }
 ];
 
+const BOOKING_SLOT_OFFER_TIME_WINDOW_OPTIONS = [
+  { value: 'morning', label: 'เช้า' },
+  { value: 'afternoon', label: 'บ่าย' },
+  { value: 'evening', label: 'เย็น' },
+  { value: 'anytime', label: 'ได้ทุกช่วง' },
+  { value: 'specific_time', label: 'ระบุเวลา' }
+];
+
+const BOOKING_SLOT_OFFER_STATUS_OPTIONS = [
+  { value: 'draft', label: 'Draft' },
+  { value: 'ready_to_send', label: 'พร้อมส่ง' },
+  { value: 'sent', label: 'ส่งแล้ว' },
+  { value: 'accepted', label: 'ลูกค้ารับเวลา' },
+  { value: 'declined', label: 'ลูกค้าปฏิเสธ' },
+  { value: 'cancelled', label: 'ยกเลิก' },
+  { value: 'expired', label: 'หมดอายุ' }
+];
+
 function bookingStatusLabel(status) {
   return BOOKING_REQUEST_STATUS_OPTIONS.find((option) => option.value === status)?.label || status || '-';
 }
@@ -6424,6 +6451,32 @@ function bookingVisitTypeLabel(visitType) {
 function bookingUrgencyLabel(urgency) {
   return BOOKING_URGENCY_OPTIONS.find((option) => option.value === urgency)?.label || urgency || '-';
 }
+
+function bookingSlotOfferTimeWindowLabel(value) {
+  return BOOKING_SLOT_OFFER_TIME_WINDOW_OPTIONS.find((option) => option.value === value)?.label || value || '-';
+}
+
+function bookingSlotOfferStatusLabel(value) {
+  return BOOKING_SLOT_OFFER_STATUS_OPTIONS.find((option) => option.value === value)?.label || value || '-';
+}
+
+function todayBangkokDateString() {
+  return new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(new Date());
+}
+
+const INITIAL_SLOT_OFFER_FORM = {
+  offeredDate: '',
+  offeredTimeWindow: 'specific_time',
+  offeredStartTime: '',
+  durationMinutes: '',
+  offerNote: '',
+  internalNote: ''
+};
 
 function BookingRequestsPage() {
   const api = useApi();
@@ -6451,7 +6504,9 @@ function BookingRequestsPage() {
   const [selectedStatus, setSelectedStatus] = useState('new');
   const [selectedSlotStatus, setSelectedSlotStatus] = useState('requested');
   const [noteText, setNoteText] = useState('');
+  const [slotOfferForm, setSlotOfferForm] = useState(INITIAL_SLOT_OFFER_FORM);
   const [notice, setNotice] = useState(null);
+  const [slotOfferNotice, setSlotOfferNotice] = useState(null);
   const [permissionError, setPermissionError] = useState(null);
 
   const [listState] = usePageData(
@@ -6482,11 +6537,18 @@ function BookingRequestsPage() {
     setDetailState({ status: 'loading', data: null, error: null });
 
     try {
-      const data = await api.getBookingRequest(sessionOptions, requestId);
-      setDetailState({ status: 'ready', data, error: null });
+      const [data, slotOffers] = await Promise.all([
+        api.getBookingRequest(sessionOptions, requestId),
+        api.listBookingSlotOffers(sessionOptions, requestId).catch(() => ({ items: [] }))
+      ]);
+      setDetailState({ status: 'ready', data: { ...data, slotOffers: slotOffers.items || [] }, error: null });
       setSelectedStatus(data.status || 'new');
       setSelectedSlotStatus(data.slotStatus || 'requested');
       setNoteText('');
+      setSlotOfferForm(INITIAL_SLOT_OFFER_FORM);
+      if (!options.keepNotice) {
+        setSlotOfferNotice(null);
+      }
     } catch (error) {
       if (error.status === 403) {
         setPermissionError('คุณไม่มีสิทธิ์จัดการคำขอนัดหมายนี้');
@@ -6504,6 +6566,10 @@ function BookingRequestsPage() {
 
   function updateDraftField(fieldName, value) {
     setFilterDraft((current) => ({ ...current, [fieldName]: value }));
+  }
+
+  function updateSlotOfferField(fieldName, value) {
+    setSlotOfferForm((current) => ({ ...current, [fieldName]: value }));
   }
 
   function renderPermissionError() {
@@ -6593,6 +6659,89 @@ function BookingRequestsPage() {
       await loadDetail(selectedId, { keepNotice: true });
     } catch (error) {
       handleActionError(error);
+    }
+  }
+
+  function validateSlotOfferForm() {
+    const offeredDate = slotOfferForm.offeredDate.trim();
+    const offeredStartTime = slotOfferForm.offeredStartTime.trim();
+    const durationText = String(slotOfferForm.durationMinutes || '').trim();
+    const offerNote = slotOfferForm.offerNote.trim();
+    const internalNote = slotOfferForm.internalNote.trim();
+
+    if (!offeredDate) {
+      return 'กรุณาระบุวันที่เสนอเวลานัด';
+    }
+    if (offeredDate < todayBangkokDateString()) {
+      return 'วันที่เสนอเวลานัดต้องไม่เป็นอดีต';
+    }
+    if (!slotOfferForm.offeredTimeWindow) {
+      return 'กรุณาระบุช่วงเวลาที่เสนอ';
+    }
+    if (slotOfferForm.offeredTimeWindow === 'specific_time' && !offeredStartTime) {
+      return 'กรุณาระบุเวลาเริ่มต้นเมื่อเลือกแบบระบุเวลา';
+    }
+    if (offeredStartTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(offeredStartTime)) {
+      return 'เวลาเริ่มต้นต้องเป็นรูปแบบ HH:mm';
+    }
+    if (durationText) {
+      const duration = Number(durationText);
+      if (!Number.isInteger(duration) || duration < 5 || duration > 480) {
+        return 'ระยะเวลาต้องอยู่ระหว่าง 5 ถึง 480 นาที';
+      }
+    }
+    if (offerNote.length > 500) {
+      return 'ข้อความข้อเสนอห้ามเกิน 500 ตัวอักษร';
+    }
+    if (internalNote.length > 1000) {
+      return 'Internal note ห้ามเกิน 1000 ตัวอักษร';
+    }
+    return null;
+  }
+
+  async function saveSlotOffer(event) {
+    event.preventDefault();
+    if (!selectedId || !detailState.data) return;
+    setPermissionError(null);
+    setSlotOfferNotice(null);
+    setNotice(null);
+
+    if (!canManage) {
+      setPermissionError('คุณไม่มีสิทธิ์จัดการคำขอนัดหมายนี้');
+      setSlotOfferNotice({ kind: 'error', message: 'บัญชีนี้ดูคำขอนัดหมายได้ แต่ไม่สามารถสร้างข้อเสนอเวลาได้' });
+      return;
+    }
+
+    const validationMessage = validateSlotOfferForm();
+    if (validationMessage) {
+      setSlotOfferNotice({ kind: 'error', message: validationMessage });
+      return;
+    }
+
+    const durationText = String(slotOfferForm.durationMinutes || '').trim();
+    const payload = {
+      offeredDate: slotOfferForm.offeredDate.trim(),
+      offeredTimeWindow: slotOfferForm.offeredTimeWindow,
+      offeredStartTime: slotOfferForm.offeredStartTime.trim() || undefined,
+      durationMinutes: durationText ? Number(durationText) : undefined,
+      offerStatus: 'draft',
+      offerNote: slotOfferForm.offerNote.trim() || undefined,
+      internalNote: slotOfferForm.internalNote.trim() || undefined,
+      metadata: { source: 'admin_queue' }
+    };
+
+    try {
+      await api.createBookingSlotOffer(sessionOptions, selectedId, payload);
+      setSlotOfferNotice({ kind: 'success', message: 'บันทึกข้อเสนอเวลานัดแล้ว' });
+      setNotice({ kind: 'success', message: 'บันทึกข้อเสนอเวลานัดแล้ว' });
+      setSlotOfferForm(INITIAL_SLOT_OFFER_FORM);
+      setRefreshToken((value) => value + 1);
+      await loadDetail(selectedId, { keepNotice: true });
+    } catch (error) {
+      if (error.status === 403) {
+        setPermissionError('คุณไม่มีสิทธิ์จัดการคำขอนัดหมายนี้');
+      }
+      setSlotOfferNotice({ kind: 'error', message: describeError(error) });
     }
   }
 
@@ -6922,6 +7071,118 @@ function BookingRequestsPage() {
                     บันทึกสถานะเวลา
                   </Button>
                 </div>
+
+                <section className="booking-slot-offers-section" data-testid="booking-slot-offers-section">
+                  <div className="split-header compact-gap">
+                    <div>
+                      <h4 className="section-heading">Slot Offers / ข้อเสนอเวลานัด</h4>
+                      <p className="muted">สร้าง draft สำหรับเสนอเวลานัดกลับให้ลูกค้า</p>
+                    </div>
+                  </div>
+
+                  {slotOfferNotice?.kind === 'success' ? (
+                    <div className="alert-banner success" data-testid="booking-slot-offer-success">{slotOfferNotice.message}</div>
+                  ) : null}
+                  {slotOfferNotice?.kind === 'error' ? (
+                    <div className="alert-banner error" data-testid="booking-slot-offer-error">{slotOfferNotice.message}</div>
+                  ) : null}
+
+                  <div className="booking-slot-offer-list" data-testid="booking-slot-offer-list">
+                    {detail.slotOffers?.length ? (
+                      detail.slotOffers.map((offer) => (
+                        <div className="booking-slot-offer-row" key={offer.id} data-testid={`booking-slot-offer-row-${offer.id}`}>
+                          <div>
+                            <strong>{offer.offeredDate} / {bookingSlotOfferTimeWindowLabel(offer.offeredTimeWindow)}</strong>
+                            <span className={`pill status-${offer.offerStatus}`}>{bookingSlotOfferStatusLabel(offer.offerStatus)}</span>
+                          </div>
+                          <div className="muted">
+                            {offer.offeredStartTime ? `เวลา ${offer.offeredStartTime}` : 'ไม่ระบุเวลาเริ่ม'} / {offer.durationMinutes ? `${offer.durationMinutes} นาที` : 'ไม่ระบุระยะเวลา'}
+                          </div>
+                          {offer.offerNote ? <p>{offer.offerNote}</p> : null}
+                          {offer.internalNote ? <p className="muted">Internal: {offer.internalNote}</p> : null}
+                          <span className="muted">{formatDateTime(offer.createdAt)}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="muted">ยังไม่มีข้อเสนอเวลานัด</p>
+                    )}
+                  </div>
+
+                  <form className="booking-slot-offer-form" onSubmit={saveSlotOffer} data-testid="booking-slot-offer-form">
+                    <div className="booking-slot-offer-grid">
+                      <label className="field">
+                        <span>วันที่เสนอ</span>
+                        <input
+                          type="date"
+                          value={slotOfferForm.offeredDate}
+                          onChange={(event) => updateSlotOfferField('offeredDate', event.target.value)}
+                          data-testid="booking-slot-offer-date"
+                          disabled={!canManage}
+                        />
+                      </label>
+                      <label className="field">
+                        <span>ช่วงเวลา</span>
+                        <select
+                          value={slotOfferForm.offeredTimeWindow}
+                          onChange={(event) => updateSlotOfferField('offeredTimeWindow', event.target.value)}
+                          data-testid="booking-slot-offer-time-window"
+                          disabled={!canManage}
+                        >
+                          {BOOKING_SLOT_OFFER_TIME_WINDOW_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="field">
+                        <span>เวลาเริ่มต้น</span>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder="14:00"
+                          value={slotOfferForm.offeredStartTime}
+                          onChange={(event) => updateSlotOfferField('offeredStartTime', event.target.value)}
+                          data-testid="booking-slot-offer-start-time"
+                          disabled={!canManage}
+                        />
+                      </label>
+                      <label className="field">
+                        <span>ระยะเวลา (นาที)</span>
+                        <input
+                          type="number"
+                          min="5"
+                          max="480"
+                          value={slotOfferForm.durationMinutes}
+                          onChange={(event) => updateSlotOfferField('durationMinutes', event.target.value)}
+                          data-testid="booking-slot-offer-duration"
+                          disabled={!canManage}
+                        />
+                      </label>
+                    </div>
+                    <label className="field">
+                      <span>ข้อความเสนอเวลา</span>
+                      <textarea
+                        value={slotOfferForm.offerNote}
+                        maxLength={500}
+                        onChange={(event) => updateSlotOfferField('offerNote', event.target.value)}
+                        data-testid="booking-slot-offer-note"
+                        disabled={!canManage}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Internal note</span>
+                      <textarea
+                        value={slotOfferForm.internalNote}
+                        maxLength={1000}
+                        onChange={(event) => updateSlotOfferField('internalNote', event.target.value)}
+                        data-testid="booking-slot-offer-internal-note"
+                        disabled={!canManage}
+                      />
+                    </label>
+                    <Button type="submit" data-testid="booking-slot-offer-save" disabled={!canManage}>
+                      บันทึกข้อเสนอเวลา
+                    </Button>
+                  </form>
+                </section>
 
                 <form className="booking-note-form" onSubmit={saveNote}>
                   <label className="field">
