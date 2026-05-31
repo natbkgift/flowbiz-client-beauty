@@ -50,6 +50,7 @@ const { handleBlogRoutes } = require('./modules/blog/routes');
 const { handleForumRoutes } = require('./modules/forum/routes');
 const { handleClinicRoutes } = require('./modules/clinics/routes');
 const { handleClinicWebsiteRoutes } = require('./modules/clinic-website/routes');
+const { handleClinicOfferingsRoutes } = require('./modules/clinic-offerings/routes');
 const { handlePublicContentRoutes } = require('./modules/public-content/routes');
 
 
@@ -408,6 +409,10 @@ async function routeRequest(request, response) {
   }
 
   if (await handleClinicWebsiteRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
+    return;
+  }
+
+  if (await handleClinicOfferingsRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
     return;
   }
 
