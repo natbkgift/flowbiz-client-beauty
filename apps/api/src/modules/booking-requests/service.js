@@ -16,6 +16,9 @@ const VALID_INTEREST_TYPES = new Set(['service', 'promotion', 'package', 'genera
 const VALID_TIME_WINDOWS = new Set(['morning', 'afternoon', 'evening', 'anytime']);
 const VALID_CONTACT_METHODS = new Set(['phone', 'line', 'email', 'any']);
 const VALID_BOOKING_STATUSES = new Set(['new', 'contacted', 'confirmed', 'cancelled', 'closed']);
+const VALID_VISIT_TYPES = new Set(['consultation', 'treatment', 'follow_up', 'other']);
+const VALID_URGENCY_LEVELS = new Set(['normal', 'soon', 'urgent']);
+const VALID_SLOT_STATUSES = new Set(['requested', 'reviewing', 'offered', 'accepted', 'rejected', 'expired']);
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function trimString(value, maxLength) {
@@ -94,6 +97,14 @@ function normalizeBookingStatus(value) {
   return normalized;
 }
 
+function normalizeSlotStatus(value) {
+  const normalized = trimString(value, 40);
+  if (!normalized || !VALID_SLOT_STATUSES.has(normalized)) {
+    throw new AppError(400, 'INVALID_SLOT_STATUS', 'slotStatus is invalid.');
+  }
+  return normalized;
+}
+
 function normalizeDateBoundary(value, fieldName, options = {}) {
   if (value === undefined || value === null || value === '') return null;
   if (typeof value !== 'string') {
@@ -139,10 +150,30 @@ function normalizeAdminFilters(searchParams) {
     throw new AppError(400, 'INVALID_BOOKING_REQUEST_STATUS', 'status is invalid.');
   }
 
+  const slotStatus = trimString(searchParams.get('slotStatus'), 40);
+  if (slotStatus && !VALID_SLOT_STATUSES.has(slotStatus)) {
+    throw new AppError(400, 'INVALID_SLOT_STATUS', 'slotStatus is invalid.');
+  }
+
+  const visitType = trimString(searchParams.get('visitType'), 40);
+  if (visitType && !VALID_VISIT_TYPES.has(visitType)) {
+    throw new AppError(400, 'INVALID_VISIT_TYPE', 'visitType is invalid.');
+  }
+
+  const urgency = trimString(searchParams.get('urgency'), 40);
+  if (urgency && !VALID_URGENCY_LEVELS.has(urgency)) {
+    throw new AppError(400, 'INVALID_URGENCY', 'urgency is invalid.');
+  }
+
   return {
     status,
     requestType,
     interestType,
+    slotStatus,
+    visitType,
+    urgency,
+    preferredDateFrom: normalizePreferredDateBoundary(searchParams.get('preferredDateFrom'), 'preferredDateFrom'),
+    preferredDateTo: normalizePreferredDateBoundary(searchParams.get('preferredDateTo'), 'preferredDateTo'),
     dateFrom: normalizeDateBoundary(searchParams.get('dateFrom'), 'dateFrom'),
     dateTo: normalizeDateBoundary(searchParams.get('dateTo'), 'dateTo', { endExclusive: true }),
     q: trimString(searchParams.get('q'), 120),
@@ -159,6 +190,22 @@ function formatDateOnly(value) {
   if (!value) return null;
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   return String(value).slice(0, 10);
+}
+
+function normalizePreferredDateBoundary(value, fieldName) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string') {
+    throw new AppError(400, 'INVALID_QUERY', `${fieldName} must be a date.`);
+  }
+  const trimmed = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    throw new AppError(400, 'INVALID_QUERY', `${fieldName} must be YYYY-MM-DD.`);
+  }
+  const parsed = new Date(`${trimmed}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== trimmed) {
+    throw new AppError(400, 'INVALID_QUERY', `${fieldName} must be a valid date.`);
+  }
+  return trimmed;
 }
 
 function mapBookingRequestRow(row, options = {}) {
@@ -186,6 +233,12 @@ function mapBookingRequestRow(row, options = {}) {
     interestId: row.interest_id ? Number(row.interest_id) : null,
     preferredDate: formatDateOnly(row.preferred_date),
     preferredTimeWindow: row.preferred_time_window || null,
+    alternativePreferredDate: formatDateOnly(row.alternative_preferred_date),
+    alternativeTimeWindow: row.alternative_time_window || null,
+    visitType: row.visit_type || 'consultation',
+    urgency: row.urgency || 'normal',
+    slotStatus: row.slot_status || 'requested',
+    slotRequest: options.includeSlotRequest ? row.slot_request_json || {} : undefined,
     preferredContactMethod: row.preferred_contact_method || null,
     customerName: row.customer_name || null,
     phone: row.phone || null,
@@ -247,6 +300,53 @@ function normalizePreferredDate(value) {
   return trimmed;
 }
 
+function normalizeSlotDate(value, fieldName) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string') {
+    throw new AppError(400, 'INVALID_SLOT_DATE', `${fieldName} must be a valid date.`);
+  }
+  const trimmed = value.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    throw new AppError(400, 'INVALID_SLOT_DATE', `${fieldName} must be YYYY-MM-DD.`);
+  }
+  const parsed = new Date(`${trimmed}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== trimmed) {
+    throw new AppError(400, 'INVALID_SLOT_DATE', `${fieldName} must be a valid date.`);
+  }
+  if (trimmed < todayDateString()) {
+    throw new AppError(400, 'INVALID_SLOT_DATE', `${fieldName} cannot be in the past.`);
+  }
+  return trimmed;
+}
+
+function normalizeSlotRequest(value) {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new AppError(400, 'INVALID_SLOT_REQUEST_PAYLOAD', 'slotRequest must be a JSON object.');
+  }
+
+  const normalized = { ...value };
+  if (Object.prototype.hasOwnProperty.call(normalized, 'notes')) {
+    if (normalized.notes === undefined || normalized.notes === null || normalized.notes === '') {
+      delete normalized.notes;
+    } else if (typeof normalized.notes !== 'string') {
+      throw new AppError(400, 'INVALID_SLOT_REQUEST_PAYLOAD', 'slotRequest.notes must be a string.');
+    } else {
+      const notes = normalized.notes.trim();
+      if (notes.length > 500) {
+        throw new AppError(400, 'INVALID_SLOT_REQUEST_PAYLOAD', 'slotRequest.notes must be 500 characters or less.');
+      }
+      if (notes) {
+        normalized.notes = notes;
+      } else {
+        delete normalized.notes;
+      }
+    }
+  }
+
+  return normalized;
+}
+
 function validateBookingRequestPayload(body) {
   rejectClinicOverride(body);
 
@@ -287,6 +387,13 @@ function validateBookingRequestPayload(body) {
     preferredTimeWindow: body.preferredTimeWindow === undefined || body.preferredTimeWindow === null || body.preferredTimeWindow === ''
       ? null
       : normalizeEnum(body.preferredTimeWindow, VALID_TIME_WINDOWS, null, 'INVALID_BOOKING_TIME_WINDOW', 'preferredTimeWindow'),
+    alternativePreferredDate: normalizeSlotDate(body.alternativePreferredDate, 'alternativePreferredDate'),
+    alternativeTimeWindow: body.alternativeTimeWindow === undefined || body.alternativeTimeWindow === null || body.alternativeTimeWindow === ''
+      ? null
+      : normalizeEnum(body.alternativeTimeWindow, VALID_TIME_WINDOWS, null, 'INVALID_SLOT_TIME_WINDOW', 'alternativeTimeWindow'),
+    visitType: normalizeEnum(body.visitType, VALID_VISIT_TYPES, 'consultation', 'INVALID_VISIT_TYPE', 'visitType'),
+    urgency: normalizeEnum(body.urgency, VALID_URGENCY_LEVELS, 'normal', 'INVALID_URGENCY', 'urgency'),
+    slotRequest: normalizeSlotRequest(body.slotRequest),
     preferredContactMethod: body.preferredContactMethod === undefined || body.preferredContactMethod === null || body.preferredContactMethod === ''
       ? null
       : normalizeEnum(body.preferredContactMethod, VALID_CONTACT_METHODS, null, 'INVALID_BOOKING_CONTACT_METHOD', 'preferredContactMethod')
@@ -390,6 +497,11 @@ function buildNotesSummary(payload, interest) {
   if (payload.preferredTimeWindow) parts.push(`preferred_time_window=${payload.preferredTimeWindow}`);
   if (payload.preferredContactMethod) parts.push(`preferred_contact_method=${payload.preferredContactMethod}`);
   if (payload.message) parts.push('message_provided=true');
+  if (payload.alternativePreferredDate) parts.push('alternative_preferred_date_provided=true');
+  if (payload.alternativeTimeWindow) parts.push(`alternative_time_window=${payload.alternativeTimeWindow}`);
+  parts.push(`visit_type=${payload.visitType}`);
+  parts.push(`urgency=${payload.urgency}`);
+  if (Object.keys(payload.slotRequest || {}).length > 0) parts.push('slot_request_provided=true');
   return parts.join('\n').slice(0, 2000);
 }
 
@@ -549,6 +661,11 @@ async function createPublicBookingRequest(slug, body) {
           interest_id,
           preferred_date,
           preferred_time_window,
+          alternative_preferred_date,
+          alternative_time_window,
+          visit_type,
+          urgency,
+          slot_request_json,
           preferred_contact_method,
           customer_name,
           phone,
@@ -557,7 +674,7 @@ async function createPublicBookingRequest(slug, body) {
           message,
           metadata_json
         )
-        values ($1, $2, $3, $4, $5, $6::date, $7, $8, $9, $10, $11, $12, $13, $14::jsonb)
+        values ($1, $2, $3, $4, $5, $6::date, $7, $8::date, $9, $10, $11, $12::jsonb, $13, $14, $15, $16, $17, $18, $19::jsonb)
         returning id
       `,
       [
@@ -568,6 +685,11 @@ async function createPublicBookingRequest(slug, body) {
         interest.interestId,
         normalized.preferredDate,
         normalized.preferredTimeWindow,
+        normalized.alternativePreferredDate,
+        normalized.alternativeTimeWindow,
+        normalized.visitType,
+        normalized.urgency,
+        JSON.stringify(normalized.slotRequest),
         normalized.preferredContactMethod,
         normalized.name,
         normalized.phone,
@@ -627,7 +749,13 @@ async function createPublicBookingRequest(slug, body) {
       interestType: interest.interestType,
       interestId: interest.interestId,
       preferredDateProvided: Boolean(normalized.preferredDate),
+      hasPreferredDate: Boolean(normalized.preferredDate),
       preferredTimeWindow: normalized.preferredTimeWindow,
+      hasAlternativePreferredDate: Boolean(normalized.alternativePreferredDate),
+      visitType: normalized.visitType,
+      urgency: normalized.urgency,
+      slotStatus: 'requested',
+      slotRequestProvided: Object.keys(normalized.slotRequest).length > 0,
       preferredContactMethod: normalized.preferredContactMethod,
       hasPhone: Boolean(normalized.phone),
       hasEmail: Boolean(normalized.email),
@@ -690,6 +818,31 @@ async function listAdminBookingRequests(context, searchParams) {
   if (filters.interestType) {
     values.push(filters.interestType);
     clauses.push(`br.interest_type = $${values.length}`);
+  }
+
+  if (filters.slotStatus) {
+    values.push(filters.slotStatus);
+    clauses.push(`br.slot_status = $${values.length}`);
+  }
+
+  if (filters.visitType) {
+    values.push(filters.visitType);
+    clauses.push(`br.visit_type = $${values.length}`);
+  }
+
+  if (filters.urgency) {
+    values.push(filters.urgency);
+    clauses.push(`br.urgency = $${values.length}`);
+  }
+
+  if (filters.preferredDateFrom) {
+    values.push(filters.preferredDateFrom);
+    clauses.push(`br.preferred_date >= $${values.length}::date`);
+  }
+
+  if (filters.preferredDateTo) {
+    values.push(filters.preferredDateTo);
+    clauses.push(`br.preferred_date <= $${values.length}::date`);
   }
 
   if (filters.dateFrom) {
@@ -811,7 +964,7 @@ async function getAdminBookingRequestDetail(context, bookingRequestId, client = 
     }));
   }
 
-  return mapBookingRequestRow(row, { includeMessage: true, notes });
+  return mapBookingRequestRow(row, { includeMessage: true, includeSlotRequest: true, notes });
 }
 
 async function updateAdminBookingRequestStatus(context, bookingRequestId, body) {
@@ -994,12 +1147,96 @@ async function addAdminBookingRequestNote(context, bookingRequestId, body) {
   };
 }
 
+async function updateAdminBookingRequestSlotStatus(context, bookingRequestId, body) {
+  assertAdminContext(context);
+  rejectAdminClinicOverride(body);
+  const normalizedId = asPositiveInteger(bookingRequestId, 'bookingRequestId');
+  const nextSlotStatus = normalizeSlotStatus(body.slotStatus);
+  const client = await getPool().connect();
+  let committed = false;
+
+  try {
+    await client.query('begin');
+    const existingResult = await client.query(
+      `
+        select id, clinic_id, lead_id, slot_status
+        from clinic_booking_requests
+        where clinic_id = $1 and id = $2
+        for update
+      `,
+      [context.currentClinic.id, normalizedId]
+    );
+
+    if (existingResult.rowCount === 0) {
+      throw new AppError(404, 'BOOKING_REQUEST_NOT_FOUND', 'Booking request not found.');
+    }
+
+    const existing = existingResult.rows[0];
+    await client.query(
+      `
+        update clinic_booking_requests
+        set slot_status = $3,
+            updated_at = now()
+        where clinic_id = $1 and id = $2
+      `,
+      [context.currentClinic.id, normalizedId, nextSlotStatus]
+    );
+
+    const summary = {
+      source: 'admin_booking_request_queue',
+      bookingRequestId: normalizedId,
+      leadId: existing.lead_id ? Number(existing.lead_id) : null,
+      fromSlotStatus: existing.slot_status,
+      toSlotStatus: nextSlotStatus,
+      changedFields: ['slotStatus']
+    };
+
+    if (existing.lead_id) {
+      await client.query(
+        `
+          insert into lead_activity (clinic_id, lead_id, event_type, event_data_json)
+          values ($1, $2, 'booking_request.slot_status_changed', $3::jsonb)
+        `,
+        [context.currentClinic.id, existing.lead_id, JSON.stringify({ summary })]
+      );
+    }
+
+    await recordAuditLog(
+      {
+        clinicId: context.currentClinic.id,
+        entityType: 'clinic_booking_request',
+        entityId: normalizedId,
+        actionType: 'booking_request.slot_status_changed',
+        actorUserId: context.currentUser?.id || null,
+        contextJson: { summary }
+      },
+      client
+    );
+
+    await client.query('commit');
+    committed = true;
+  } catch (error) {
+    if (!committed) {
+      await client.query('rollback').catch(() => {});
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return {
+    success: true,
+    item: await getAdminBookingRequestDetail(context, normalizedId)
+  };
+}
+
 module.exports = {
   createPublicBookingRequest,
   validateBookingRequestPayload,
   listAdminBookingRequests,
   getAdminBookingRequestDetail,
   updateAdminBookingRequestStatus,
+  updateAdminBookingRequestSlotStatus,
   addAdminBookingRequestNote,
   normalizeAdminFilters,
   normalizeBookingNotePayload,

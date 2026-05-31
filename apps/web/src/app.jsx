@@ -608,6 +608,9 @@ function createApiClient(apiBaseUrl) {
     updateBookingRequestStatus(session, requestId, body) {
       return request(`/admin/booking-requests/${requestId}/status`, { ...session, method: 'PATCH', body });
     },
+    updateBookingRequestSlotStatus(session, requestId, body) {
+      return request(`/admin/booking-requests/${requestId}/slot-status`, { ...session, method: 'PATCH', body });
+    },
     addBookingRequestNote(session, requestId, body) {
       return request(`/admin/booking-requests/${requestId}/notes`, { ...session, method: 'POST', body });
     }
@@ -6373,6 +6376,31 @@ const BOOKING_INTEREST_TYPE_OPTIONS = [
   { value: 'package', label: 'แพ็กเกจ' }
 ];
 
+const BOOKING_SLOT_STATUS_OPTIONS = [
+  { value: '', label: 'ทุกสถานะเวลา' },
+  { value: 'requested', label: 'ร้องขอ' },
+  { value: 'reviewing', label: 'กำลังตรวจ' },
+  { value: 'offered', label: 'เสนอเวลาแล้ว' },
+  { value: 'accepted', label: 'ลูกค้ารับเวลา' },
+  { value: 'rejected', label: 'ปฏิเสธ' },
+  { value: 'expired', label: 'หมดอายุ' }
+];
+
+const BOOKING_VISIT_TYPE_OPTIONS = [
+  { value: '', label: 'ทุกประเภทบริการ' },
+  { value: 'consultation', label: 'ปรึกษา' },
+  { value: 'treatment', label: 'ทำหัตถการ' },
+  { value: 'follow_up', label: 'ติดตามผล' },
+  { value: 'other', label: 'อื่นๆ' }
+];
+
+const BOOKING_URGENCY_OPTIONS = [
+  { value: '', label: 'ทุกความเร่งด่วน' },
+  { value: 'normal', label: 'ปกติ' },
+  { value: 'soon', label: 'เร็วๆ นี้' },
+  { value: 'urgent', label: 'เร่งด่วน' }
+];
+
 function bookingStatusLabel(status) {
   return BOOKING_REQUEST_STATUS_OPTIONS.find((option) => option.value === status)?.label || status || '-';
 }
@@ -6383,6 +6411,18 @@ function bookingRequestTypeLabel(requestType) {
 
 function bookingInterestTypeLabel(interestType) {
   return BOOKING_INTEREST_TYPE_OPTIONS.find((option) => option.value === interestType)?.label || interestType || '-';
+}
+
+function bookingSlotStatusLabel(status) {
+  return BOOKING_SLOT_STATUS_OPTIONS.find((option) => option.value === status)?.label || status || '-';
+}
+
+function bookingVisitTypeLabel(visitType) {
+  return BOOKING_VISIT_TYPE_OPTIONS.find((option) => option.value === visitType)?.label || visitType || '-';
+}
+
+function bookingUrgencyLabel(urgency) {
+  return BOOKING_URGENCY_OPTIONS.find((option) => option.value === urgency)?.label || urgency || '-';
 }
 
 function BookingRequestsPage() {
@@ -6396,6 +6436,11 @@ function BookingRequestsPage() {
     status: '',
     requestType: '',
     interestType: '',
+    slotStatus: '',
+    visitType: '',
+    urgency: '',
+    preferredDateFrom: '',
+    preferredDateTo: '',
     dateFrom: '',
     dateTo: ''
   });
@@ -6404,6 +6449,7 @@ function BookingRequestsPage() {
   const [selectedId, setSelectedId] = useState(null);
   const [detailState, setDetailState] = useState({ status: 'idle', data: null, error: null });
   const [selectedStatus, setSelectedStatus] = useState('new');
+  const [selectedSlotStatus, setSelectedSlotStatus] = useState('requested');
   const [noteText, setNoteText] = useState('');
   const [notice, setNotice] = useState(null);
   const [permissionError, setPermissionError] = useState(null);
@@ -6416,6 +6462,11 @@ function BookingRequestsPage() {
       appliedFilters.status,
       appliedFilters.requestType,
       appliedFilters.interestType,
+      appliedFilters.slotStatus,
+      appliedFilters.visitType,
+      appliedFilters.urgency,
+      appliedFilters.preferredDateFrom,
+      appliedFilters.preferredDateTo,
       appliedFilters.dateFrom,
       appliedFilters.dateTo,
       refreshToken
@@ -6434,6 +6485,7 @@ function BookingRequestsPage() {
       const data = await api.getBookingRequest(sessionOptions, requestId);
       setDetailState({ status: 'ready', data, error: null });
       setSelectedStatus(data.status || 'new');
+      setSelectedSlotStatus(data.slotStatus || 'requested');
       setNoteText('');
     } catch (error) {
       if (error.status === 403) {
@@ -6488,6 +6540,27 @@ function BookingRequestsPage() {
     try {
       await api.updateBookingRequestStatus(sessionOptions, selectedId, { status: selectedStatus });
       setNotice({ kind: 'success', message: 'อัปเดตสถานะคำขอนัดหมายแล้ว' });
+      setRefreshToken((value) => value + 1);
+      await loadDetail(selectedId, { keepNotice: true });
+    } catch (error) {
+      handleActionError(error);
+    }
+  }
+
+  async function saveSlotStatus() {
+    if (!selectedId || !detailState.data) return;
+    setPermissionError(null);
+    setNotice(null);
+
+    if (!canManage) {
+      setPermissionError('คุณไม่มีสิทธิ์จัดการคำขอนัดหมายนี้');
+      setNotice({ kind: 'error', message: 'บัญชีนี้ดูคำขอนัดหมายได้ แต่ไม่สามารถเปลี่ยนสถานะได้' });
+      return;
+    }
+
+    try {
+      await api.updateBookingRequestSlotStatus(sessionOptions, selectedId, { slotStatus: selectedSlotStatus });
+      setNotice({ kind: 'success', message: 'อัปเดตสถานะเวลาที่สะดวกแล้ว' });
       setRefreshToken((value) => value + 1);
       await loadDetail(selectedId, { keepNotice: true });
     } catch (error) {
@@ -6604,6 +6677,60 @@ function BookingRequestsPage() {
               </select>
             </label>
             <label className="field">
+              <span>สถานะเวลา</span>
+              <select
+                value={filterDraft.slotStatus}
+                onChange={(event) => updateDraftField('slotStatus', event.target.value)}
+                data-testid="booking-requests-slot-status-filter"
+              >
+                {BOOKING_SLOT_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value || 'all-slot-status'} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>ประเภทบริการ</span>
+              <select
+                value={filterDraft.visitType}
+                onChange={(event) => updateDraftField('visitType', event.target.value)}
+                data-testid="booking-requests-visit-type-filter"
+              >
+                {BOOKING_VISIT_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value || 'all-visit-type'} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>ความเร่งด่วน</span>
+              <select
+                value={filterDraft.urgency}
+                onChange={(event) => updateDraftField('urgency', event.target.value)}
+                data-testid="booking-requests-urgency-filter"
+              >
+                {BOOKING_URGENCY_OPTIONS.map((option) => (
+                  <option key={option.value || 'all-urgency'} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>วันนัดตั้งแต่</span>
+              <input
+                type="date"
+                value={filterDraft.preferredDateFrom}
+                onChange={(event) => updateDraftField('preferredDateFrom', event.target.value)}
+                data-testid="booking-requests-preferred-date-from"
+              />
+            </label>
+            <label className="field">
+              <span>วันนัดถึง</span>
+              <input
+                type="date"
+                value={filterDraft.preferredDateTo}
+                onChange={(event) => updateDraftField('preferredDateTo', event.target.value)}
+                data-testid="booking-requests-preferred-date-to"
+              />
+            </label>
+            <label className="field">
               <span>สร้างตั้งแต่วันที่</span>
               <input
                 type="date"
@@ -6648,6 +6775,7 @@ function BookingRequestsPage() {
                       <th>ลูกค้า</th>
                       <th>ประเภท</th>
                       <th>วันที่ต้องการ</th>
+                      <th>Slot</th>
                       <th>ช่องทาง</th>
                       <th>สถานะ</th>
                       <th>สร้างเมื่อ</th>
@@ -6668,8 +6796,13 @@ function BookingRequestsPage() {
                         <td>
                           {bookingRequestTypeLabel(item.requestType)}
                           <div className="muted">{bookingInterestTypeLabel(item.interestType)}</div>
+                          <div className="muted" data-testid="booking-request-visit-type">{bookingVisitTypeLabel(item.visitType)}</div>
                         </td>
                         <td>{item.preferredDate || '-'}</td>
+                        <td>
+                          <span data-testid="booking-request-slot-status">{bookingSlotStatusLabel(item.slotStatus)}</span>
+                          <div className="muted" data-testid="booking-request-urgency">{bookingUrgencyLabel(item.urgency)}</div>
+                        </td>
                         <td>{item.preferredContactMethod || '-'}</td>
                         <td><span className={`pill status-${item.status}`}>{bookingStatusLabel(item.status)}</span></td>
                         <td>{formatDateTime(item.createdAt)}</td>
@@ -6718,6 +6851,22 @@ function BookingRequestsPage() {
                     <dt>เวลาที่ต้องการ</dt>
                     <dd>{detail.preferredDate || '-'} / {detail.preferredTimeWindow || '-'}</dd>
                   </div>
+                  <div>
+                    <dt>เวลาสำรอง</dt>
+                    <dd data-testid="booking-request-alt-slot">{detail.alternativePreferredDate || '-'} / {detail.alternativeTimeWindow || '-'}</dd>
+                  </div>
+                  <div>
+                    <dt>ประเภทบริการ</dt>
+                    <dd data-testid="booking-request-visit-type">{bookingVisitTypeLabel(detail.visitType)}</dd>
+                  </div>
+                  <div>
+                    <dt>ความเร่งด่วน</dt>
+                    <dd data-testid="booking-request-urgency">{bookingUrgencyLabel(detail.urgency)}</dd>
+                  </div>
+                  <div>
+                    <dt>สถานะเวลา</dt>
+                    <dd data-testid="booking-request-slot-status">{bookingSlotStatusLabel(detail.slotStatus)}</dd>
+                  </div>
                 </dl>
                 {detail.message ? (
                   <div className="booking-message-box">
@@ -6747,6 +6896,30 @@ function BookingRequestsPage() {
                     disabled={!canManage}
                   >
                     บันทึกสถานะ
+                  </Button>
+                </div>
+
+                <div className="booking-status-editor">
+                  <label className="field">
+                    <span>สถานะเวลาที่สะดวก</span>
+                    <select
+                      value={selectedSlotStatus}
+                      onChange={(event) => setSelectedSlotStatus(event.target.value)}
+                      data-testid="booking-request-slot-status-select"
+                      disabled={!canManage}
+                    >
+                      {BOOKING_SLOT_STATUS_OPTIONS.filter((option) => option.value).map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <Button
+                    type="button"
+                    onClick={saveSlotStatus}
+                    data-testid="booking-request-slot-status-save"
+                    disabled={!canManage}
+                  >
+                    บันทึกสถานะเวลา
                   </Button>
                 </div>
 
