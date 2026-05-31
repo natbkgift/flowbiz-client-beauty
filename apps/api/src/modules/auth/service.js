@@ -163,6 +163,7 @@ async function login(payload) {
       organizationId: currentMembership.organizationId,
       workspaceId: currentMembership.workspaceId,
       role: currentMembership.role,
+      legacyRole: currentMembership.legacyRole,
       status: currentMembership.status,
       permissions: currentMembership.permissions
     },
@@ -173,6 +174,7 @@ async function login(payload) {
       organizationId: membership.organizationId,
       workspaceId: membership.workspaceId,
       role: membership.role,
+      legacyRole: membership.legacyRole,
       status: membership.status,
       permissions: membership.permissions,
       clinic: membership.clinic,
@@ -227,6 +229,7 @@ async function authenticateRequest(request) {
       organizationId: currentMembership.organizationId,
       workspaceId: currentMembership.workspaceId,
       role: currentMembership.role,
+      legacyRole: currentMembership.legacyRole,
       status: currentMembership.status,
       permissions: currentMembership.permissions
     },
@@ -237,6 +240,7 @@ async function authenticateRequest(request) {
       organizationId: membership.organizationId,
       workspaceId: membership.workspaceId,
       role: membership.role,
+      legacyRole: membership.legacyRole,
       status: membership.status,
       permissions: membership.permissions,
       clinic: membership.clinic,

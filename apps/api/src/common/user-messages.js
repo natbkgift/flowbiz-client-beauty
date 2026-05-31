@@ -150,7 +150,10 @@ const THAI_ERROR_MESSAGES = {
   INVALID_BOOKING_DATE: 'วันที่ต้องการนัดหมายไม่ถูกต้อง',
   INVALID_BOOKING_TIME_WINDOW: 'ช่วงเวลาที่ต้องการไม่ถูกต้อง',
   INVALID_BOOKING_CONTACT_METHOD: 'ช่องทางติดต่อกลับที่ต้องการไม่ถูกต้อง',
+  INVALID_BOOKING_REQUEST_STATUS: 'สถานะคำขอนัดหมายไม่ถูกต้อง',
   BOOKING_REQUEST_NOT_FOUND: 'ไม่พบคำขอนัดหมายที่ต้องการ',
+  BOOKING_REQUEST_PERMISSION_DENIED: 'คุณไม่มีสิทธิ์จัดการคำขอนัดหมายนี้',
+  INVALID_BOOKING_REQUEST_NOTE: 'ข้อความ note ของคำขอนัดหมายไม่ถูกต้อง',
   PUBLIC_BOOKING_REQUEST_RATE_LIMITED: 'มีการส่งคำขอนัดหมายบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่',
   INTERNAL_SERVER_ERROR: 'ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง'
 };

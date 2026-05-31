@@ -14,6 +14,7 @@ function mapMembership(row) {
     workspaceId: row.workspace_id,
     roleId: row.resolved_role_id,
     role: row.role_key,
+    legacyRole: row.legacy_role || null,
     status: row.membership_status,
     permissions: (row.permissions_json || []).map((permission) => buildPermissionKey(permission.resource, permission.action)),
     clinic: toPublicClinic(row),
@@ -32,6 +33,7 @@ async function getMembershipsByUserId(userId) {
         wm.organization_id,
         wm.workspace_id,
         wm.status as membership_status,
+        cu.role as legacy_role,
         coalesce(resolved_role.id, 0) as resolved_role_id,
         coalesce(resolved_role.key, $2) as role_key,
         c.id as clinic_id,
@@ -70,6 +72,7 @@ async function getMembershipsByUserId(userId) {
         ) as permissions_json
       from workspace_memberships wm
       inner join clinics c on c.id = wm.clinic_id
+      left join clinic_users cu on cu.clinic_id = wm.clinic_id and cu.user_id = wm.user_id
       left join organizations o on o.id = wm.organization_id
       left join workspaces w on w.id = wm.workspace_id
       left join lateral (
@@ -94,6 +97,7 @@ async function getMembershipsByUserId(userId) {
         wm.organization_id,
         wm.workspace_id,
         wm.status,
+        cu.role,
         resolved_role.id,
         resolved_role.key,
         c.id,

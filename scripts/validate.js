@@ -151,6 +151,7 @@ const requiredPaths = [
   'apps/api/src/modules/public-leads/service.js',
   'apps/api/src/modules/public-leads/routes.js',
   'database/migrations/040_booking_requests.sql',
+  'database/migrations/041_booking_request_admin_events.sql',
   'apps/api/src/modules/booking-requests/service.js',
   'apps/api/src/modules/booking-requests/routes.js',
   'tests/clinic_offerings_admin_api.test.js',
@@ -164,6 +165,9 @@ const requiredPaths = [
   'docs/MULTI_CLINIC_PR11_PUBLIC_LEAD_CAPTURE_HANDOFF.md',
   'tests/public_booking_request_api.test.js',
   'tests/public_booking_request_ui.test.js',
+  'tests/booking_request_admin_api.test.js',
+  'tests/booking_request_admin_ui.test.js',
+  'docs/MULTI_CLINIC_PR12B_ADMIN_BOOKING_REQUEST_QUEUE_HANDOFF.md',
   'docs/MULTI_CLINIC_PR12A_BOOKING_REQUEST_WORKFLOW_HANDOFF.md'
 ];
 
@@ -285,7 +289,9 @@ function checkSyntax() {
     'apps/api/src/modules/booking-requests/service.js',
     'apps/api/src/modules/booking-requests/routes.js',
     'tests/public_booking_request_api.test.js',
-    'tests/public_booking_request_ui.test.js'
+    'tests/public_booking_request_ui.test.js',
+    'tests/booking_request_admin_api.test.js',
+    'tests/booking_request_admin_ui.test.js'
   ];
 
   for (const file of jsFiles) {
