@@ -263,6 +263,32 @@ test('Member magic link UI - token invalid shows token error', async () => {
   assert.match(app.document.querySelector('[data-testid="member-access-token-error"]').textContent, /ลิงก์/);
 });
 
+test('Member magic link UI - token route accepts hash without leading slash', async () => {
+  const app = await loadPublicApp({
+    pathName: '/clinic-alpha#member-access?token=no-slash-token',
+    routes: clinicRoutes({
+      'GET /public/clinics/clinic-alpha/member-access/session?token=no-slash-token': {
+        status: 200,
+        body: {
+          success: true,
+          member: {
+            displayName: 'Jane D.',
+            contact: {
+              emailMasked: 'ja***@example.com',
+              phoneMasked: '08*****99',
+              lineIdMasked: '@ja***'
+            }
+          },
+          bookingRequests: []
+        }
+      }
+    })
+  });
+
+  await waitFor(() => app.document.querySelector('[data-testid="member-access-profile-name"]'));
+  assert.equal(app.document.querySelector('[data-testid="member-access-profile-name"]').textContent, 'Jane D.');
+});
+
 test('Member magic link UI - platform routes do not render member access UI', async () => {
   const app = await loadPublicApp({ pathName: '/', routes: {} });
   await waitFor(() => app.document.querySelector('.saas-landing') || app.document.querySelector('.header-glass'));
