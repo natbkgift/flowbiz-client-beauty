@@ -4547,11 +4547,12 @@ function emptyPackageForm() {
   };
 }
 
-function compactPayload(payload) {
+function compactPayload(payload, options = {}) {
+  const keepNull = Boolean(options.keepNull);
   const next = {};
 
   Object.entries(payload).forEach(([key, value]) => {
-    if (value === '' || value === null || value === undefined) {
+    if (value === '' || value === undefined || (value === null && !keepNull)) {
       return;
     }
 
@@ -4566,20 +4567,40 @@ function parseOptionalNumber(value) {
     return undefined;
   }
 
-  return Number(value);
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function isHttpUrlOrBlank(value) {
-  if (!value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
     return true;
   }
 
   try {
-    const parsed = new URL(value);
+    const parsed = new URL(trimmed);
     return ['http:', 'https:'].includes(parsed.protocol);
   } catch (_) {
     return false;
   }
+}
+
+function optionalTextPayloadValue(value, allowClears = false) {
+  const trimmed = String(value || '').trim();
+  return trimmed || (allowClears ? null : undefined);
+}
+
+function optionalNumberPayloadValue(value, allowClears = false) {
+  if (value === '' || value === null || value === undefined) {
+    return allowClears ? null : undefined;
+  }
+
+  const parsed = parseOptionalNumber(value);
+  return parsed === undefined ? undefined : parsed;
+}
+
+function hasInvalidOptionalNumber(value) {
+  return value !== '' && value !== null && value !== undefined && parseOptionalNumber(value) === undefined;
 }
 
 function formatAdminOfferingPrice(item, kind) {
@@ -4606,49 +4627,52 @@ function formatAdminOfferingPrice(item, kind) {
   return 'สอบถามราคา';
 }
 
-function buildServicePayload(form) {
+function buildServicePayload(form, options = {}) {
+  const allowClears = Boolean(options.allowClears);
   return compactPayload({
     name: form.name.trim(),
-    category: form.category.trim(),
-    shortDescription: form.shortDescription.trim(),
-    durationMinutes: parseOptionalNumber(form.durationMinutes),
-    priceMin: parseOptionalNumber(form.priceMin),
-    priceMax: parseOptionalNumber(form.priceMax),
+    category: optionalTextPayloadValue(form.category, allowClears),
+    shortDescription: optionalTextPayloadValue(form.shortDescription, allowClears),
+    durationMinutes: optionalNumberPayloadValue(form.durationMinutes, allowClears),
+    priceMin: optionalNumberPayloadValue(form.priceMin, allowClears),
+    priceMax: optionalNumberPayloadValue(form.priceMax, allowClears),
     currency: form.currency.trim() || 'THB',
     status: form.status,
     isFeatured: Boolean(form.isFeatured),
     sortOrder: parseOptionalNumber(form.sortOrder),
-    imageUrl: form.imageUrl.trim()
-  });
+    imageUrl: optionalTextPayloadValue(form.imageUrl, allowClears)
+  }, { keepNull: allowClears });
 }
 
-function buildPromotionPayload(form) {
+function buildPromotionPayload(form, options = {}) {
+  const allowClears = Boolean(options.allowClears);
   return compactPayload({
     title: form.title.trim(),
-    subtitle: form.subtitle.trim(),
-    badgeLabel: form.badgeLabel.trim(),
-    startsAt: form.startsAt,
-    endsAt: form.endsAt,
+    subtitle: optionalTextPayloadValue(form.subtitle, allowClears),
+    badgeLabel: optionalTextPayloadValue(form.badgeLabel, allowClears),
+    startsAt: optionalTextPayloadValue(form.startsAt, allowClears),
+    endsAt: optionalTextPayloadValue(form.endsAt, allowClears),
     status: form.status,
     isFeatured: Boolean(form.isFeatured),
     sortOrder: parseOptionalNumber(form.sortOrder),
-    imageUrl: form.imageUrl.trim(),
-    ctaLabel: form.ctaLabel.trim(),
-    ctaUrl: form.ctaUrl.trim()
-  });
+    imageUrl: optionalTextPayloadValue(form.imageUrl, allowClears),
+    ctaLabel: optionalTextPayloadValue(form.ctaLabel, allowClears),
+    ctaUrl: optionalTextPayloadValue(form.ctaUrl, allowClears)
+  }, { keepNull: allowClears });
 }
 
-function buildPackagePayload(form) {
+function buildPackagePayload(form, options = {}) {
+  const allowClears = Boolean(options.allowClears);
   return compactPayload({
     name: form.name.trim(),
-    summary: form.summary.trim(),
-    price: parseOptionalNumber(form.price),
+    summary: optionalTextPayloadValue(form.summary, allowClears),
+    price: optionalNumberPayloadValue(form.price, allowClears),
     currency: form.currency.trim() || 'THB',
     status: form.status,
     isFeatured: Boolean(form.isFeatured),
     sortOrder: parseOptionalNumber(form.sortOrder),
-    imageUrl: form.imageUrl.trim()
-  });
+    imageUrl: optionalTextPayloadValue(form.imageUrl, allowClears)
+  }, { keepNull: allowClears });
 }
 
 function ClinicOfferingsAdminPage() {
@@ -4720,8 +4744,34 @@ function ClinicOfferingsAdminPage() {
 
     const priceMin = parseOptionalNumber(serviceForm.priceMin);
     const priceMax = parseOptionalNumber(serviceForm.priceMax);
+    const durationMinutes = parseOptionalNumber(serviceForm.durationMinutes);
+
+    if (
+      hasInvalidOptionalNumber(serviceForm.priceMin)
+      || hasInvalidOptionalNumber(serviceForm.priceMax)
+      || hasInvalidOptionalNumber(serviceForm.durationMinutes)
+    ) {
+      setMessage({ kind: 'error', message: 'กรุณาระบุตัวเลขของราคาและระยะเวลาให้ถูกต้อง' });
+      return;
+    }
+
+    if (priceMin != null && priceMin < 0) {
+      setMessage({ kind: 'error', message: 'ราคาต่ำสุดต้องไม่น้อยกว่า 0' });
+      return;
+    }
+
+    if (priceMax != null && priceMax < 0) {
+      setMessage({ kind: 'error', message: 'ราคาสูงสุดต้องไม่น้อยกว่า 0' });
+      return;
+    }
+
     if (priceMin != null && priceMax != null && priceMax < priceMin) {
       setMessage({ kind: 'error', message: 'ราคาสูงสุดต้องมากกว่าหรือเท่ากับราคาต่ำสุด' });
+      return;
+    }
+
+    if (durationMinutes != null && durationMinutes < 0) {
+      setMessage({ kind: 'error', message: 'ระยะเวลาต้องไม่น้อยกว่า 0' });
       return;
     }
 
@@ -4730,7 +4780,7 @@ function ClinicOfferingsAdminPage() {
       return;
     }
 
-    const payload = buildServicePayload(serviceForm);
+    const payload = buildServicePayload(serviceForm, { allowClears: Boolean(serviceForm.id) });
 
     try {
       if (serviceForm.id) {
@@ -4771,7 +4821,7 @@ function ClinicOfferingsAdminPage() {
       return;
     }
 
-    const payload = buildPromotionPayload(promotionForm);
+    const payload = buildPromotionPayload(promotionForm, { allowClears: Boolean(promotionForm.id) });
 
     try {
       if (promotionForm.id) {
@@ -4802,12 +4852,23 @@ function ClinicOfferingsAdminPage() {
       return;
     }
 
+    const price = parseOptionalNumber(packageForm.price);
+    if (hasInvalidOptionalNumber(packageForm.price)) {
+      setMessage({ kind: 'error', message: 'กรุณาระบุตัวเลขของราคาให้ถูกต้อง' });
+      return;
+    }
+
+    if (price != null && price < 0) {
+      setMessage({ kind: 'error', message: 'ราคาต้องไม่น้อยกว่า 0' });
+      return;
+    }
+
     if (!isHttpUrlOrBlank(packageForm.imageUrl)) {
       setMessage({ kind: 'error', message: 'Image URL ต้องขึ้นต้นด้วย http:// หรือ https://' });
       return;
     }
 
-    const payload = buildPackagePayload(packageForm);
+    const payload = buildPackagePayload(packageForm, { allowClears: Boolean(packageForm.id) });
 
     try {
       if (packageForm.id) {
@@ -4890,9 +4951,10 @@ function ClinicOfferingsAdminPage() {
       return;
     }
 
+    const quantity = parseInt(serviceLinkForm.quantity, 10);
     const payload = {
       serviceId: Number(serviceLinkForm.serviceId),
-      quantity: Math.max(1, Number(serviceLinkForm.quantity || 1)),
+      quantity: Number.isNaN(quantity) ? 1 : Math.max(1, quantity),
       sortOrder: (linkedServices[selectedPackageId] || []).length
     };
 

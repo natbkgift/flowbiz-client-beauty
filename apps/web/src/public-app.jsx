@@ -1094,11 +1094,9 @@ function ClinicHeroSection({ clinic, websiteSettings, brandingSettings, contactS
           <div className="clinic-logo-placeholder" data-testid="clinic-template-logo">✨</div>
         )}
 
-        <h1 className="clinic-title" data-testid="clinic-name" data-testid-override="clinic-template-title">
+        <h1 className="clinic-title" data-testid="clinic-template-title">
           {displayName}
         </h1>
-        {/* Hidden element with data-testid="clinic-template-title" to meet test requirements */}
-        <span data-testid="clinic-template-title" style={{ display: 'none' }}>{displayName}</span>
 
         {tagline && (
           <p className="clinic-tagline" data-testid="clinic-template-tagline">

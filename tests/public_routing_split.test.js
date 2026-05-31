@@ -162,7 +162,7 @@ test('PR6 - Public Routing Split tests', async (t) => {
     // Verify clinic shell renders successfully
     await waitFor(() => app.document.querySelector('[data-testid="clinic-public-shell"]'));
     
-    assert.equal(app.document.querySelector('[data-testid="clinic-name"]').textContent, 'Clinic Alpha Premium');
+    assert.equal(app.document.querySelector('[data-testid="clinic-template-title"]').textContent, 'Clinic Alpha Premium');
     assert.equal(app.document.querySelector('[data-testid="clinic-slug"]').textContent, 'clinic-alpha');
     assert.equal(app.document.querySelector('[data-testid="clinic-status"]').textContent, 'active');
     assert.match(app.document.querySelector('[data-testid="clinic-contact"]').textContent, /089-999-9999/);
@@ -189,7 +189,7 @@ test('PR6 - Public Routing Split tests', async (t) => {
     });
 
     await waitFor(() => app.document.querySelector('[data-testid="clinic-public-shell"]'));
-    assert.equal(app.document.querySelector('[data-testid="clinic-name"]').textContent, 'Clinic Alpha Premium');
+    assert.equal(app.document.querySelector('[data-testid="clinic-template-title"]').textContent, 'Clinic Alpha Premium');
     
     // Check that GET /public/clinics/clinic-alpha was called
     const apiCall = app.requests.find(r => r.url.pathname.endsWith('/public/clinics/clinic-alpha'));
@@ -232,7 +232,7 @@ test('PR6 - Public Routing Split tests', async (t) => {
     await waitFor(() => app.document.querySelector('[data-testid="clinic-unpublished-notice"]'));
     assert.ok(app.document.querySelector('[data-testid="clinic-unpublished-notice"]'));
     assert.match(app.document.querySelector('[data-testid="clinic-unpublished-notice"]').textContent, /ยังไม่ถูกเผยแพร่เต็มรูปแบบ/);
-    assert.equal(app.document.querySelector('[data-testid="clinic-name"]').textContent, 'Draft Clinic Inc');
+    assert.equal(app.document.querySelector('[data-testid="clinic-template-title"]').textContent, 'Draft Clinic Inc');
   });
 
   // Test 6: "/blog" and "/forum" do not trigger clinic resolver

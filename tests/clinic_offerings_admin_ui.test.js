@@ -275,6 +275,7 @@ test('Admin Offerings UI - creates service without clinicId in payload', async (
   setInputValue(app.document.querySelector('[data-testid="clinic-offerings-service-name"]'), 'Hydra Facial', app.window);
   setInputValue(app.document.querySelector('[data-testid="clinic-offerings-service-price-min"]'), '1500', app.window);
   setInputValue(app.document.querySelector('[data-testid="clinic-offerings-service-price-max"]'), '3500', app.window);
+  setInputValue(app.document.querySelector('[data-testid="clinic-offerings-service-image-url"]'), '  https://example.com/hydra.png  ', app.window);
   submitForm(app.document.querySelector('[data-testid="clinic-offerings-service-form"]'), app.window);
 
   await waitFor(() => app.document.body.textContent.includes('เพิ่มบริการสำเร็จ'));
@@ -283,6 +284,7 @@ test('Admin Offerings UI - creates service without clinicId in payload', async (
   const payload = JSON.parse(request.body);
   assert.equal(payload.name, 'Hydra Facial');
   assert.equal(payload.priceMin, 1500);
+  assert.equal(payload.imageUrl, 'https://example.com/hydra.png');
   assert.equal(payload.clinicId, undefined);
   assert.equal(payload.clinic_id, undefined);
 });
@@ -310,6 +312,32 @@ test('Admin Offerings UI - blocks unsafe offering URLs', async () => {
 
   await waitFor(() => app.document.body.textContent.includes('Image URL ต้องขึ้นต้นด้วย'));
   assert.equal(app.requests.some((item) => item.method === 'POST' && item.url.pathname === '/admin/clinic-offerings/services'), false);
+});
+
+test('Admin Offerings UI - blocks negative service values and package price before request', async () => {
+  const app = await loadAdminApp({ routes: offeringRoutes(createSessionFixture()) });
+  await waitFor(() => app.document.querySelector('[data-testid="clinic-offerings-service-name"]'));
+
+  setInputValue(app.document.querySelector('[data-testid="clinic-offerings-service-name"]'), 'Negative Price', app.window);
+  setInputValue(app.document.querySelector('[data-testid="clinic-offerings-service-price-min"]'), '-1', app.window);
+  submitForm(app.document.querySelector('[data-testid="clinic-offerings-service-form"]'), app.window);
+
+  await waitFor(() => app.document.body.textContent.includes('ราคาต่ำสุดต้องไม่น้อยกว่า 0'));
+  assert.equal(app.requests.some((item) => item.method === 'POST' && item.url.pathname === '/admin/clinic-offerings/services'), false);
+
+  setInputValue(app.document.querySelector('[data-testid="clinic-offerings-service-price-min"]'), '', app.window);
+  setInputValue(app.document.querySelector('[data-testid="clinic-offerings-service-duration"]'), '-5', app.window);
+  submitForm(app.document.querySelector('[data-testid="clinic-offerings-service-form"]'), app.window);
+  await waitFor(() => app.document.body.textContent.includes('ระยะเวลาต้องไม่น้อยกว่า 0'));
+
+  click(app.document.querySelector('[data-testid="clinic-offerings-tab-packages"]'), app.window);
+  await waitFor(() => app.document.querySelector('[data-testid="clinic-offerings-package-name"]'));
+  setInputValue(app.document.querySelector('[data-testid="clinic-offerings-package-name"]'), 'Negative Package', app.window);
+  setInputValue(app.document.querySelector('[data-testid="clinic-offerings-package-price"]'), '-100', app.window);
+  submitForm(app.document.querySelector('[data-testid="clinic-offerings-package-form"]'), app.window);
+
+  await waitFor(() => app.document.body.textContent.includes('ราคาต้องไม่น้อยกว่า 0'));
+  assert.equal(app.requests.some((item) => item.method === 'POST' && item.url.pathname === '/admin/clinic-offerings/packages'), false);
 });
 
 test('Admin Offerings UI - updates and deletes services', async () => {
@@ -346,6 +374,50 @@ test('Admin Offerings UI - updates and deletes services', async () => {
 
   click(app.document.querySelector('[data-testid="clinic-offerings-service-delete-11"]'), app.window);
   await waitFor(() => app.requests.some((item) => item.method === 'DELETE' && item.url.pathname === '/admin/clinic-offerings/services/11'));
+});
+
+test('Admin Offerings UI - update can clear optional offering fields', async () => {
+  const app = await loadAdminApp({
+    routes: offeringRoutes(createSessionFixture(), {
+      services: [
+        { status: 200, body: { items: services } },
+        { status: 200, body: { items: [{ ...services[0], category: null, shortDescription: null, priceMin: null, priceMax: null, imageUrl: null }, services[1]] } }
+      ],
+      promotions: [
+        { status: 200, body: { items: promotions } },
+        { status: 200, body: { items: promotions } }
+      ],
+      packages: [
+        { status: 200, body: { items: packages } },
+        { status: 200, body: { items: packages } }
+      ],
+      extra: {
+        'PATCH /admin/clinic-offerings/services/11': { status: 200, body: { ...services[0], category: null, shortDescription: null, priceMin: null, priceMax: null, imageUrl: null } }
+      }
+    })
+  });
+
+  await waitFor(() => app.document.querySelector('[data-testid="clinic-offerings-service-edit-11"]'));
+  click(app.document.querySelector('[data-testid="clinic-offerings-service-edit-11"]'), app.window);
+  await waitFor(() => app.document.querySelector('[data-testid="clinic-offerings-service-category"]').value === 'Injectable');
+
+  setInputValue(app.document.querySelector('[data-testid="clinic-offerings-service-category"]'), '', app.window);
+  setInputValue(app.document.querySelector('[data-testid="clinic-offerings-service-short-description"]'), '', app.window);
+  setInputValue(app.document.querySelector('[data-testid="clinic-offerings-service-price-min"]'), '', app.window);
+  setInputValue(app.document.querySelector('[data-testid="clinic-offerings-service-price-max"]'), '', app.window);
+  setInputValue(app.document.querySelector('[data-testid="clinic-offerings-service-image-url"]'), '', app.window);
+  submitForm(app.document.querySelector('[data-testid="clinic-offerings-service-form"]'), app.window);
+
+  await waitFor(() => app.requests.some((item) => item.method === 'PATCH' && item.url.pathname === '/admin/clinic-offerings/services/11'));
+  const request = app.requests.find((item) => item.method === 'PATCH' && item.url.pathname === '/admin/clinic-offerings/services/11');
+  const payload = JSON.parse(request.body);
+  assert.equal(payload.category, null);
+  assert.equal(payload.shortDescription, null);
+  assert.equal(payload.priceMin, null);
+  assert.equal(payload.priceMax, null);
+  assert.equal(payload.imageUrl, null);
+  assert.equal(payload.clinicId, undefined);
+  assert.equal(payload.clinic_id, undefined);
 });
 
 test('Admin Offerings UI - reorders services with items payload only', async () => {
@@ -430,7 +502,7 @@ test('Admin Offerings UI - package service add and remove uses tenant-safe paylo
   click(await waitFor(() => app.document.querySelector('[data-testid="clinic-offerings-tab-packages"]')), app.window);
   await waitFor(() => app.document.querySelector('[data-testid="clinic-offerings-package-service-service"]'));
   setInputValue(app.document.querySelector('[data-testid="clinic-offerings-package-service-service"]'), '11', app.window);
-  setInputValue(app.document.querySelector('[data-testid="clinic-offerings-package-service-quantity"]'), '2', app.window);
+  setInputValue(app.document.querySelector('[data-testid="clinic-offerings-package-service-quantity"]'), '2.9', app.window);
   submitForm(app.document.querySelector('[data-testid="clinic-offerings-package-service-form"]'), app.window);
 
   await waitFor(() => app.document.querySelector('[data-testid="clinic-offerings-package-service-row-11"]'));
