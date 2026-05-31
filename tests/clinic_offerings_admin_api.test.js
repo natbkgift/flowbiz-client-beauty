@@ -579,6 +579,27 @@ test('Clinic Offerings Admin API - Integration Tests', async (t) => {
     assert.equal(res2.body.error.code, 'INVALID_REQUEST');
   });
 
+  await t.test('15b. Query clinicId is rejected with 400', async () => {
+    const res = await routeJson(handleClinicOfferingsRoutes, {
+      method: 'GET',
+      path: '/admin/clinic-offerings/services',
+      authenticateRequest: ownerAuthClinic1,
+      searchParams: { clinicId: String(testClinicId2) }
+    });
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.body.error.code, 'INVALID_REQUEST');
+
+    const res2 = await routeJson(handleClinicOfferingsRoutes, {
+      method: 'PATCH',
+      path: '/admin/clinic-offerings/services/reorder',
+      authenticateRequest: ownerAuthClinic1,
+      searchParams: { clinic_id: String(testClinicId2) },
+      body: { items: [{ id: createdServiceId, sortOrder: 1 }] }
+    });
+    assert.equal(res2.statusCode, 400);
+    assert.equal(res2.body.error.code, 'INVALID_REQUEST');
+  });
+
   // -------------------------------------------------------------------------
   // 16. Audit logs created with summary-only context
   // -------------------------------------------------------------------------
@@ -619,6 +640,26 @@ test('Clinic Offerings Admin API - Integration Tests', async (t) => {
     });
     assert.equal(res.statusCode, 400);
     assert.equal(res.body.error.code, 'INVALID_OFFERING_METADATA');
+  });
+
+  await t.test('17b. Invalid boolean and sortOrder payloads are rejected', async () => {
+    const boolRes = await routeJson(handleClinicOfferingsRoutes, {
+      method: 'POST',
+      path: '/admin/clinic-offerings/services',
+      authenticateRequest: ownerAuthClinic1,
+      body: { name: 'String Boolean Service', isFeatured: 'true' }
+    });
+    assert.equal(boolRes.statusCode, 400);
+    assert.equal(boolRes.body.error.code, 'INVALID_OFFERING_PAYLOAD');
+
+    const sortRes = await routeJson(handleClinicOfferingsRoutes, {
+      method: 'PATCH',
+      path: '/admin/clinic-offerings/services/reorder',
+      authenticateRequest: ownerAuthClinic1,
+      body: { items: [{ id: createdServiceId, sortOrder: 'not-a-number' }] }
+    });
+    assert.equal(sortRes.statusCode, 400);
+    assert.equal(sortRes.body.error.code, 'INVALID_OFFERING_PAYLOAD');
   });
 
   // -------------------------------------------------------------------------

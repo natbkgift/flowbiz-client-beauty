@@ -65,12 +65,22 @@ function rejectClinicIdInBody(body) {
   }
 }
 
+function rejectClinicIdInQuery(url) {
+  if (url.searchParams.has('clinicId') || url.searchParams.has('clinic_id')) {
+    throw new AppError(400, 'INVALID_REQUEST', 'clinicId cannot be overridden in the query string.');
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Route handler
 // ---------------------------------------------------------------------------
 
 async function handleClinicOfferingsRoutes(request, response, url, tools) {
   const { authenticateRequest, parseJsonBody, json } = tools;
+
+  if (url.pathname.startsWith('/admin/clinic-offerings')) {
+    rejectClinicIdInQuery(url);
+  }
 
   // =========================================================================
   // ADMIN – SERVICES

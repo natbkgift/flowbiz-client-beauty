@@ -3,6 +3,11 @@
 const { getPool } = require('../../db');
 const { AppError } = require('../../common/errors');
 const { recordAuditLog } = require('../audit/service');
+const {
+  normalizeClinicSlug,
+  isValidClinicSlug,
+  isReservedClinicSlug
+} = require('../clinics/validation');
 
 // ---------------------------------------------------------------------------
 // Shared validation helpers
@@ -39,6 +44,33 @@ function validateMetadata(meta, fieldName) {
   if (typeof meta !== 'object' || Array.isArray(meta)) {
     throw new AppError(400, 'INVALID_OFFERING_METADATA', `${fieldName} must be a JSON object.`);
   }
+}
+
+function normalizeBoolean(value, fieldName, fallback) {
+  if (value === undefined) return fallback;
+  if (typeof value !== 'boolean') {
+    throw new AppError(400, 'INVALID_OFFERING_PAYLOAD', `${fieldName} must be a boolean.`);
+  }
+  return value;
+}
+
+function normalizeNumber(value, fieldName, fallback = null, options = {}) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    throw new AppError(400, 'INVALID_OFFERING_PAYLOAD', `${fieldName} must be numeric.`);
+  }
+  if (options.integer && !Number.isInteger(num)) {
+    throw new AppError(400, 'INVALID_OFFERING_PAYLOAD', `${fieldName} must be an integer.`);
+  }
+  if (options.min !== undefined && num < options.min) {
+    throw new AppError(400, options.price ? 'INVALID_PRICE_RANGE' : 'INVALID_OFFERING_PAYLOAD', `${fieldName} is below the minimum value.`);
+  }
+  return num;
+}
+
+function normalizeSortOrder(value, fallback = 0) {
+  return normalizeNumber(value, 'sortOrder', fallback, { integer: true });
 }
 
 /**
@@ -175,6 +207,9 @@ async function listServices(clinicId, queryParams) {
   const params = [clinicId];
 
   if (status) {
+    if (!isValidStatus(status)) {
+      throw new AppError(400, 'INVALID_OFFERING_STATUS', `Invalid status: ${status}`);
+    }
     params.push(status);
     sql += ` and status = $${params.length}`;
   }
@@ -212,26 +247,16 @@ async function createService(clinicId, actorUserId, body) {
   const metadata = body.metadata !== undefined ? body.metadata : {};
   validateMetadata(metadata, 'metadata');
 
-  const priceMin = body.priceMin != null ? Number(body.priceMin) : null;
-  const priceMax = body.priceMax != null ? Number(body.priceMax) : null;
-
-  if (priceMin != null && (isNaN(priceMin) || priceMin < 0)) {
-    throw new AppError(400, 'INVALID_PRICE_RANGE', 'priceMin must be a non-negative number.');
-  }
-  if (priceMax != null && (isNaN(priceMax) || priceMax < 0)) {
-    throw new AppError(400, 'INVALID_PRICE_RANGE', 'priceMax must be a non-negative number.');
-  }
+  const priceMin = normalizeNumber(body.priceMin, 'priceMin', null, { min: 0, price: true });
+  const priceMax = normalizeNumber(body.priceMax, 'priceMax', null, { min: 0, price: true });
   if (priceMin != null && priceMax != null && priceMax < priceMin) {
     throw new AppError(400, 'INVALID_PRICE_RANGE', 'priceMax must be >= priceMin.');
   }
 
-  const durationMinutes = body.durationMinutes != null ? Number(body.durationMinutes) : null;
-  if (durationMinutes != null && (isNaN(durationMinutes) || durationMinutes < 0 || !Number.isInteger(durationMinutes))) {
-    throw new AppError(400, 'INVALID_OFFERING_PAYLOAD', 'durationMinutes must be a non-negative integer.');
-  }
+  const durationMinutes = normalizeNumber(body.durationMinutes, 'durationMinutes', null, { integer: true, min: 0 });
 
-  const isFeatured = body.isFeatured !== undefined ? Boolean(body.isFeatured) : false;
-  const sortOrder = body.sortOrder != null ? Number(body.sortOrder) : 0;
+  const isFeatured = normalizeBoolean(body.isFeatured, 'isFeatured', false);
+  const sortOrder = normalizeSortOrder(body.sortOrder, 0);
 
   const result = await pool.query(
     `insert into clinic_services (
@@ -315,26 +340,19 @@ async function updateService(clinicId, actorUserId, serviceId, body) {
   const metadata = body.metadata !== undefined ? body.metadata : existing.metadata_json;
   validateMetadata(metadata, 'metadata');
 
-  const priceMin = body.priceMin !== undefined ? (body.priceMin != null ? Number(body.priceMin) : null) : (existing.price_min != null ? Number(existing.price_min) : null);
-  const priceMax = body.priceMax !== undefined ? (body.priceMax != null ? Number(body.priceMax) : null) : (existing.price_max != null ? Number(existing.price_max) : null);
-
-  if (priceMin != null && (isNaN(priceMin) || priceMin < 0)) {
-    throw new AppError(400, 'INVALID_PRICE_RANGE', 'priceMin must be a non-negative number.');
-  }
-  if (priceMax != null && (isNaN(priceMax) || priceMax < 0)) {
-    throw new AppError(400, 'INVALID_PRICE_RANGE', 'priceMax must be a non-negative number.');
-  }
+  const priceMin = body.priceMin !== undefined
+    ? normalizeNumber(body.priceMin, 'priceMin', null, { min: 0, price: true })
+    : (existing.price_min != null ? Number(existing.price_min) : null);
+  const priceMax = body.priceMax !== undefined
+    ? normalizeNumber(body.priceMax, 'priceMax', null, { min: 0, price: true })
+    : (existing.price_max != null ? Number(existing.price_max) : null);
   if (priceMin != null && priceMax != null && priceMax < priceMin) {
     throw new AppError(400, 'INVALID_PRICE_RANGE', 'priceMax must be >= priceMin.');
   }
 
   const durationMinutes = body.durationMinutes !== undefined
-    ? (body.durationMinutes != null ? Number(body.durationMinutes) : null)
+    ? normalizeNumber(body.durationMinutes, 'durationMinutes', null, { integer: true, min: 0 })
     : (existing.duration_minutes != null ? Number(existing.duration_minutes) : null);
-
-  if (durationMinutes != null && (isNaN(durationMinutes) || durationMinutes < 0 || !Number.isInteger(durationMinutes))) {
-    throw new AppError(400, 'INVALID_OFFERING_PAYLOAD', 'durationMinutes must be a non-negative integer.');
-  }
 
   const result = await pool.query(
     `update clinic_services set
@@ -354,8 +372,8 @@ async function updateService(clinicId, actorUserId, serviceId, body) {
       priceMax,
       body.currency !== undefined ? body.currency : existing.currency,
       status,
-      body.isFeatured !== undefined ? Boolean(body.isFeatured) : existing.is_featured,
-      body.sortOrder !== undefined ? Number(body.sortOrder) : existing.sort_order,
+      normalizeBoolean(body.isFeatured, 'isFeatured', existing.is_featured),
+      body.sortOrder !== undefined ? normalizeSortOrder(body.sortOrder, existing.sort_order) : existing.sort_order,
       imageUrl,
       JSON.stringify(metadata),
       serviceId
@@ -427,10 +445,11 @@ async function reorderServices(clinicId, actorUserId, body) {
       if (item.id == null || item.sortOrder == null) {
         throw new AppError(400, 'INVALID_REORDER_ITEM', 'Each reorder item must have id and sortOrder.');
       }
+      const sortOrder = normalizeSortOrder(item.sortOrder);
 
       const updateRes = await client.query(
         'update clinic_services set sort_order = $1, updated_at = now() where id = $2 and clinic_id = $3',
-        [Number(item.sortOrder), Number(item.id), clinicId]
+        [sortOrder, Number(item.id), clinicId]
       );
 
       if (updateRes.rowCount !== 1) {
@@ -482,6 +501,9 @@ async function listPromotions(clinicId, queryParams) {
   const params = [clinicId];
 
   if (status) {
+    if (!isValidStatus(status)) {
+      throw new AppError(400, 'INVALID_OFFERING_STATUS', `Invalid status: ${status}`);
+    }
     params.push(status);
     sql += ` and status = $${params.length}`;
   }
@@ -535,8 +557,8 @@ async function createPromotion(clinicId, actorUserId, body) {
     throw new AppError(400, 'INVALID_OFFERING_PAYLOAD', 'endsAt must be >= startsAt.');
   }
 
-  const isFeatured = body.isFeatured !== undefined ? Boolean(body.isFeatured) : false;
-  const sortOrder = body.sortOrder != null ? Number(body.sortOrder) : 0;
+  const isFeatured = normalizeBoolean(body.isFeatured, 'isFeatured', false);
+  const sortOrder = normalizeSortOrder(body.sortOrder, 0);
 
   const result = await pool.query(
     `insert into clinic_promotions (
@@ -651,8 +673,8 @@ async function updatePromotion(clinicId, actorUserId, promotionId, body) {
       startsAt,
       endsAt,
       status,
-      body.isFeatured !== undefined ? Boolean(body.isFeatured) : existing.is_featured,
-      body.sortOrder !== undefined ? Number(body.sortOrder) : existing.sort_order,
+      normalizeBoolean(body.isFeatured, 'isFeatured', existing.is_featured),
+      body.sortOrder !== undefined ? normalizeSortOrder(body.sortOrder, existing.sort_order) : existing.sort_order,
       imageUrl,
       body.ctaLabel !== undefined ? body.ctaLabel : existing.cta_label,
       ctaUrl,
@@ -726,10 +748,11 @@ async function reorderPromotions(clinicId, actorUserId, body) {
       if (item.id == null || item.sortOrder == null) {
         throw new AppError(400, 'INVALID_REORDER_ITEM', 'Each reorder item must have id and sortOrder.');
       }
+      const sortOrder = normalizeSortOrder(item.sortOrder);
 
       const updateRes = await client.query(
         'update clinic_promotions set sort_order = $1, updated_at = now() where id = $2 and clinic_id = $3',
-        [Number(item.sortOrder), Number(item.id), clinicId]
+        [sortOrder, Number(item.id), clinicId]
       );
 
       if (updateRes.rowCount !== 1) {
@@ -781,6 +804,9 @@ async function listPackages(clinicId, queryParams) {
   const params = [clinicId];
 
   if (status) {
+    if (!isValidStatus(status)) {
+      throw new AppError(400, 'INVALID_OFFERING_STATUS', `Invalid status: ${status}`);
+    }
     params.push(status);
     sql += ` and status = $${params.length}`;
   }
@@ -818,13 +844,10 @@ async function createPackage(clinicId, actorUserId, body) {
   const metadata = body.metadata !== undefined ? body.metadata : {};
   validateMetadata(metadata, 'metadata');
 
-  const price = body.price != null ? Number(body.price) : null;
-  if (price != null && (isNaN(price) || price < 0)) {
-    throw new AppError(400, 'INVALID_PRICE_RANGE', 'price must be a non-negative number.');
-  }
+  const price = normalizeNumber(body.price, 'price', null, { min: 0, price: true });
 
-  const isFeatured = body.isFeatured !== undefined ? Boolean(body.isFeatured) : false;
-  const sortOrder = body.sortOrder != null ? Number(body.sortOrder) : 0;
+  const isFeatured = normalizeBoolean(body.isFeatured, 'isFeatured', false);
+  const sortOrder = normalizeSortOrder(body.sortOrder, 0);
 
   const result = await pool.query(
     `insert into clinic_packages (
@@ -905,12 +928,8 @@ async function updatePackage(clinicId, actorUserId, packageId, body) {
   validateMetadata(metadata, 'metadata');
 
   const price = body.price !== undefined
-    ? (body.price != null ? Number(body.price) : null)
+    ? normalizeNumber(body.price, 'price', null, { min: 0, price: true })
     : (existing.price != null ? Number(existing.price) : null);
-
-  if (price != null && (isNaN(price) || price < 0)) {
-    throw new AppError(400, 'INVALID_PRICE_RANGE', 'price must be a non-negative number.');
-  }
 
   const result = await pool.query(
     `update clinic_packages set
@@ -926,8 +945,8 @@ async function updatePackage(clinicId, actorUserId, packageId, body) {
       price,
       body.currency !== undefined ? body.currency : existing.currency,
       status,
-      body.isFeatured !== undefined ? Boolean(body.isFeatured) : existing.is_featured,
-      body.sortOrder !== undefined ? Number(body.sortOrder) : existing.sort_order,
+      normalizeBoolean(body.isFeatured, 'isFeatured', existing.is_featured),
+      body.sortOrder !== undefined ? normalizeSortOrder(body.sortOrder, existing.sort_order) : existing.sort_order,
       imageUrl,
       JSON.stringify(metadata),
       packageId
@@ -999,10 +1018,11 @@ async function reorderPackages(clinicId, actorUserId, body) {
       if (item.id == null || item.sortOrder == null) {
         throw new AppError(400, 'INVALID_REORDER_ITEM', 'Each reorder item must have id and sortOrder.');
       }
+      const sortOrder = normalizeSortOrder(item.sortOrder);
 
       const updateRes = await client.query(
         'update clinic_packages set sort_order = $1, updated_at = now() where id = $2 and clinic_id = $3',
-        [Number(item.sortOrder), Number(item.id), clinicId]
+        [sortOrder, Number(item.id), clinicId]
       );
 
       if (updateRes.rowCount !== 1) {
@@ -1070,12 +1090,9 @@ async function addServiceToPackage(clinicId, actorUserId, packageId, body) {
     throw new AppError(403, 'CROSS_TENANT_FORBIDDEN', 'Service does not belong to this clinic.');
   }
 
-  const quantity = body.quantity != null ? Number(body.quantity) : 1;
-  if (!Number.isInteger(quantity) || quantity < 1) {
-    throw new AppError(400, 'INVALID_OFFERING_PAYLOAD', 'quantity must be a positive integer.');
-  }
+  const quantity = normalizeNumber(body.quantity, 'quantity', 1, { integer: true, min: 1 });
 
-  const sortOrder = body.sortOrder != null ? Number(body.sortOrder) : 0;
+  const sortOrder = normalizeSortOrder(body.sortOrder, 0);
 
   const result = await pool.query(
     `insert into clinic_package_services (clinic_id, package_id, service_id, quantity, sort_order)
@@ -1173,10 +1190,11 @@ async function reorderPackageServices(clinicId, actorUserId, packageId, body) {
       if (item.serviceId == null || item.sortOrder == null) {
         throw new AppError(400, 'INVALID_REORDER_ITEM', 'Each reorder item must have serviceId and sortOrder.');
       }
+      const sortOrder = normalizeSortOrder(item.sortOrder);
 
       const updateRes = await client.query(
         'update clinic_package_services set sort_order = $1 where package_id = $2 and service_id = $3 and clinic_id = $4',
-        [Number(item.sortOrder), Number(packageId), Number(item.serviceId), clinicId]
+        [sortOrder, Number(packageId), Number(item.serviceId), clinicId]
       );
 
       if (updateRes.rowCount !== 1) {
@@ -1232,7 +1250,10 @@ async function resolveActiveClinicIdBySlug(slug) {
   if (!slug || typeof slug !== 'string') return null;
 
   const pool = getPool();
-  const normalized = slug.toLowerCase().trim();
+  const normalized = normalizeClinicSlug(slug);
+  if (!isValidClinicSlug(normalized) || isReservedClinicSlug(normalized)) {
+    return null;
+  }
 
   const result = await pool.query(
     'select id, status from clinics where slug = $1 limit 1',

@@ -24,7 +24,8 @@ create table if not exists clinic_services (
   is_featured     boolean not null default false,
   sort_order      integer not null default 0,
   image_url       text null,
-  metadata_json   jsonb not null default '{}'::jsonb,
+  metadata_json   jsonb not null default '{}'::jsonb
+                    check (jsonb_typeof(metadata_json) = 'object'),
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
   constraint clinic_services_clinic_key_unique unique (clinic_id, service_key),
@@ -68,7 +69,8 @@ create table if not exists clinic_promotions (
   image_url       text null,
   cta_label       varchar(120) null,
   cta_url         text null,
-  metadata_json   jsonb not null default '{}'::jsonb,
+  metadata_json   jsonb not null default '{}'::jsonb
+                    check (jsonb_typeof(metadata_json) = 'object'),
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
   constraint clinic_promotions_clinic_key_unique unique (clinic_id, promotion_key),
@@ -109,7 +111,8 @@ create table if not exists clinic_packages (
   is_featured     boolean not null default false,
   sort_order      integer not null default 0,
   image_url       text null,
-  metadata_json   jsonb not null default '{}'::jsonb,
+  metadata_json   jsonb not null default '{}'::jsonb
+                    check (jsonb_typeof(metadata_json) = 'object'),
   created_at      timestamptz not null default now(),
   updated_at      timestamptz not null default now(),
   constraint clinic_packages_clinic_key_unique unique (clinic_id, package_key),

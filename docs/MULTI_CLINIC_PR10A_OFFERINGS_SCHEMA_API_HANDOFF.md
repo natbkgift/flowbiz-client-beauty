@@ -188,7 +188,7 @@ No authentication required. Returns only `status = active` items for active clin
 > [!IMPORTANT]
 > All tenant isolation is enforced through the authenticated session context — **never** from request body.
 
-- `clinicId` and `clinic_id` in request bodies are rejected with `400 INVALID_REQUEST`
+- `clinicId` and `clinic_id` in request bodies or query strings are rejected with `400 INVALID_REQUEST`
 - Every query filters by `clinic_id = context.currentClinic.id`
 - Update/delete/reorder operations validate that the target record belongs to the current clinic
 - Cross-tenant access → `403 CROSS_TENANT_FORBIDDEN`
@@ -205,6 +205,7 @@ No authentication required. Returns only `status = active` items for active clin
 - `key` auto-generated from name/title using lowercase snake normalization
 - `status` must be: `draft`, `active`, `inactive`, `archived`
 - `metadata` must be a JSON object (not array, not null, not string)
+- `metadata_json` is also constrained as a JSON object in the database schema
 - `imageUrl`, `ctaUrl` must be `http://` or `https://` or empty/null
 - `data:`, `javascript:`, `file:` URLs are rejected with `INVALID_OFFERING_URL`
 
