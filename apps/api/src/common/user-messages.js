@@ -142,6 +142,16 @@ const THAI_ERROR_MESSAGES = {
   INVALID_PUBLIC_LEAD_EMAIL: 'รูปแบบอีเมลสำหรับติดต่อกลับไม่ถูกต้อง',
   INVALID_INTEREST: 'บริการ โปรโมชั่น หรือแพ็กเกจที่เลือกไม่พร้อมใช้งาน',
   PUBLIC_LEAD_RATE_LIMITED: 'มีการส่งข้อมูลบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่',
+  INVALID_BOOKING_REQUEST_PAYLOAD: 'ข้อมูลคำขอนัดหมายไม่ครบถ้วนหรือไม่ถูกต้อง',
+  BOOKING_CONSENT_REQUIRED: 'กรุณายอมรับเงื่อนไขการติดต่อกลับก่อนส่งคำขอนัดหมาย',
+  BOOKING_CONTACT_REQUIRED: 'กรุณาระบุเบอร์โทรศัพท์ อีเมล หรือ LINE ID อย่างน้อยหนึ่งช่องทาง',
+  INVALID_BOOKING_EMAIL: 'รูปแบบอีเมลสำหรับคำขอนัดหมายไม่ถูกต้อง',
+  INVALID_BOOKING_INTEREST: 'บริการ โปรโมชั่น หรือแพ็กเกจที่เลือกไม่พร้อมรับคำขอนัดหมาย',
+  INVALID_BOOKING_DATE: 'วันที่ต้องการนัดหมายไม่ถูกต้อง',
+  INVALID_BOOKING_TIME_WINDOW: 'ช่วงเวลาที่ต้องการไม่ถูกต้อง',
+  INVALID_BOOKING_CONTACT_METHOD: 'ช่องทางติดต่อกลับที่ต้องการไม่ถูกต้อง',
+  BOOKING_REQUEST_NOT_FOUND: 'ไม่พบคำขอนัดหมายที่ต้องการ',
+  PUBLIC_BOOKING_REQUEST_RATE_LIMITED: 'มีการส่งคำขอนัดหมายบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่',
   INTERNAL_SERVER_ERROR: 'ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง'
 };
 

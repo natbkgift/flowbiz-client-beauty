@@ -163,6 +163,21 @@ async function submitPublicClinicLead(slug, payload) {
   return data;
 }
 
+async function submitPublicClinicBookingRequest(slug, payload) {
+  const response = await fetch(`${API_BASE}/public/clinics/${encodeURIComponent(slug)}/booking-requests`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const code = data?.error?.code || 'BOOKING_REQUEST_SUBMIT_FAILED';
+    const message = data?.error?.message || 'ส่งคำขอนัดหมายไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+    throw new Error(`${code}: ${message}`);
+  }
+  return data;
+}
+
 async function apiFetch(path, options = {}) {
   const pathWithContext = withPublicClinicContext(path);
   try {
@@ -1023,7 +1038,13 @@ function ClinicWebsiteTemplate({ data, clinicSlug, offerings = {}, offeringsStat
 
   const themeStyle = buildClinicThemeStyle(brandingSettings);
   const leadFormRef = useRef(null);
+  const bookingFormRef = useRef(null);
   const [selectedInterest, setSelectedInterest] = useState({ interestType: 'general', interestId: '' });
+  const [selectedBookingInterest, setSelectedBookingInterest] = useState({
+    requestType: 'consultation',
+    interestType: 'general',
+    interestId: ''
+  });
 
   const handleInterestSelect = (interestType, interestId) => {
     setSelectedInterest({ interestType, interestId: String(interestId || '') });
@@ -1033,6 +1054,24 @@ function ClinicWebsiteTemplate({ data, clinicSlug, offerings = {}, offeringsStat
         formNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
       const messageInput = formNode?.querySelector?.('[data-testid="clinic-lead-message"]');
+      if (messageInput?.focus) {
+        messageInput.focus();
+      }
+    });
+  };
+
+  const handleBookingSelect = (interestType, interestId) => {
+    setSelectedBookingInterest({
+      requestType: 'booking_request',
+      interestType,
+      interestId: String(interestId || '')
+    });
+    window.requestAnimationFrame(() => {
+      const formNode = bookingFormRef.current;
+      if (formNode?.scrollIntoView) {
+        formNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      const messageInput = formNode?.querySelector?.('[data-testid="clinic-booking-message"]');
       if (messageInput?.focus) {
         messageInput.focus();
       }
@@ -1085,24 +1124,33 @@ function ClinicWebsiteTemplate({ data, clinicSlug, offerings = {}, offeringsStat
         homepageSections={activeSections}
         services={offerings.services || []}
         onInterestSelect={handleInterestSelect}
+        onBookingSelect={handleBookingSelect}
       />
 
       <ClinicPromotionsPreview
         homepageSections={activeSections}
         promotions={offerings.promotions || []}
         onInterestSelect={handleInterestSelect}
+        onBookingSelect={handleBookingSelect}
       />
 
       <ClinicPackagesPreview
         homepageSections={activeSections}
         packages={offerings.packages || []}
         onInterestSelect={handleInterestSelect}
+        onBookingSelect={handleBookingSelect}
       />
 
       <ClinicLeadCaptureForm
         ref={leadFormRef}
         clinicSlug={clinicSlug}
         selectedInterest={selectedInterest}
+      />
+
+      <ClinicBookingRequestForm
+        ref={bookingFormRef}
+        clinicSlug={clinicSlug}
+        selectedBookingInterest={selectedBookingInterest}
       />
 
       <ClinicAboutSection websiteSettings={websiteSettings} />
@@ -1210,7 +1258,7 @@ function ClinicTrustSection({ homepageSections }) {
   );
 }
 
-function ClinicServicesPreview({ homepageSections, services = [], onInterestSelect }) {
+function ClinicServicesPreview({ homepageSections, services = [], onInterestSelect, onBookingSelect }) {
   const serviceSec = homepageSections.find(s => s.sectionType === 'services_preview' || s.sectionKey === 'services_preview');
   
   let items = [];
@@ -1262,6 +1310,16 @@ function ClinicServicesPreview({ homepageSections, services = [], onInterestSele
                 สนใจบริการนี้
               </button>
             ) : null}
+            {hasApiItems ? (
+              <button
+                type="button"
+                className="cta-btn clinic-btn-primary clinic-card-cta"
+                data-testid={`clinic-template-service-booking-${svc.id}`}
+                onClick={() => onBookingSelect?.('service', svc.id)}
+              >
+                ขอนัดหมายบริการนี้
+              </button>
+            ) : null}
           </div>
         ))}
       </div>
@@ -1269,7 +1327,7 @@ function ClinicServicesPreview({ homepageSections, services = [], onInterestSele
   );
 }
 
-function ClinicPromotionsPreview({ homepageSections, promotions = [], onInterestSelect }) {
+function ClinicPromotionsPreview({ homepageSections, promotions = [], onInterestSelect, onBookingSelect }) {
   const promoSec = homepageSections.find(s => s.sectionType === 'promotions_preview' || s.sectionKey === 'promotions_preview');
 
   let items = [];
@@ -1322,6 +1380,16 @@ function ClinicPromotionsPreview({ homepageSections, promotions = [], onInterest
                   สนใจโปรโมชั่นนี้
                 </button>
               ) : null}
+              {hasApiItems ? (
+                <button
+                  type="button"
+                  className="cta-btn clinic-btn-primary clinic-card-cta"
+                  data-testid={`clinic-template-promotion-booking-${promo.id}`}
+                  onClick={() => onBookingSelect?.('promotion', promo.id)}
+                >
+                  ขอนัดหมายโปรโมชั่นนี้
+                </button>
+              ) : null}
             </div>
           ))}
         </div>
@@ -1330,7 +1398,7 @@ function ClinicPromotionsPreview({ homepageSections, promotions = [], onInterest
   );
 }
 
-function ClinicPackagesPreview({ homepageSections, packages = [], onInterestSelect }) {
+function ClinicPackagesPreview({ homepageSections, packages = [], onInterestSelect, onBookingSelect }) {
   const packageSec = homepageSections.find(s => s.sectionType === 'packages_preview' || s.sectionKey === 'packages_preview');
   let items = [];
   const hasApiItems = Array.isArray(packages) && packages.length > 0;
@@ -1370,6 +1438,16 @@ function ClinicPackagesPreview({ homepageSections, packages = [], onInterestSele
                 onClick={() => onInterestSelect?.('package', pkg.id)}
               >
                 สนใจแพ็กเกจนี้
+              </button>
+            ) : null}
+            {hasApiItems ? (
+              <button
+                type="button"
+                className="cta-btn clinic-btn-primary clinic-card-cta"
+                data-testid={`clinic-template-package-booking-${pkg.id}`}
+                onClick={() => onBookingSelect?.('package', pkg.id)}
+              >
+                ขอนัดหมายแพ็กเกจนี้
               </button>
             ) : null}
           </div>
@@ -1598,6 +1676,238 @@ const ClinicLeadCaptureForm = React.forwardRef(function ClinicLeadCaptureForm({ 
 
         <button className="cta-btn clinic-btn-primary clinic-lead-submit" data-testid="clinic-lead-submit" type="submit" disabled={submitting}>
           {submitting ? 'กำลังส่งข้อมูล...' : 'ส่งข้อมูลให้ทีมงานติดต่อกลับ'}
+        </button>
+      </form>
+    </section>
+  );
+});
+
+const ClinicBookingRequestForm = React.forwardRef(function ClinicBookingRequestForm({ clinicSlug, selectedBookingInterest }, ref) {
+  const [form, setForm] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    lineId: '',
+    requestType: 'consultation',
+    interestType: 'general',
+    interestId: '',
+    preferredDate: '',
+    preferredTimeWindow: 'anytime',
+    preferredContactMethod: 'any',
+    message: '',
+    consentAccepted: false,
+    honeypot: ''
+  });
+  const [status, setStatus] = useState({ kind: 'idle', message: '' });
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!selectedBookingInterest) return;
+    setForm((prev) => ({
+      ...prev,
+      requestType: selectedBookingInterest.requestType || 'consultation',
+      interestType: selectedBookingInterest.interestType || 'general',
+      interestId: selectedBookingInterest.interestId || ''
+    }));
+  }, [selectedBookingInterest]);
+
+  const updateField = (field, value) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    if (status.kind === 'error') {
+      setStatus({ kind: 'idle', message: '' });
+    }
+  };
+
+  const validate = () => {
+    if (!form.consentAccepted) {
+      return 'กรุณายอมรับเงื่อนไขการติดต่อกลับก่อนส่งคำขอนัดหมาย';
+    }
+    if (!form.phone.trim() && !form.email.trim() && !form.lineId.trim()) {
+      return 'กรุณาระบุเบอร์โทรศัพท์ อีเมล หรือ LINE ID อย่างน้อยหนึ่งช่องทาง';
+    }
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      return 'รูปแบบอีเมลไม่ถูกต้อง';
+    }
+    if (form.preferredDate) {
+      const today = new Date();
+      const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(form.preferredDate) || form.preferredDate < todayString) {
+        return 'วันที่ต้องการนัดหมายไม่ถูกต้อง';
+      }
+    }
+    if (form.message.length > 1000) {
+      return 'ข้อความต้องไม่เกิน 1000 ตัวอักษร';
+    }
+    if (form.honeypot.trim()) {
+      return 'ส่งคำขอนัดหมายไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+    }
+    return null;
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    if (submitting) return;
+
+    const validationError = validate();
+    if (validationError) {
+      setStatus({ kind: 'error', message: validationError });
+      return;
+    }
+
+    setSubmitting(true);
+    setStatus({ kind: 'idle', message: '' });
+    const payload = {
+      name: form.name.trim(),
+      phone: form.phone.trim(),
+      email: form.email.trim(),
+      lineId: form.lineId.trim(),
+      requestType: form.requestType,
+      interestType: form.interestType,
+      interestId: form.interestId ? Number(form.interestId) : undefined,
+      preferredDate: form.preferredDate || undefined,
+      preferredTimeWindow: form.preferredTimeWindow,
+      preferredContactMethod: form.preferredContactMethod,
+      message: form.message.trim(),
+      consentAccepted: form.consentAccepted,
+      honeypot: form.honeypot
+    };
+
+    try {
+      const result = await submitPublicClinicBookingRequest(clinicSlug, payload);
+      setStatus({
+        kind: 'success',
+        message: result?.message || 'รับคำขอนัดหมายแล้วค่ะ ทีมงานจะติดต่อกลับเพื่อยืนยันเวลา'
+      });
+      setForm({
+        name: '',
+        phone: '',
+        email: '',
+        lineId: '',
+        requestType: 'consultation',
+        interestType: 'general',
+        interestId: '',
+        preferredDate: '',
+        preferredTimeWindow: 'anytime',
+        preferredContactMethod: 'any',
+        message: '',
+        consentAccepted: false,
+        honeypot: ''
+      });
+    } catch (error) {
+      setStatus({
+        kind: 'error',
+        message: error.message.replace(/^[A-Z_]+:\s*/, '') || 'ส่งคำขอนัดหมายไม่สำเร็จ กรุณาลองใหม่อีกครั้ง'
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <section className="clinic-template-section clinic-lead-capture-section clinic-booking-request-section" data-testid="clinic-booking-form-section" ref={ref}>
+      <div className="clinic-section-header">
+        <span className="clinic-eyebrow">Booking Request</span>
+        <h2>ขอนัดหมาย / ขอให้ทีมงานติดต่อกลับ</h2>
+      </div>
+      <form className="clinic-lead-form clinic-booking-form" data-testid="clinic-booking-form" onSubmit={handleSubmit}>
+        {status.kind === 'success' ? (
+          <div className="clinic-lead-alert success" data-testid="clinic-booking-success">{status.message}</div>
+        ) : null}
+        {status.kind === 'error' ? (
+          <div className="clinic-lead-alert error" data-testid="clinic-booking-error">{status.message}</div>
+        ) : null}
+
+        <label className="clinic-lead-field">
+          <span>ชื่อ</span>
+          <input data-testid="clinic-booking-name" value={form.name} maxLength={120} onChange={(event) => updateField('name', event.target.value)} autoComplete="name" />
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>เบอร์โทรศัพท์</span>
+          <input data-testid="clinic-booking-phone" value={form.phone} maxLength={40} onChange={(event) => updateField('phone', event.target.value)} autoComplete="tel" />
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>อีเมล</span>
+          <input data-testid="clinic-booking-email" type="email" value={form.email} maxLength={160} onChange={(event) => updateField('email', event.target.value)} autoComplete="email" />
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>LINE ID</span>
+          <input data-testid="clinic-booking-line-id" value={form.lineId} maxLength={80} onChange={(event) => updateField('lineId', event.target.value)} autoComplete="off" />
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>ประเภทคำขอ</span>
+          <select data-testid="clinic-booking-request-type" value={form.requestType} onChange={(event) => updateField('requestType', event.target.value)}>
+            <option value="consultation">ขอปรึกษา</option>
+            <option value="booking_request">ขอนัดหมาย</option>
+            <option value="follow_up">ให้ติดต่อกลับ</option>
+          </select>
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>ประเภทความสนใจ</span>
+          <select data-testid="clinic-booking-interest-type" value={form.interestType} onChange={(event) => updateField('interestType', event.target.value)}>
+            <option value="general">ปรึกษาทั่วไป</option>
+            <option value="service">บริการ</option>
+            <option value="promotion">โปรโมชั่น</option>
+            <option value="package">แพ็กเกจ</option>
+          </select>
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>รหัสบริการ/โปร/แพ็กเกจ</span>
+          <input data-testid="clinic-booking-interest-id" type="number" min="1" value={form.interestId} onChange={(event) => updateField('interestId', event.target.value)} />
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>วันที่ต้องการ</span>
+          <input data-testid="clinic-booking-preferred-date" type="date" value={form.preferredDate} onChange={(event) => updateField('preferredDate', event.target.value)} />
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>ช่วงเวลา</span>
+          <select data-testid="clinic-booking-time-window" value={form.preferredTimeWindow} onChange={(event) => updateField('preferredTimeWindow', event.target.value)}>
+            <option value="anytime">เวลาใดก็ได้</option>
+            <option value="morning">ช่วงเช้า</option>
+            <option value="afternoon">ช่วงบ่าย</option>
+            <option value="evening">ช่วงเย็น</option>
+          </select>
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>ช่องทางติดต่อกลับ</span>
+          <select data-testid="clinic-booking-contact-method" value={form.preferredContactMethod} onChange={(event) => updateField('preferredContactMethod', event.target.value)}>
+            <option value="any">ช่องทางใดก็ได้</option>
+            <option value="phone">โทรศัพท์</option>
+            <option value="line">LINE</option>
+            <option value="email">อีเมล</option>
+          </select>
+        </label>
+
+        <label className="clinic-lead-field clinic-lead-field-wide">
+          <span>ข้อความถึงทีมงาน</span>
+          <textarea data-testid="clinic-booking-message" value={form.message} maxLength={1000} onChange={(event) => updateField('message', event.target.value)} rows={4} />
+        </label>
+
+        <input
+          data-testid="clinic-booking-honeypot"
+          className="clinic-lead-honeypot"
+          tabIndex="-1"
+          autoComplete="off"
+          value={form.honeypot}
+          onChange={(event) => updateField('honeypot', event.target.value)}
+          aria-hidden="true"
+        />
+
+        <label className="clinic-lead-consent clinic-lead-field-wide">
+          <input data-testid="clinic-booking-consent" type="checkbox" checked={form.consentAccepted} onChange={(event) => updateField('consentAccepted', event.target.checked)} />
+          <span>ยินยอมให้คลินิกติดต่อกลับเพื่อยืนยันคำขอนัดหมาย</span>
+        </label>
+
+        <button className="cta-btn clinic-btn-primary clinic-lead-submit" data-testid="clinic-booking-submit" type="submit" disabled={submitting}>
+          {submitting ? 'กำลังส่งคำขอ...' : 'ส่งคำขอนัดหมาย'}
         </button>
       </form>
     </section>
