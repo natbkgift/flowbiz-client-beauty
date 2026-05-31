@@ -522,5 +522,21 @@ test('Admin Booking Request API - Queue and Status Management', async (t) => {
     assert.ok(byDateRange.body.items.some((item) => item.id === bookingAId));
     assert.equal(byDateRange.body.items.some((item) => item.id === consultId), false);
     assert.equal(byDateRange.body.items.some((item) => item.id === packageId), false);
+
+    const bySearch = await routeJson(handleBookingRequestRoutes, {
+      path: '/admin/booking-requests',
+      authenticateRequest: contextFor('owner'),
+      searchParams: { q: 'Jane' }
+    });
+    assert.equal(bySearch.statusCode, 200);
+    assert.ok(bySearch.body.items.some((item) => item.id === bookingAId));
+
+    const escapedWildcardSearch = await routeJson(handleBookingRequestRoutes, {
+      path: '/admin/booking-requests',
+      authenticateRequest: contextFor('owner'),
+      searchParams: { q: '%' }
+    });
+    assert.equal(escapedWildcardSearch.statusCode, 200);
+    assert.equal(escapedWildcardSearch.body.items.length, 0);
   });
 });

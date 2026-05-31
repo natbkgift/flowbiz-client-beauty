@@ -146,6 +146,10 @@ function normalizeAdminFilters(searchParams) {
   };
 }
 
+function escapeLikePattern(value) {
+  return value.replace(/[%_\\]/g, '\\$&');
+}
+
 function formatDateOnly(value) {
   if (!value) return null;
   if (value instanceof Date) return value.toISOString().slice(0, 10);
@@ -658,13 +662,13 @@ async function listAdminBookingRequests(context, searchParams) {
   }
 
   if (filters.q) {
-    values.push(`%${filters.q.toLowerCase()}%`);
+    values.push(`%${escapeLikePattern(filters.q.toLowerCase())}%`);
     clauses.push(`(
-      lower(coalesce(br.customer_name, '')) like $${values.length}
-      or lower(coalesce(br.phone, '')) like $${values.length}
-      or lower(coalesce(br.email, '')) like $${values.length}
-      or lower(coalesce(br.line_id, '')) like $${values.length}
-      or lower(coalesce(l.full_name, '')) like $${values.length}
+      lower(coalesce(br.customer_name, '')) like $${values.length} escape '\\'
+      or lower(coalesce(br.phone, '')) like $${values.length} escape '\\'
+      or lower(coalesce(br.email, '')) like $${values.length} escape '\\'
+      or lower(coalesce(br.line_id, '')) like $${values.length} escape '\\'
+      or lower(coalesce(l.full_name, '')) like $${values.length} escape '\\'
     )`);
   }
 
@@ -957,5 +961,6 @@ module.exports = {
   updateAdminBookingRequestStatus,
   addAdminBookingRequestNote,
   normalizeAdminFilters,
-  normalizeBookingNotePayload
+  normalizeBookingNotePayload,
+  escapeLikePattern
 };
