@@ -206,6 +206,21 @@ async function verifyMemberAccessToken(slug, token) {
   return data;
 }
 
+async function respondToMemberSlotOffer(slug, offerId, payload) {
+  const response = await fetch(`${API_BASE}/public/clinics/${encodeURIComponent(slug)}/member-access/slot-offers/${encodeURIComponent(offerId)}/respond`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const code = data?.error?.code || 'SLOT_OFFER_RESPONSE_FAILED';
+    const message = data?.error?.message || 'ตอบรับข้อเสนอเวลานัดไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+    throw new Error(`${code}: ${message}`);
+  }
+  return data;
+}
+
 async function apiFetch(path, options = {}) {
   const pathWithContext = withPublicClinicContext(path);
   try {
@@ -1219,6 +1234,9 @@ function MemberAccessPage({ clinicSlug }) {
   const [session, setSession] = useState(null);
   const [tokenError, setTokenError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [slotOfferNotes, setSlotOfferNotes] = useState({});
+  const [slotOfferStatus, setSlotOfferStatus] = useState({ type: 'idle', message: '' });
+  const [respondingOfferId, setRespondingOfferId] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -1280,6 +1298,59 @@ function MemberAccessPage({ clinicSlug }) {
     }
   };
 
+  const handleSlotOfferNoteChange = (offerId, value) => {
+    if (value.length > 500) {
+      setSlotOfferStatus({ type: 'error', message: 'ข้อความตอบกลับต้องไม่เกิน 500 ตัวอักษร' });
+      return;
+    }
+    setSlotOfferStatus({ type: 'idle', message: '' });
+    setSlotOfferNotes((current) => ({
+      ...current,
+      [offerId]: value
+    }));
+  };
+
+  const handleSlotOfferResponse = async (offer, response) => {
+    const note = (slotOfferNotes[offer.id] || '').trim();
+    setSlotOfferStatus({ type: 'idle', message: '' });
+    if (note.length > 500) {
+      setSlotOfferStatus({ type: 'error', message: 'ข้อความตอบกลับต้องไม่เกิน 500 ตัวอักษร' });
+      return;
+    }
+
+    setRespondingOfferId(offer.id);
+    try {
+      const result = await respondToMemberSlotOffer(clinicSlug, offer.id, {
+        token: pageToken,
+        response,
+        note,
+        honeypot: ''
+      });
+      const updatedOffer = result.offer || {};
+      setSession((current) => ({
+        ...current,
+        slotOffers: (Array.isArray(current?.slotOffers) ? current.slotOffers : []).map((item) => (
+          item.id === offer.id
+            ? {
+                ...item,
+                offerStatus: updatedOffer.offerStatus || response,
+                customerResponse: updatedOffer.customerResponse || response,
+                customerRespondedAt: updatedOffer.customerRespondedAt || new Date().toISOString()
+              }
+            : item
+        ))
+      }));
+      setSlotOfferStatus({
+        type: 'success',
+        message: response === 'accepted' ? 'ตอบรับข้อเสนอเวลานัดเรียบร้อยแล้ว' : 'ปฏิเสธข้อเสนอเวลานัดเรียบร้อยแล้ว'
+      });
+    } catch (err) {
+      setSlotOfferStatus({ type: 'error', message: err.message });
+    } finally {
+      setRespondingOfferId(null);
+    }
+  };
+
   if (pageToken) {
     if (tokenError) {
       return (
@@ -1302,6 +1373,9 @@ function MemberAccessPage({ clinicSlug }) {
     const member = session.member || {};
     const contactInfo = member.contact || {};
     const bookings = Array.isArray(session.bookingRequests) ? session.bookingRequests : [];
+    const slotOffers = (Array.isArray(session.slotOffers) ? session.slotOffers : []).filter((offer) => (
+      ['ready_to_send', 'sent', 'accepted', 'declined'].includes(offer.offerStatus)
+    ));
 
     return (
       <section className="clinic-template-section member-access-panel" data-testid="member-access-session">
@@ -1330,6 +1404,67 @@ function MemberAccessPage({ clinicSlug }) {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className="member-access-slot-offers" data-testid="member-access-slot-offers">
+          <h2>ข้อเสนอเวลานัดจากคลินิก</h2>
+          {slotOfferStatus.type === 'success' && (
+            <div className="clinic-lead-alert success" data-testid="member-access-slot-offer-success">{slotOfferStatus.message}</div>
+          )}
+          {slotOfferStatus.type === 'error' && (
+            <div className="clinic-lead-alert error" data-testid="member-access-slot-offer-error">{slotOfferStatus.message}</div>
+          )}
+          {slotOffers.length === 0 ? (
+            <div className="clinic-fallback-card">
+              <h4>ยังไม่มีข้อเสนอเวลานัดที่เปิดให้ตอบกลับ</h4>
+            </div>
+          ) : slotOffers.map((offer) => {
+            const responded = offer.customerResponse === 'accepted' || offer.customerResponse === 'declined' || offer.offerStatus === 'accepted' || offer.offerStatus === 'declined';
+            const canRespond = !responded && (offer.offerStatus === 'ready_to_send' || offer.offerStatus === 'sent');
+            return (
+              <div className="member-access-slot-offer-row" data-testid={`member-access-slot-offer-row-${offer.id}`} key={offer.id}>
+                <div className="member-access-slot-offer-main">
+                  <strong>{offer.offeredDate || 'ไม่ระบุวัน'}</strong>
+                  <span>{offer.offeredTimeWindow || 'ไม่ระบุช่วงเวลา'} {offer.offeredStartTime || ''}</span>
+                  <span>{offer.durationMinutes ? `${offer.durationMinutes} นาที` : 'ไม่ระบุระยะเวลา'}</span>
+                </div>
+                <div className="member-access-slot-offer-response">
+                  <span className="member-access-status">{offer.customerResponse || offer.offerStatus}</span>
+                  {canRespond && (
+                    <>
+                      <textarea
+                        data-testid={`member-access-slot-offer-note-${offer.id}`}
+                        value={slotOfferNotes[offer.id] || ''}
+                        onChange={(event) => handleSlotOfferNoteChange(offer.id, event.target.value)}
+                        maxLength={500}
+                        placeholder="หมายเหตุถึงคลินิก (ไม่บังคับ)"
+                      />
+                      <div className="member-access-slot-offer-actions">
+                        <button
+                          className="cta-btn clinic-btn-primary"
+                          data-testid={`member-access-slot-offer-accept-${offer.id}`}
+                          type="button"
+                          disabled={respondingOfferId === offer.id}
+                          onClick={() => handleSlotOfferResponse(offer, 'accepted')}
+                        >
+                          Accept
+                        </button>
+                        <button
+                          className="cta-btn secondary"
+                          data-testid={`member-access-slot-offer-decline-${offer.id}`}
+                          type="button"
+                          disabled={respondingOfferId === offer.id}
+                          onClick={() => handleSlotOfferResponse(offer, 'declined')}
+                        >
+                          Decline
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </section>
     );

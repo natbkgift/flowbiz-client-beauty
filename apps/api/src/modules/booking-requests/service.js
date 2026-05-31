@@ -266,6 +266,8 @@ function mapSlotOfferRow(row) {
     offeredStartTime: row.offered_start_time || null,
     durationMinutes: row.duration_minutes === null || row.duration_minutes === undefined ? null : Number(row.duration_minutes),
     offerStatus: row.offer_status,
+    customerResponse: row.customer_response || null,
+    customerRespondedAt: row.customer_responded_at || null,
     offerNote: row.offer_note || null,
     internalNote: row.internal_note || null,
     createdByUserId: row.created_by_user_id ? Number(row.created_by_user_id) : null,

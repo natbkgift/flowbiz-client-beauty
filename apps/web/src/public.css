@@ -2010,6 +2010,17 @@ a {
   gap: 0.85rem;
 }
 
+.member-access-slot-offers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 2rem;
+}
+
+.member-access-slot-offers h2 {
+  font-size: 1.35rem;
+}
+
 .member-access-booking-row {
   display: flex;
   justify-content: space-between;
@@ -2024,6 +2035,56 @@ a {
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
+}
+
+.member-access-slot-offer-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.75fr);
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: var(--bg-primary);
+}
+
+.member-access-slot-offer-main,
+.member-access-slot-offer-response {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.member-access-slot-offer-main span,
+.member-access-slot-offer-response span {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.member-access-slot-offer-response textarea {
+  width: 100%;
+  min-height: 82px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font: inherit;
+  padding: 0.75rem;
+  resize: vertical;
+}
+
+.member-access-slot-offer-response textarea:focus {
+  border-color: var(--gold-primary);
+  outline: none;
+}
+
+.member-access-slot-offer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.member-access-slot-offer-actions .cta-btn {
+  border-radius: 8px;
 }
 
 .member-access-booking-row span {
@@ -2291,6 +2352,14 @@ a {
   }
 
   .clinic-lead-submit {
+    width: 100%;
+  }
+
+  .member-access-slot-offer-row {
+    grid-template-columns: 1fr;
+  }
+
+  .member-access-slot-offer-actions .cta-btn {
     width: 100%;
   }
 }

@@ -10,6 +10,9 @@ const { resolvePublicClinicBySlug } = require('../public-content/clinic-resolver
 const GENERIC_REQUEST_MESSAGE = 'หากพบข้อมูลสมาชิก ระบบจะส่งลิงก์เข้าใช้งานให้ตามช่องทางที่ระบุ';
 const VALID_CHANNELS = new Set(['email', 'phone', 'line']);
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PUBLIC_SLOT_OFFER_STATUSES = new Set(['ready_to_send', 'sent', 'accepted', 'declined']);
+const RESPONDABLE_SLOT_OFFER_STATUSES = new Set(['ready_to_send', 'sent']);
+const VALID_SLOT_OFFER_RESPONSES = new Set(['accepted', 'declined']);
 
 function trimString(value, maxLength, code = 'INVALID_MEMBER_ACCESS_PAYLOAD') {
   if (value === undefined || value === null) return null;
@@ -38,6 +41,22 @@ function rejectClinicOverride(body) {
   }
   if (body.clinicId !== undefined || body.clinic_id !== undefined) {
     throw new AppError(400, 'INVALID_MEMBER_ACCESS_PAYLOAD', 'clinicId cannot be supplied for public member access.');
+  }
+}
+
+function rejectSlotOfferClinicOverride(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new AppError(400, 'INVALID_SLOT_OFFER_RESPONSE', 'Request body must be a JSON object.');
+  }
+  if (
+    body.clinicId !== undefined ||
+    body.clinic_id !== undefined ||
+    body.memberId !== undefined ||
+    body.member_id !== undefined ||
+    body.leadId !== undefined ||
+    body.lead_id !== undefined
+  ) {
+    throw new AppError(400, 'INVALID_SLOT_OFFER_RESPONSE', 'Tenant, member, and lead identifiers cannot be supplied for public slot offer response.');
   }
 }
 
@@ -164,6 +183,64 @@ function mapPublicBookingRequest(row) {
     preferredDate: formatDateOnly(row.preferred_date),
     preferredTimeWindow: row.preferred_time_window || null,
     createdAt: row.created_at
+  };
+}
+
+function mapPublicSlotOffer(row, options = {}) {
+  const base = {
+    id: Number(row.id),
+    bookingRequestId: Number(row.booking_request_id),
+    offeredDate: formatDateOnly(row.offered_date),
+    offeredTimeWindow: row.offered_time_window,
+    offeredStartTime: row.offered_start_time || null,
+    durationMinutes: row.duration_minutes === null || row.duration_minutes === undefined ? null : Number(row.duration_minutes),
+    offerStatus: row.offer_status,
+    customerResponse: row.customer_response || null,
+    customerRespondedAt: row.customer_responded_at || null,
+    createdAt: row.created_at
+  };
+
+  if (options.responseOnly) {
+    return {
+      id: base.id,
+      bookingRequestId: base.bookingRequestId,
+      offerStatus: base.offerStatus,
+      customerResponse: base.customerResponse,
+      customerRespondedAt: base.customerRespondedAt
+    };
+  }
+
+  return base;
+}
+
+function normalizePositiveInteger(value, fieldName, code = 'INVALID_SLOT_OFFER_RESPONSE') {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new AppError(400, code, `${fieldName} must be a positive integer.`);
+  }
+  return parsed;
+}
+
+function normalizeSlotOfferResponsePayload(body) {
+  rejectSlotOfferClinicOverride(body);
+  const honeypot = trimHoneypot(body.honeypot);
+  if (honeypot) {
+    return { isBot: true };
+  }
+
+  const response = trimString(body.response, 40, 'INVALID_SLOT_OFFER_RESPONSE');
+  if (!response || !VALID_SLOT_OFFER_RESPONSES.has(response)) {
+    throw new AppError(400, 'INVALID_SLOT_OFFER_RESPONSE', 'response must be accepted or declined.');
+  }
+
+  const note = trimString(body.note, 500, 'INVALID_SLOT_OFFER_RESPONSE');
+  const token = normalizeToken(body.token);
+
+  return {
+    isBot: false,
+    token,
+    response,
+    note
   };
 }
 
@@ -358,14 +435,17 @@ async function requestMemberMagicLink(slug, body, requestMeta = {}) {
   }
 }
 
-async function verifyMemberMagicToken(slug, token, requestMeta = {}) {
+async function resolveMemberSessionByToken(slug, token, requestMeta = {}, options = {}) {
   const normalizedToken = normalizeToken(token);
   const clinic = await resolveActiveClinicOrThrow(slug);
   const tokenHash = hashAccessToken(normalizedToken);
-  const client = await getPool().connect();
+  const client = options.client || await getPool().connect();
+  const shouldManageTransaction = !options.client;
 
   try {
-    await client.query('begin');
+    if (shouldManageTransaction) {
+      await client.query('begin');
+    }
     const result = await client.query(
       `
         select
@@ -439,12 +519,222 @@ async function verifyMemberMagicToken(slug, token, requestMeta = {}) {
     });
     await recordMemberAccessEvent(client, clinic.id, row, 'member_access.verified', summary);
     await auditMemberAccess(client, clinic.id, Number(row.id), 'member_access.verified', summary);
+    if (shouldManageTransaction) {
+      await client.query('commit');
+    }
+
+    return {
+      clinic,
+      memberRow: row,
+      success: true,
+      member: mapMemberPublicProfile(row),
+      bookingRequests: bookingsResult.rows.map(mapPublicBookingRequest)
+    };
+  } catch (error) {
+    if (shouldManageTransaction) {
+      await client.query('rollback').catch(() => {});
+    }
+    throw error;
+  } finally {
+    if (shouldManageTransaction) {
+      client.release();
+    }
+  }
+}
+
+async function listPublicSlotOffersForMember(client, clinicId, memberId) {
+  const result = await client.query(
+    `
+      select
+        o.id,
+        o.booking_request_id,
+        o.offered_date,
+        o.offered_time_window,
+        o.offered_start_time,
+        o.duration_minutes,
+        o.offer_status,
+        o.customer_response,
+        o.customer_responded_at,
+        o.created_at
+      from clinic_booking_slot_offers o
+      inner join clinic_booking_requests br
+        on br.clinic_id = o.clinic_id
+        and br.id = o.booking_request_id
+        and br.member_id = $2
+      where o.clinic_id = $1
+        and o.member_id = $2
+        and o.offer_status = any($3::varchar[])
+      order by o.created_at desc, o.id desc
+      limit 20
+    `,
+    [clinicId, memberId, Array.from(PUBLIC_SLOT_OFFER_STATUSES)]
+  );
+
+  return result.rows.map(mapPublicSlotOffer);
+}
+
+async function verifyMemberMagicToken(slug, token, requestMeta = {}) {
+  const client = await getPool().connect();
+  try {
+    await client.query('begin');
+    const session = await resolveMemberSessionByToken(slug, token, requestMeta, { client });
+    const slotOffers = await listPublicSlotOffersForMember(client, session.clinic.id, Number(session.memberRow.id));
     await client.query('commit');
 
     return {
       success: true,
-      member: mapMemberPublicProfile(row),
-      bookingRequests: bookingsResult.rows.map(mapPublicBookingRequest)
+      member: session.member,
+      bookingRequests: session.bookingRequests,
+      slotOffers
+    };
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function respondToMemberSlotOffer(slug, offerId, body, requestMeta = {}) {
+  const normalizedOfferId = normalizePositiveInteger(offerId, 'offerId');
+  const normalized = normalizeSlotOfferResponsePayload(body);
+  if (normalized.isBot) {
+    return { success: true, botAccepted: true };
+  }
+
+  const client = await getPool().connect();
+  try {
+    await client.query('begin');
+    const session = await resolveMemberSessionByToken(slug, normalized.token, requestMeta, { client });
+    const clinicId = session.clinic.id;
+    const memberId = Number(session.memberRow.id);
+
+    const existingResult = await client.query(
+      `
+        select
+          o.*,
+          br.lead_id as booking_lead_id,
+          br.member_id as booking_member_id
+        from clinic_booking_slot_offers o
+        inner join clinic_booking_requests br
+          on br.clinic_id = o.clinic_id
+          and br.id = o.booking_request_id
+          and br.member_id = $3
+        where o.clinic_id = $1
+          and o.id = $2
+          and o.member_id = $3
+        for update
+      `,
+      [clinicId, normalizedOfferId, memberId]
+    );
+
+    if (existingResult.rowCount === 0) {
+      throw new AppError(404, 'SLOT_OFFER_NOT_FOUND', 'Slot offer not found.');
+    }
+
+    const existing = existingResult.rows[0];
+    if (existing.customer_response || existing.offer_status === 'accepted' || existing.offer_status === 'declined') {
+      const alreadySameResponse = existing.customer_response === normalized.response && existing.offer_status === normalized.response;
+      if (!alreadySameResponse) {
+        throw new AppError(409, 'SLOT_OFFER_ALREADY_RESPONDED', 'Slot offer has already been responded to.');
+      }
+
+      await client.query('commit');
+      return {
+        success: true,
+        offer: mapPublicSlotOffer(existing, { responseOnly: true })
+      };
+    }
+
+    if (!RESPONDABLE_SLOT_OFFER_STATUSES.has(existing.offer_status)) {
+      throw new AppError(409, 'SLOT_OFFER_RESPONSE_NOT_ALLOWED', 'Slot offer response is not allowed for the current status.');
+    }
+
+    const nextSlotStatus = normalized.response === 'accepted' ? 'accepted' : 'rejected';
+    const updateResult = await client.query(
+      `
+        update clinic_booking_slot_offers
+        set offer_status = $4,
+            customer_response = $4,
+            customer_response_note = $5,
+            customer_responded_at = now(),
+            updated_at = now()
+        where clinic_id = $1
+          and id = $2
+          and member_id = $3
+        returning
+          id,
+          booking_request_id,
+          offered_date,
+          offered_time_window,
+          offered_start_time,
+          duration_minutes,
+          offer_status,
+          customer_response,
+          customer_responded_at,
+          created_at
+      `,
+      [clinicId, normalizedOfferId, memberId, normalized.response, normalized.note]
+    );
+
+    await client.query(
+      `
+        update clinic_booking_requests
+        set slot_status = $4,
+            updated_at = now()
+        where clinic_id = $1
+          and id = $2
+          and member_id = $3
+      `,
+      [clinicId, existing.booking_request_id, memberId, nextSlotStatus]
+    );
+
+    const summary = {
+      source: 'member_magic_link_slot_offer_response',
+      bookingRequestId: Number(existing.booking_request_id),
+      offerId: normalizedOfferId,
+      memberId,
+      leadId: existing.booking_lead_id ? Number(existing.booking_lead_id) : null,
+      response: normalized.response,
+      noteProvided: Boolean(normalized.note)
+    };
+
+    if (existing.booking_lead_id) {
+      await client.query(
+        `
+          insert into lead_activity (clinic_id, lead_id, event_type, event_data_json)
+          values ($1, $2, $3, $4::jsonb)
+        `,
+        [
+          clinicId,
+          existing.booking_lead_id,
+          normalized.response === 'accepted'
+            ? 'booking_request.slot_offer_customer_accepted'
+            : 'booking_request.slot_offer_customer_declined',
+          JSON.stringify({ summary })
+        ]
+      );
+    }
+
+    await recordAuditLog(
+      {
+        clinicId,
+        entityType: 'clinic_booking_slot_offer',
+        entityId: normalizedOfferId,
+        actionType: normalized.response === 'accepted'
+          ? 'clinic_booking_slot_offer.customer_accepted'
+          : 'clinic_booking_slot_offer.customer_declined',
+        actorUserId: null,
+        contextJson: { summary }
+      },
+      client
+    );
+
+    await client.query('commit');
+
+    return {
+      success: true,
+      offer: mapPublicSlotOffer(updateResult.rows[0], { responseOnly: true })
     };
   } catch (error) {
     await client.query('rollback').catch(() => {});
@@ -457,6 +747,7 @@ async function verifyMemberMagicToken(slug, token, requestMeta = {}) {
 module.exports = {
   requestMemberMagicLink,
   verifyMemberMagicToken,
+  respondToMemberSlotOffer,
   mapMemberPublicProfile,
   maskEmail,
   maskPhone,
@@ -464,5 +755,7 @@ module.exports = {
   hashAccessToken,
   createAccessToken,
   findMemberByContact,
-  mapPublicBookingRequest
+  mapPublicBookingRequest,
+  mapPublicSlotOffer,
+  resolveMemberSessionByToken
 };
