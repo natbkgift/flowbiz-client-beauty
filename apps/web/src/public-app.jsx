@@ -1956,15 +1956,13 @@ const ClinicBookingRequestForm = React.forwardRef(function ClinicBookingRequestF
       return 'รูปแบบอีเมลไม่ถูกต้อง';
     }
     if (form.preferredDate) {
-      const today = new Date();
-      const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const todayString = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Bangkok' }).format(new Date());
       if (!/^\d{4}-\d{2}-\d{2}$/.test(form.preferredDate) || form.preferredDate < todayString) {
         return 'วันที่ต้องการนัดหมายไม่ถูกต้อง';
       }
     }
     if (form.alternativePreferredDate) {
-      const today = new Date();
-      const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const todayString = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Bangkok' }).format(new Date());
       if (!/^\d{4}-\d{2}-\d{2}$/.test(form.alternativePreferredDate) || form.alternativePreferredDate < todayString) {
         return 'วันที่สำรองไม่ถูกต้อง';
       }
@@ -2164,7 +2162,7 @@ const ClinicBookingRequestForm = React.forwardRef(function ClinicBookingRequestF
 
         <label className="clinic-lead-field clinic-lead-field-wide">
           <span>หมายเหตุเวลาที่สะดวก</span>
-          <textarea data-testid="clinic-booking-slot-notes" value={form.slotNotes} maxLength={501} onChange={(event) => updateField('slotNotes', event.target.value)} rows={3} />
+          <textarea data-testid="clinic-booking-slot-notes" value={form.slotNotes} maxLength={500} onChange={(event) => updateField('slotNotes', event.target.value)} rows={3} />
         </label>
 
         <label className="clinic-lead-field">
