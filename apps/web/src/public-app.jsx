@@ -1237,6 +1237,7 @@ function MemberAccessPage({ clinicSlug }) {
   const [slotOfferNotes, setSlotOfferNotes] = useState({});
   const [slotOfferStatus, setSlotOfferStatus] = useState({ type: 'idle', message: '' });
   const [respondingOfferId, setRespondingOfferId] = useState(null);
+  const respondingOfferIdRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -1311,6 +1312,9 @@ function MemberAccessPage({ clinicSlug }) {
   };
 
   const handleSlotOfferResponse = async (offer, response) => {
+    if (respondingOfferIdRef.current) {
+      return;
+    }
     const note = (slotOfferNotes[offer.id] || '').trim();
     setSlotOfferStatus({ type: 'idle', message: '' });
     if (note.length > 500) {
@@ -1318,6 +1322,7 @@ function MemberAccessPage({ clinicSlug }) {
       return;
     }
 
+    respondingOfferIdRef.current = offer.id;
     setRespondingOfferId(offer.id);
     try {
       const result = await respondToMemberSlotOffer(clinicSlug, offer.id, {
@@ -1347,6 +1352,7 @@ function MemberAccessPage({ clinicSlug }) {
     } catch (err) {
       setSlotOfferStatus({ type: 'error', message: err.message });
     } finally {
+      respondingOfferIdRef.current = null;
       setRespondingOfferId(null);
     }
   };
@@ -1438,13 +1444,14 @@ function MemberAccessPage({ clinicSlug }) {
                         onChange={(event) => handleSlotOfferNoteChange(offer.id, event.target.value)}
                         maxLength={500}
                         placeholder="หมายเหตุถึงคลินิก (ไม่บังคับ)"
+                        disabled={Boolean(respondingOfferId)}
                       />
                       <div className="member-access-slot-offer-actions">
                         <button
                           className="cta-btn clinic-btn-primary"
                           data-testid={`member-access-slot-offer-accept-${offer.id}`}
                           type="button"
-                          disabled={respondingOfferId === offer.id}
+                          disabled={Boolean(respondingOfferId)}
                           onClick={() => handleSlotOfferResponse(offer, 'accepted')}
                         >
                           Accept
@@ -1453,7 +1460,7 @@ function MemberAccessPage({ clinicSlug }) {
                           className="cta-btn secondary"
                           data-testid={`member-access-slot-offer-decline-${offer.id}`}
                           type="button"
-                          disabled={respondingOfferId === offer.id}
+                          disabled={Boolean(respondingOfferId)}
                           onClick={() => handleSlotOfferResponse(offer, 'declined')}
                         >
                           Decline

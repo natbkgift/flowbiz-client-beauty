@@ -243,6 +243,64 @@ test('Member slot offer response UI - accept sends token and response without te
   assert.equal(capturedPayload.note, 'สะดวกเวลานี้ค่ะ');
   assert.equal(capturedPayload.clinicId, undefined);
   assert.equal(capturedPayload.clinic_id, undefined);
+  assert.equal(capturedPayload.memberId, undefined);
+  assert.equal(capturedPayload.member_id, undefined);
+  assert.equal(capturedPayload.leadId, undefined);
+  assert.equal(capturedPayload.lead_id, undefined);
+});
+
+test('Member slot offer response UI - disables all slot offer response controls while submission is pending', async () => {
+  let resolveResponse;
+  const pendingResponse = new Promise((resolve) => {
+    resolveResponse = resolve;
+  });
+  const responseableSession = {
+    ...sessionPayload,
+    slotOffers: [
+      ...sessionPayload.slotOffers,
+      {
+        id: 1003,
+        bookingRequestId: 123,
+        offeredDate: '2099-06-22',
+        offeredTimeWindow: 'morning',
+        offeredStartTime: '10:00',
+        durationMinutes: 30,
+        offerStatus: 'sent',
+        customerResponse: null,
+        createdAt: '2099-06-01T00:00:00.000Z'
+      }
+    ]
+  };
+  const app = await loadPublicApp({
+    routes: clinicRoutes({
+      'POST /public/clinics/clinic-alpha/member-access/slot-offers/1001/respond': () => pendingResponse
+    }, responseableSession)
+  });
+
+  await waitFor(() => app.document.querySelector('[data-testid="member-access-slot-offer-accept-1001"]'));
+  click(app.window, app.document.querySelector('[data-testid="member-access-slot-offer-accept-1001"]'));
+
+  await waitFor(() => app.document.querySelector('[data-testid="member-access-slot-offer-accept-1001"]').disabled);
+  assert.equal(app.document.querySelector('[data-testid="member-access-slot-offer-decline-1001"]').disabled, true);
+  assert.equal(app.document.querySelector('[data-testid="member-access-slot-offer-accept-1003"]').disabled, true);
+  assert.equal(app.document.querySelector('[data-testid="member-access-slot-offer-decline-1003"]').disabled, true);
+  assert.equal(app.document.querySelector('[data-testid="member-access-slot-offer-note-1001"]').disabled, true);
+  assert.equal(app.document.querySelector('[data-testid="member-access-slot-offer-note-1003"]').disabled, true);
+
+  resolveResponse({
+    status: 200,
+    body: {
+      success: true,
+      offer: {
+        id: 1001,
+        bookingRequestId: 123,
+        offerStatus: 'accepted',
+        customerResponse: 'accepted',
+        customerRespondedAt: '2099-06-01T01:00:00.000Z'
+      }
+    }
+  });
+  await waitFor(() => app.document.querySelector('[data-testid="member-access-slot-offer-success"]'));
 });
 
 test('Member slot offer response UI - decline sends declined response', async () => {

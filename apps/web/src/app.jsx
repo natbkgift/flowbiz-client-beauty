@@ -7100,6 +7100,7 @@ function BookingRequestsPage() {
                           </div>
                           {offer.offerNote ? <p>{offer.offerNote}</p> : null}
                           {offer.internalNote ? <p className="muted">Internal: {offer.internalNote}</p> : null}
+                          {offer.customerResponseNote ? <p className="muted">Customer response: {offer.customerResponseNote}</p> : null}
                           <span className="muted">{formatDateTime(offer.createdAt)}</span>
                         </div>
                       ))

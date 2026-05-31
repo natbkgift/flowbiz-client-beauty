@@ -169,11 +169,12 @@ async function createOffer(pool, tenant, bookingId, leadId, memberId, overrides 
         offered_start_time,
         duration_minutes,
         offer_status,
+        customer_response_note,
         offer_note,
         internal_note,
         metadata_json
       )
-      values ($1, $2, $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12::jsonb)
+      values ($1, $2, $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12, $13::jsonb)
       returning id
     `,
     [
@@ -186,6 +187,7 @@ async function createOffer(pool, tenant, bookingId, leadId, memberId, overrides 
       overrides.offeredStartTime || '14:00',
       overrides.durationMinutes === undefined ? 60 : overrides.durationMinutes,
       overrides.offerStatus || 'ready_to_send',
+      overrides.customerResponseNote || 'raw public-hidden customer response note',
       overrides.offerNote || 'raw public-hidden offer note',
       overrides.internalNote || 'raw public-hidden internal note',
       JSON.stringify(overrides.metadata || { private: 'metadata-hidden' })
@@ -300,8 +302,8 @@ test('Member Slot Offer Response API - magic-link customer response', async (t) 
       searchParams: { token: tokenA }
     });
     const serialized = JSON.stringify(res.body.slotOffers);
-    assert.doesNotMatch(serialized, /offerNote|offer_note|internalNote|internal_note|metadata|createdByUserId|updatedByUserId|clinicId|leadId|memberId/);
-    assert.doesNotMatch(serialized, /raw public-hidden offer note|raw public-hidden internal note|metadata-hidden/);
+    assert.doesNotMatch(serialized, /offerNote|offer_note|internalNote|internal_note|customerResponseNote|customer_response_note|metadata|createdByUserId|updatedByUserId|clinicId|leadId|memberId/);
+    assert.doesNotMatch(serialized, /raw public-hidden offer note|raw public-hidden internal note|raw public-hidden customer response note|metadata-hidden/);
   });
 
   await t.test('4. Respond endpoint rejects public tenant/member/lead selectors', async () => {
@@ -513,6 +515,7 @@ test('Member Slot Offer Response API - magic-link customer response', async (t) 
       'id',
       'offerStatus'
     ]);
+    assert.doesNotMatch(JSON.stringify(res.body), /customerResponseNote|customer_response_note|not available/);
   });
 
   await t.test('20. No confirmed appointment table created or used', async () => {
