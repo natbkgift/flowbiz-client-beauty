@@ -480,11 +480,13 @@ test('Admin Offerings UI - creates promotion and package from tabs', async () =>
   setInputValue(app.document.querySelector('[data-testid="clinic-offerings-promotion-title"]'), 'VIP Promo', app.window);
   submitForm(app.document.querySelector('[data-testid="clinic-offerings-promotion-form"]'), app.window);
   await waitFor(() => app.requests.some((item) => item.method === 'POST' && item.url.pathname === '/admin/clinic-offerings/promotions'));
+  await waitFor(() => app.document.querySelector('[data-testid="clinic-offerings-page"]') && app.document.body.textContent.includes('เพิ่มโปรโมชั่นสำเร็จ'));
 
-  click(app.document.querySelector('[data-testid="clinic-offerings-tab-packages"]'), app.window);
-  await waitFor(() => app.document.querySelector('[data-testid="clinic-offerings-package-name"]'));
-  setInputValue(app.document.querySelector('[data-testid="clinic-offerings-package-name"]'), 'VIP Package', app.window);
-  setInputValue(app.document.querySelector('[data-testid="clinic-offerings-package-price"]'), '9900', app.window);
+  click(await waitFor(() => app.document.querySelector('[data-testid="clinic-offerings-tab-packages"]')), app.window);
+  const packageNameInput = await waitFor(() => app.document.querySelector('[data-testid="clinic-offerings-package-name"]'));
+  const packagePriceInput = await waitFor(() => app.document.querySelector('[data-testid="clinic-offerings-package-price"]'));
+  setInputValue(packageNameInput, 'VIP Package', app.window);
+  setInputValue(packagePriceInput, '9900', app.window);
   submitForm(app.document.querySelector('[data-testid="clinic-offerings-package-form"]'), app.window);
   await waitFor(() => app.requests.some((item) => item.method === 'POST' && item.url.pathname === '/admin/clinic-offerings/packages'));
 });
