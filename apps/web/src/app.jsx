@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { key: 'clinics', label: 'จัดการคลินิก', caption: 'เพิ่ม แก้ไข และควบคุมคลินิก' },
   { key: 'clinic-website', label: 'เว็บไซต์คลินิก', caption: 'ตั้งค่าเว็บ โลโก้ สี และหน้าแรก' },
   { key: 'clinic-offerings', label: 'บริการและแพ็กเกจ', caption: 'จัดการบริการ โปรโมชั่น และแพ็กเกจ' },
+  { key: 'booking-requests', label: 'คำขอนัดหมาย', caption: 'ติดตามคำขอนัดหมายจากหน้าเว็บ' },
   { key: 'unified-inbox', label: 'กล่องแชทรวม', caption: 'แชทโซเชียลและ AI co-pilot' },
   { key: 'roas-analytics', label: 'ROAS และสะสมแต้ม', caption: 'ค่าโฆษณา CAC และแนะนำเพื่อน' },
   { key: 'ai-agent-console', label: 'คอนโซล AI Agent', caption: 'กฎ Agent และคิว HITL' },
@@ -590,6 +591,25 @@ function createApiClient(apiBaseUrl) {
     },
     reorderClinicPackageServices(session, packageId, body) {
       return request(`/admin/clinic-offerings/packages/${packageId}/services/reorder`, { ...session, method: 'PATCH', body });
+    },
+    listBookingRequests(session, params = {}) {
+      const search = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          search.set(key, value);
+        }
+      });
+      const suffix = search.toString() ? `?${search.toString()}` : '';
+      return request(`/admin/booking-requests${suffix}`, session);
+    },
+    getBookingRequest(session, requestId) {
+      return request(`/admin/booking-requests/${requestId}`, session);
+    },
+    updateBookingRequestStatus(session, requestId, body) {
+      return request(`/admin/booking-requests/${requestId}/status`, { ...session, method: 'PATCH', body });
+    },
+    addBookingRequestNote(session, requestId, body) {
+      return request(`/admin/booking-requests/${requestId}/notes`, { ...session, method: 'POST', body });
     }
   };
 }
@@ -6329,6 +6349,443 @@ function ClinicWebsiteEditorPage() {
   );
 }
 
+const BOOKING_REQUEST_STATUS_OPTIONS = [
+  { value: '', label: 'ทุกสถานะ' },
+  { value: 'new', label: 'ใหม่' },
+  { value: 'contacted', label: 'ติดต่อแล้ว' },
+  { value: 'confirmed', label: 'ยืนยันแล้ว' },
+  { value: 'cancelled', label: 'ยกเลิก' },
+  { value: 'closed', label: 'ปิดงาน' }
+];
+
+const BOOKING_REQUEST_TYPE_OPTIONS = [
+  { value: '', label: 'ทุกประเภทคำขอ' },
+  { value: 'consultation', label: 'ปรึกษา' },
+  { value: 'booking_request', label: 'ขอนัดหมาย' },
+  { value: 'follow_up', label: 'ติดตามผล' }
+];
+
+const BOOKING_INTEREST_TYPE_OPTIONS = [
+  { value: '', label: 'ทุกความสนใจ' },
+  { value: 'general', label: 'ทั่วไป' },
+  { value: 'service', label: 'บริการ' },
+  { value: 'promotion', label: 'โปรโมชั่น' },
+  { value: 'package', label: 'แพ็กเกจ' }
+];
+
+function bookingStatusLabel(status) {
+  return BOOKING_REQUEST_STATUS_OPTIONS.find((option) => option.value === status)?.label || status || '-';
+}
+
+function bookingRequestTypeLabel(requestType) {
+  return BOOKING_REQUEST_TYPE_OPTIONS.find((option) => option.value === requestType)?.label || requestType || '-';
+}
+
+function bookingInterestTypeLabel(interestType) {
+  return BOOKING_INTEREST_TYPE_OPTIONS.find((option) => option.value === interestType)?.label || interestType || '-';
+}
+
+function BookingRequestsPage() {
+  const api = useApi();
+  const sessionOptions = useSessionRequestOptions();
+  const { session } = useTenant();
+  const normalizedRole = session?.currentMembership?.role || '';
+  const role = session?.currentMembership?.legacyRole || normalizedRole;
+  const canManage = ['owner', 'manager', 'marketing', 'sales', 'admin'].includes(role) || normalizedRole === 'admin';
+  const [filterDraft, setFilterDraft] = useState({
+    status: '',
+    requestType: '',
+    interestType: '',
+    dateFrom: '',
+    dateTo: ''
+  });
+  const [appliedFilters, setAppliedFilters] = useState(filterDraft);
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [selectedId, setSelectedId] = useState(null);
+  const [detailState, setDetailState] = useState({ status: 'idle', data: null, error: null });
+  const [selectedStatus, setSelectedStatus] = useState('new');
+  const [noteText, setNoteText] = useState('');
+  const [notice, setNotice] = useState(null);
+  const [permissionError, setPermissionError] = useState(null);
+
+  const [listState] = usePageData(
+    () => api.listBookingRequests(sessionOptions, { ...appliedFilters, limit: 50, offset: 0 }),
+    [
+      api,
+      sessionOptions,
+      appliedFilters.status,
+      appliedFilters.requestType,
+      appliedFilters.interestType,
+      appliedFilters.dateFrom,
+      appliedFilters.dateTo,
+      refreshToken
+    ]
+  );
+
+  async function loadDetail(requestId, options = {}) {
+    setSelectedId(requestId);
+    setPermissionError(null);
+    if (!options.keepNotice) {
+      setNotice(null);
+    }
+    setDetailState({ status: 'loading', data: null, error: null });
+
+    try {
+      const data = await api.getBookingRequest(sessionOptions, requestId);
+      setDetailState({ status: 'ready', data, error: null });
+      setSelectedStatus(data.status || 'new');
+      setNoteText('');
+    } catch (error) {
+      if (error.status === 403) {
+        setPermissionError('คุณไม่มีสิทธิ์จัดการคำขอนัดหมายนี้');
+      }
+      setDetailState({ status: 'error', data: null, error });
+    }
+  }
+
+  function applyFilters(event) {
+    event.preventDefault();
+    setSelectedId(null);
+    setDetailState({ status: 'idle', data: null, error: null });
+    setAppliedFilters({ ...filterDraft });
+  }
+
+  function updateDraftField(fieldName, value) {
+    setFilterDraft((current) => ({ ...current, [fieldName]: value }));
+  }
+
+  function renderPermissionError() {
+    if (!permissionError) return null;
+    return (
+      <Card variant="notice" className="error-card" data-testid="booking-request-permission-error">
+        <h3 className="section-heading">คุณไม่มีสิทธิ์จัดการคำขอนัดหมายนี้</h3>
+        <p className="muted">กรุณาใช้บัญชี Owner, Manager, Marketing หรือ Sales</p>
+      </Card>
+    );
+  }
+
+  function handleActionError(error) {
+    if (error.status === 403) {
+      setPermissionError('คุณไม่มีสิทธิ์จัดการคำขอนัดหมายนี้');
+      setNotice({ kind: 'error', message: 'คุณไม่มีสิทธิ์จัดการคำขอนัดหมายนี้' });
+      return;
+    }
+
+    setNotice({ kind: 'error', message: describeError(error) });
+  }
+
+  async function saveStatus() {
+    if (!selectedId || !detailState.data) return;
+    setPermissionError(null);
+    setNotice(null);
+
+    if (!canManage) {
+      setPermissionError('คุณไม่มีสิทธิ์จัดการคำขอนัดหมายนี้');
+      setNotice({ kind: 'error', message: 'บัญชีนี้ดูคำขอนัดหมายได้ แต่ไม่สามารถเปลี่ยนสถานะได้' });
+      return;
+    }
+
+    try {
+      await api.updateBookingRequestStatus(sessionOptions, selectedId, { status: selectedStatus });
+      setNotice({ kind: 'success', message: 'อัปเดตสถานะคำขอนัดหมายแล้ว' });
+      setRefreshToken((value) => value + 1);
+      await loadDetail(selectedId, { keepNotice: true });
+    } catch (error) {
+      handleActionError(error);
+    }
+  }
+
+  async function saveNote(event) {
+    event.preventDefault();
+    if (!selectedId || !detailState.data) return;
+    setPermissionError(null);
+    setNotice(null);
+
+    if (!canManage) {
+      setPermissionError('คุณไม่มีสิทธิ์จัดการคำขอนัดหมายนี้');
+      setNotice({ kind: 'error', message: 'บัญชีนี้ดูคำขอนัดหมายได้ แต่ไม่สามารถเปลี่ยนสถานะได้' });
+      return;
+    }
+
+    const note = noteText.trim();
+    if (!note) {
+      setNotice({ kind: 'error', message: 'กรุณาระบุ note ก่อนบันทึก' });
+      return;
+    }
+
+    try {
+      await api.addBookingRequestNote(sessionOptions, selectedId, { note });
+      setNotice({ kind: 'success', message: 'บันทึก note แล้ว' });
+      setNoteText('');
+      await loadDetail(selectedId, { keepNotice: true });
+    } catch (error) {
+      handleActionError(error);
+    }
+  }
+
+  if (listState.status === 'loading' || listState.status === 'idle') {
+    return <LoadingCard label="กำลังโหลดคำขอนัดหมาย..." />;
+  }
+
+  if (listState.status === 'error') {
+    if (listState.error?.status === 403) {
+      return (
+        <PageShell title="คำขอนัดหมาย" intro="ติดตามคำขอนัดหมายจากหน้าเว็บคลินิก">
+          <Card variant="notice" className="error-card" data-testid="booking-request-permission-error">
+            <h3 className="section-heading">คุณไม่มีสิทธิ์จัดการคำขอนัดหมายนี้</h3>
+            <p className="muted">กรุณาใช้บัญชี Owner, Manager, Marketing หรือ Sales</p>
+          </Card>
+        </PageShell>
+      );
+    }
+    return <ErrorCard error={listState.error} />;
+  }
+
+  const items = listState.data?.items || [];
+  const detail = detailState.data;
+
+  return (
+    <PageShell
+      title="คำขอนัดหมาย"
+      intro="ดูคำขอจากหน้าเว็บคลินิก กรองรายการ เปิดรายละเอียด และอัปเดตสถานะการติดตาม"
+    >
+      <div className="booking-requests-page" data-testid="booking-requests-page">
+        {notice?.kind === 'success' ? (
+          <div className="alert-banner success" data-testid="booking-request-success">{notice.message}</div>
+        ) : null}
+        {notice?.kind === 'error' ? (
+          <div className="alert-banner error" data-testid="booking-request-error">{notice.message}</div>
+        ) : null}
+        {renderPermissionError()}
+
+        {!canManage ? (
+          <Card variant="notice" className="notice-card" data-testid="booking-request-readonly-notice">
+            <h3 className="section-heading">โหมดอ่านอย่างเดียว</h3>
+            <p className="muted">บัญชีนี้ดูคำขอนัดหมายได้ แต่ไม่สามารถเปลี่ยนสถานะได้</p>
+          </Card>
+        ) : null}
+
+        <Card variant="section" className="section-card">
+          <form className="booking-requests-filters" data-testid="booking-requests-filters" onSubmit={applyFilters}>
+            <label className="field">
+              <span>สถานะ</span>
+              <select
+                value={filterDraft.status}
+                onChange={(event) => updateDraftField('status', event.target.value)}
+                data-testid="booking-requests-status-filter"
+              >
+                {BOOKING_REQUEST_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value || 'all-status'} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>ประเภทคำขอ</span>
+              <select
+                value={filterDraft.requestType}
+                onChange={(event) => updateDraftField('requestType', event.target.value)}
+                data-testid="booking-requests-request-type-filter"
+              >
+                {BOOKING_REQUEST_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value || 'all-request-type'} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>ความสนใจ</span>
+              <select
+                value={filterDraft.interestType}
+                onChange={(event) => updateDraftField('interestType', event.target.value)}
+                data-testid="booking-requests-interest-type-filter"
+              >
+                {BOOKING_INTEREST_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value || 'all-interest-type'} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>สร้างตั้งแต่วันที่</span>
+              <input
+                type="date"
+                value={filterDraft.dateFrom}
+                onChange={(event) => updateDraftField('dateFrom', event.target.value)}
+                data-testid="booking-requests-date-from"
+              />
+            </label>
+            <label className="field">
+              <span>สร้างถึงวันที่</span>
+              <input
+                type="date"
+                value={filterDraft.dateTo}
+                onChange={(event) => updateDraftField('dateTo', event.target.value)}
+                data-testid="booking-requests-date-to"
+              />
+            </label>
+            <div className="booking-filter-actions">
+              <Button type="submit" data-testid="booking-requests-filter-submit">ค้นหา</Button>
+            </div>
+          </form>
+        </Card>
+
+        <div className="booking-requests-layout">
+          <Card variant="section" className="section-card">
+            <div className="split-header compact-gap">
+              <div>
+                <h3 className="section-heading">รายการคำขอ</h3>
+                <p className="muted">ทั้งหมด {listState.data?.total || 0} รายการ</p>
+              </div>
+              <button type="button" className="secondary-button" onClick={() => setRefreshToken((value) => value + 1)}>
+                รีเฟรช
+              </button>
+            </div>
+            {items.length === 0 ? (
+              <EmptyState title="ยังไม่มีคำขอนัดหมาย" message="เมื่อมีลูกค้าส่งคำขอจากหน้าเว็บ รายการจะปรากฏที่นี่" />
+            ) : (
+              <div className="table-shell">
+                <table className="data-table" data-testid="booking-requests-list">
+                  <thead>
+                    <tr>
+                      <th>ลูกค้า</th>
+                      <th>ประเภท</th>
+                      <th>วันที่ต้องการ</th>
+                      <th>ช่องทาง</th>
+                      <th>สถานะ</th>
+                      <th>สร้างเมื่อ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item) => (
+                      <tr
+                        key={item.id}
+                        className={String(selectedId) === String(item.id) ? 'selected-row' : ''}
+                        onClick={() => loadDetail(item.id)}
+                        data-testid={`booking-request-row-${item.id}`}
+                      >
+                        <td>
+                          <strong>{item.customerName || item.lead?.name || 'ไม่ระบุชื่อ'}</strong>
+                          <div className="muted">{item.phone || item.email || item.lineId || '-'}</div>
+                        </td>
+                        <td>
+                          {bookingRequestTypeLabel(item.requestType)}
+                          <div className="muted">{bookingInterestTypeLabel(item.interestType)}</div>
+                        </td>
+                        <td>{item.preferredDate || '-'}</td>
+                        <td>{item.preferredContactMethod || '-'}</td>
+                        <td><span className={`pill status-${item.status}`}>{bookingStatusLabel(item.status)}</span></td>
+                        <td>{formatDateTime(item.createdAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
+          <Card variant="section" className="section-card" data-testid="booking-request-detail">
+            {detailState.status === 'idle' ? (
+              <EmptyState title="เลือกรายการเพื่อดูรายละเอียด" message="คลิกคำขอนัดหมายจากตารางด้านซ้าย" />
+            ) : null}
+            {detailState.status === 'loading' ? <LoadingState label="กำลังโหลดรายละเอียดคำขอ..." /> : null}
+            {detailState.status === 'error' ? <ErrorCard error={detailState.error} /> : null}
+            {detailState.status === 'ready' && detail ? (
+              <div className="booking-request-detail-panel">
+                <div>
+                  <h3 className="section-heading">{detail.customerName || detail.lead?.name || 'ไม่ระบุชื่อ'}</h3>
+                  <p className="muted">คำขอ #{detail.id} / Lead #{detail.leadId || '-'}</p>
+                </div>
+                <dl className="booking-detail-grid">
+                  <div>
+                    <dt>โทรศัพท์</dt>
+                    <dd>{detail.phone || '-'}</dd>
+                  </div>
+                  <div>
+                    <dt>อีเมล</dt>
+                    <dd>{detail.email || '-'}</dd>
+                  </div>
+                  <div>
+                    <dt>LINE ID</dt>
+                    <dd>{detail.lineId || '-'}</dd>
+                  </div>
+                  <div>
+                    <dt>ประเภทคำขอ</dt>
+                    <dd>{bookingRequestTypeLabel(detail.requestType)}</dd>
+                  </div>
+                  <div>
+                    <dt>ความสนใจ</dt>
+                    <dd>{bookingInterestTypeLabel(detail.interestType)} {detail.interestId ? `#${detail.interestId}` : ''}</dd>
+                  </div>
+                  <div>
+                    <dt>เวลาที่ต้องการ</dt>
+                    <dd>{detail.preferredDate || '-'} / {detail.preferredTimeWindow || '-'}</dd>
+                  </div>
+                </dl>
+                {detail.message ? (
+                  <div className="booking-message-box">
+                    <h4 className="section-heading">ข้อความจากลูกค้า</h4>
+                    <p>{detail.message}</p>
+                  </div>
+                ) : null}
+
+                <div className="booking-status-editor">
+                  <label className="field">
+                    <span>สถานะคำขอ</span>
+                    <select
+                      value={selectedStatus}
+                      onChange={(event) => setSelectedStatus(event.target.value)}
+                      data-testid="booking-request-status-select"
+                      disabled={!canManage}
+                    >
+                      {BOOKING_REQUEST_STATUS_OPTIONS.filter((option) => option.value).map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <Button
+                    type="button"
+                    onClick={saveStatus}
+                    data-testid="booking-request-status-save"
+                    disabled={!canManage}
+                  >
+                    บันทึกสถานะ
+                  </Button>
+                </div>
+
+                <form className="booking-note-form" onSubmit={saveNote}>
+                  <label className="field">
+                    <span>Internal note / follow-up note</span>
+                    <textarea
+                      value={noteText}
+                      maxLength={1000}
+                      onChange={(event) => setNoteText(event.target.value)}
+                      data-testid="booking-request-note"
+                      disabled={!canManage}
+                    />
+                  </label>
+                  <Button type="submit" data-testid="booking-request-note-save" disabled={!canManage}>
+                    บันทึก note
+                  </Button>
+                </form>
+
+                {detail.notes?.length ? (
+                  <ul className="stack-list">
+                    {detail.notes.map((note) => (
+                      <li key={note.id} className="stack-item">
+                        <strong>{note.authorName || 'ทีมคลินิก'}</strong>
+                        <span>{note.content}</span>
+                        <span className="muted">{formatDateTime(note.createdAt)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
+          </Card>
+        </div>
+      </div>
+    </PageShell>
+  );
+}
+
 function renderPage(route) {
   switch (route?.key) {
     case 'clinics':
@@ -6337,6 +6794,8 @@ function renderPage(route) {
       return <ClinicWebsiteEditorPage />;
     case 'clinic-offerings':
       return <ClinicOfferingsAdminPage />;
+    case 'booking-requests':
+      return <BookingRequestsPage />;
     case 'unified-inbox':
       return <UnifiedInboxPage />;
     case 'roas-analytics':

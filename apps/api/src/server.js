@@ -422,7 +422,7 @@ async function routeRequest(request, response) {
     return;
   }
 
-  if (await handleBookingRequestRoutes(request, response, url, { parseJsonBody, json })) {
+  if (await handleBookingRequestRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
     return;
   }
 

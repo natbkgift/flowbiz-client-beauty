@@ -10,6 +10,7 @@ const VALID_REQUEST_TYPES = new Set(['consultation', 'booking_request', 'follow_
 const VALID_INTEREST_TYPES = new Set(['service', 'promotion', 'package', 'general']);
 const VALID_TIME_WINDOWS = new Set(['morning', 'afternoon', 'evening', 'anytime']);
 const VALID_CONTACT_METHODS = new Set(['phone', 'line', 'email', 'any']);
+const VALID_BOOKING_STATUSES = new Set(['new', 'contacted', 'confirmed', 'cancelled', 'closed']);
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function trimString(value, maxLength) {
@@ -31,6 +32,21 @@ function rejectClinicOverride(body) {
   }
 }
 
+function rejectAdminClinicOverride(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new AppError(400, 'INVALID_BOOKING_REQUEST_PAYLOAD', 'Request body must be a JSON object.');
+  }
+  if (body.clinicId !== undefined || body.clinic_id !== undefined) {
+    throw new AppError(400, 'INVALID_REQUEST', 'clinicId cannot be overridden for booking requests.');
+  }
+}
+
+function rejectAdminClinicOverrideQuery(searchParams) {
+  if (searchParams.has('clinicId') || searchParams.has('clinic_id')) {
+    throw new AppError(400, 'INVALID_REQUEST', 'clinicId cannot be overridden in the query string.');
+  }
+}
+
 function normalizeEnum(value, allowed, fallback, code, fieldName) {
   const normalized = trimString(value, 40) || fallback;
   if (!allowed.has(normalized)) {
@@ -46,6 +62,151 @@ function normalizeInterestId(value) {
     throw new AppError(400, 'INVALID_BOOKING_INTEREST', 'interestId must be a positive integer.');
   }
   return parsed;
+}
+
+function asPositiveInteger(value, fieldName) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new AppError(400, 'INVALID_QUERY', `${fieldName} must be a positive integer.`);
+  }
+  return parsed;
+}
+
+function asNonNegativeInteger(value, fallback, fieldName) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new AppError(400, 'INVALID_QUERY', `${fieldName} must be a non-negative integer.`);
+  }
+  return parsed;
+}
+
+function normalizeBookingStatus(value) {
+  const normalized = trimString(value, 40);
+  if (!normalized || !VALID_BOOKING_STATUSES.has(normalized)) {
+    throw new AppError(400, 'INVALID_BOOKING_REQUEST_STATUS', 'status is invalid.');
+  }
+  return normalized;
+}
+
+function normalizeDateBoundary(value, fieldName, options = {}) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string') {
+    throw new AppError(400, 'INVALID_QUERY', `${fieldName} must be a date or timestamp.`);
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const parsed = new Date(`${trimmed}T00:00:00.000Z`);
+    if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== trimmed) {
+      throw new AppError(400, 'INVALID_QUERY', `${fieldName} must be a valid date.`);
+    }
+    if (options.endExclusive) {
+      parsed.setUTCDate(parsed.getUTCDate() + 1);
+    }
+    return parsed.toISOString();
+  }
+
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) {
+    throw new AppError(400, 'INVALID_QUERY', `${fieldName} must be a valid date or timestamp.`);
+  }
+  return parsed.toISOString();
+}
+
+function normalizeAdminFilters(searchParams) {
+  rejectAdminClinicOverrideQuery(searchParams);
+
+  const requestType = trimString(searchParams.get('requestType'), 40);
+  if (requestType && !VALID_REQUEST_TYPES.has(requestType)) {
+    throw new AppError(400, 'INVALID_BOOKING_REQUEST_PAYLOAD', 'requestType is invalid.');
+  }
+
+  const interestType = trimString(searchParams.get('interestType'), 40);
+  if (interestType && !VALID_INTEREST_TYPES.has(interestType)) {
+    throw new AppError(400, 'INVALID_BOOKING_INTEREST', 'interestType is invalid.');
+  }
+
+  const status = trimString(searchParams.get('status'), 40);
+  if (status && !VALID_BOOKING_STATUSES.has(status)) {
+    throw new AppError(400, 'INVALID_BOOKING_REQUEST_STATUS', 'status is invalid.');
+  }
+
+  return {
+    status,
+    requestType,
+    interestType,
+    dateFrom: normalizeDateBoundary(searchParams.get('dateFrom'), 'dateFrom'),
+    dateTo: normalizeDateBoundary(searchParams.get('dateTo'), 'dateTo', { endExclusive: true }),
+    q: trimString(searchParams.get('q'), 120),
+    limit: Math.min(asPositiveInteger(searchParams.get('limit') || '50', 'limit'), 100),
+    offset: asNonNegativeInteger(searchParams.get('offset'), 0, 'offset')
+  };
+}
+
+function formatDateOnly(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
+function mapBookingRequestRow(row, options = {}) {
+  const lead = row.lead_id
+    ? {
+        id: Number(row.lead_id),
+        name: row.lead_full_name || null,
+        fullName: row.lead_full_name || null,
+        phone: row.lead_phone || null,
+        email: row.lead_email || null,
+        status: row.lead_status || null,
+        stage: row.lead_stage || null,
+        ownerUserId: row.lead_owner_user_id || null,
+        ownerName: row.lead_owner_name || null
+      }
+    : null;
+
+  return {
+    id: Number(row.id),
+    leadId: row.lead_id ? Number(row.lead_id) : null,
+    lead,
+    requestType: row.request_type,
+    interestType: row.interest_type,
+    interestId: row.interest_id ? Number(row.interest_id) : null,
+    preferredDate: formatDateOnly(row.preferred_date),
+    preferredTimeWindow: row.preferred_time_window || null,
+    preferredContactMethod: row.preferred_contact_method || null,
+    customerName: row.customer_name || null,
+    phone: row.phone || null,
+    email: row.email || null,
+    lineId: row.line_id || null,
+    message: options.includeMessage ? row.message || null : undefined,
+    status: row.status,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    notes: options.notes || undefined
+  };
+}
+
+function assertAdminContext(context) {
+  if (!context?.currentClinic?.id) {
+    throw new AppError(403, 'CLINIC_CONTEXT_REQUIRED', 'Clinic context is required.');
+  }
+}
+
+function normalizeBookingNotePayload(body) {
+  rejectAdminClinicOverride(body);
+  if (typeof body.note !== 'string') {
+    throw new AppError(400, 'INVALID_BOOKING_REQUEST_NOTE', 'note is required.');
+  }
+
+  const note = body.note.trim();
+  if (!note || note.length > 1000) {
+    throw new AppError(400, 'INVALID_BOOKING_REQUEST_NOTE', 'note must be between 1 and 1000 characters.');
+  }
+
+  return { note };
 }
 
 function todayDateString() {
@@ -465,7 +626,336 @@ async function createPublicBookingRequest(slug, body) {
   }
 }
 
+async function listAdminBookingRequests(context, searchParams) {
+  assertAdminContext(context);
+  const filters = normalizeAdminFilters(searchParams);
+  const values = [context.currentClinic.id];
+  const clauses = ['br.clinic_id = $1'];
+
+  if (filters.status) {
+    values.push(filters.status);
+    clauses.push(`br.status = $${values.length}`);
+  }
+
+  if (filters.requestType) {
+    values.push(filters.requestType);
+    clauses.push(`br.request_type = $${values.length}`);
+  }
+
+  if (filters.interestType) {
+    values.push(filters.interestType);
+    clauses.push(`br.interest_type = $${values.length}`);
+  }
+
+  if (filters.dateFrom) {
+    values.push(filters.dateFrom);
+    clauses.push(`br.created_at >= $${values.length}`);
+  }
+
+  if (filters.dateTo) {
+    values.push(filters.dateTo);
+    clauses.push(`br.created_at < $${values.length}`);
+  }
+
+  if (filters.q) {
+    values.push(`%${filters.q.toLowerCase()}%`);
+    clauses.push(`(
+      lower(coalesce(br.customer_name, '')) like $${values.length}
+      or lower(coalesce(br.phone, '')) like $${values.length}
+      or lower(coalesce(br.email, '')) like $${values.length}
+      or lower(coalesce(br.line_id, '')) like $${values.length}
+      or lower(coalesce(l.full_name, '')) like $${values.length}
+    )`);
+  }
+
+  values.push(filters.limit);
+  const limitPosition = values.length;
+  values.push(filters.offset);
+  const offsetPosition = values.length;
+
+  const result = await getPool().query(
+    `
+      select
+        br.*,
+        l.full_name as lead_full_name,
+        l.phone as lead_phone,
+        l.email as lead_email,
+        l.status as lead_status,
+        l.stage as lead_stage,
+        l.owner_user_id as lead_owner_user_id,
+        u.name as lead_owner_name,
+        count(*) over()::int as total_count
+      from clinic_booking_requests br
+      left join leads l on l.clinic_id = br.clinic_id and l.id = br.lead_id
+      left join users u on u.id = l.owner_user_id
+      where ${clauses.join(' and ')}
+      order by br.created_at desc, br.id desc
+      limit $${limitPosition}
+      offset $${offsetPosition}
+    `,
+    values
+  );
+
+  return {
+    items: result.rows.map((row) => mapBookingRequestRow(row)),
+    total: result.rows[0]?.total_count || 0,
+    limit: filters.limit,
+    offset: filters.offset
+  };
+}
+
+async function getAdminBookingRequestDetail(context, bookingRequestId, client = getPool()) {
+  assertAdminContext(context);
+  const normalizedId = asPositiveInteger(bookingRequestId, 'bookingRequestId');
+  const result = await client.query(
+    `
+      select
+        br.*,
+        l.full_name as lead_full_name,
+        l.phone as lead_phone,
+        l.email as lead_email,
+        l.status as lead_status,
+        l.stage as lead_stage,
+        l.owner_user_id as lead_owner_user_id,
+        u.name as lead_owner_name
+      from clinic_booking_requests br
+      left join leads l on l.clinic_id = br.clinic_id and l.id = br.lead_id
+      left join users u on u.id = l.owner_user_id
+      where br.clinic_id = $1 and br.id = $2
+      limit 1
+    `,
+    [context.currentClinic.id, normalizedId]
+  );
+
+  if (result.rowCount === 0) {
+    throw new AppError(404, 'BOOKING_REQUEST_NOT_FOUND', 'Booking request not found.');
+  }
+
+  const row = result.rows[0];
+  let notes = [];
+
+  if (row.lead_id) {
+    const notesResult = await client.query(
+      `
+        select
+          ln.id,
+          ln.note_type,
+          ln.content,
+          ln.created_at,
+          ln.updated_at,
+          u.id as author_user_id,
+          u.name as author_name
+        from lead_notes ln
+        left join users u on u.id = ln.author_user_id
+        where ln.clinic_id = $1
+          and ln.lead_id = $2
+          and ln.note_type = 'booking_request_internal'
+        order by ln.created_at asc, ln.id asc
+      `,
+      [context.currentClinic.id, row.lead_id]
+    );
+
+    notes = notesResult.rows.map((noteRow) => ({
+      id: Number(noteRow.id),
+      noteType: noteRow.note_type,
+      content: noteRow.content,
+      authorUserId: noteRow.author_user_id || null,
+      authorName: noteRow.author_name || null,
+      createdAt: noteRow.created_at,
+      updatedAt: noteRow.updated_at
+    }));
+  }
+
+  return mapBookingRequestRow(row, { includeMessage: true, notes });
+}
+
+async function updateAdminBookingRequestStatus(context, bookingRequestId, body) {
+  assertAdminContext(context);
+  rejectAdminClinicOverride(body);
+  const normalizedId = asPositiveInteger(bookingRequestId, 'bookingRequestId');
+  const nextStatus = normalizeBookingStatus(body.status);
+  const client = await getPool().connect();
+  let committed = false;
+
+  try {
+    await client.query('begin');
+    const existingResult = await client.query(
+      `
+        select id, clinic_id, lead_id, status
+        from clinic_booking_requests
+        where clinic_id = $1 and id = $2
+        for update
+      `,
+      [context.currentClinic.id, normalizedId]
+    );
+
+    if (existingResult.rowCount === 0) {
+      throw new AppError(404, 'BOOKING_REQUEST_NOT_FOUND', 'Booking request not found.');
+    }
+
+    const existing = existingResult.rows[0];
+    const updateResult = await client.query(
+      `
+        update clinic_booking_requests
+        set status = $3,
+            updated_at = now()
+        where clinic_id = $1 and id = $2
+        returning id, lead_id, status
+      `,
+      [context.currentClinic.id, normalizedId, nextStatus]
+    );
+
+    if (updateResult.rowCount === 0) {
+      throw new AppError(404, 'BOOKING_REQUEST_NOT_FOUND', 'Booking request not found.');
+    }
+
+    const summary = {
+      source: 'admin_booking_request_queue',
+      bookingRequestId: normalizedId,
+      leadId: existing.lead_id ? Number(existing.lead_id) : null,
+      fromStatus: existing.status,
+      toStatus: nextStatus,
+      changedFields: ['status']
+    };
+
+    if (existing.lead_id) {
+      await client.query(
+        `
+          insert into lead_activity (clinic_id, lead_id, event_type, event_data_json)
+          values ($1, $2, 'booking_request.status_changed', $3::jsonb)
+        `,
+        [context.currentClinic.id, existing.lead_id, JSON.stringify({ summary })]
+      );
+    }
+
+    await recordAuditLog(
+      {
+        clinicId: context.currentClinic.id,
+        entityType: 'clinic_booking_request',
+        entityId: normalizedId,
+        actionType: 'clinic_booking_request.status_changed',
+        actorUserId: context.currentUser?.id || null,
+        contextJson: { summary }
+      },
+      client
+    );
+
+    await client.query('commit');
+    committed = true;
+  } catch (error) {
+    if (!committed) {
+      await client.query('rollback').catch(() => {});
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return {
+    success: true,
+    item: await getAdminBookingRequestDetail(context, normalizedId)
+  };
+}
+
+async function addAdminBookingRequestNote(context, bookingRequestId, body) {
+  assertAdminContext(context);
+  const normalizedId = asPositiveInteger(bookingRequestId, 'bookingRequestId');
+  const normalized = normalizeBookingNotePayload(body);
+  const client = await getPool().connect();
+  let committed = false;
+  let noteId = null;
+
+  try {
+    await client.query('begin');
+    const existingResult = await client.query(
+      `
+        select id, lead_id
+        from clinic_booking_requests
+        where clinic_id = $1 and id = $2
+        for update
+      `,
+      [context.currentClinic.id, normalizedId]
+    );
+
+    if (existingResult.rowCount === 0) {
+      throw new AppError(404, 'BOOKING_REQUEST_NOT_FOUND', 'Booking request not found.');
+    }
+
+    const existing = existingResult.rows[0];
+    if (!existing.lead_id) {
+      throw new AppError(400, 'INVALID_BOOKING_REQUEST_NOTE', 'Booking request is not linked to a lead.');
+    }
+
+    const noteResult = await client.query(
+      `
+        insert into lead_notes (clinic_id, lead_id, author_user_id, note_type, content)
+        values ($1, $2, $3, 'booking_request_internal', $4)
+        returning id
+      `,
+      [context.currentClinic.id, existing.lead_id, context.currentUser?.id || null, normalized.note]
+    );
+    noteId = Number(noteResult.rows[0].id);
+
+    await client.query(
+      `
+        insert into notes (clinic_id, entity_type, entity_id, author_user_id, note_type, content)
+        values ($1, 'lead', $2, $3, 'booking_request_internal', $4)
+      `,
+      [context.currentClinic.id, existing.lead_id, context.currentUser?.id || null, normalized.note]
+    );
+
+    const summary = {
+      source: 'admin_booking_request_queue',
+      bookingRequestId: normalizedId,
+      leadId: Number(existing.lead_id),
+      noteProvided: true
+    };
+
+    await client.query(
+      `
+        insert into lead_activity (clinic_id, lead_id, event_type, event_data_json)
+        values ($1, $2, 'booking_request.note_added', $3::jsonb)
+      `,
+      [context.currentClinic.id, existing.lead_id, JSON.stringify({ summary })]
+    );
+
+    await recordAuditLog(
+      {
+        clinicId: context.currentClinic.id,
+        entityType: 'clinic_booking_request',
+        entityId: normalizedId,
+        actionType: 'clinic_booking_request.note_added',
+        actorUserId: context.currentUser?.id || null,
+        contextJson: { summary }
+      },
+      client
+    );
+
+    await client.query('commit');
+    committed = true;
+  } catch (error) {
+    if (!committed) {
+      await client.query('rollback').catch(() => {});
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return {
+    success: true,
+    noteId,
+    item: await getAdminBookingRequestDetail(context, normalizedId)
+  };
+}
+
 module.exports = {
   createPublicBookingRequest,
-  validateBookingRequestPayload
+  validateBookingRequestPayload,
+  listAdminBookingRequests,
+  getAdminBookingRequestDetail,
+  updateAdminBookingRequestStatus,
+  addAdminBookingRequestNote,
+  normalizeAdminFilters,
+  normalizeBookingNotePayload
 };

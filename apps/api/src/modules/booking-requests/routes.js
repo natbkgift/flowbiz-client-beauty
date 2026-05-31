@@ -3,10 +3,77 @@
 const { matchPath } = require('../../common/routing');
 const { checkRateLimit } = require('../../common/rate-limiter');
 const { AppError } = require('../../common/errors');
-const { createPublicBookingRequest } = require('./service');
+const {
+  createPublicBookingRequest,
+  listAdminBookingRequests,
+  getAdminBookingRequestDetail,
+  updateAdminBookingRequestStatus,
+  addAdminBookingRequestNote
+} = require('./service');
+
+function assertClinicContext(context) {
+  if (!context?.currentClinic?.id) {
+    throw new AppError(403, 'CLINIC_CONTEXT_REQUIRED', 'Clinic context is required.');
+  }
+}
+
+function getBookingQueueRole(context) {
+  return context.currentMembership?.legacyRole || context.currentMembership?.role;
+}
+
+function assertReadPermission(context) {
+  assertClinicContext(context);
+  const role = getBookingQueueRole(context);
+  const normalizedRole = context.currentMembership?.role;
+  if (!['owner', 'manager', 'marketing', 'sales', 'staff', 'admin', 'operator'].includes(role) && !['admin', 'operator'].includes(normalizedRole)) {
+    throw new AppError(403, 'BOOKING_REQUEST_PERMISSION_DENIED', 'Booking request read permission is required.');
+  }
+}
+
+function assertManagePermission(context) {
+  assertClinicContext(context);
+  const role = getBookingQueueRole(context);
+  const normalizedRole = context.currentMembership?.role;
+  if (!['owner', 'manager', 'marketing', 'sales', 'admin'].includes(role) && normalizedRole !== 'admin') {
+    throw new AppError(403, 'BOOKING_REQUEST_PERMISSION_DENIED', 'Booking request management permission is required.');
+  }
+}
 
 async function handleBookingRequestRoutes(request, response, url, tools) {
-  const { parseJsonBody, json } = tools;
+  const { authenticateRequest, parseJsonBody, json } = tools;
+
+  if (url.pathname === '/admin/booking-requests' && request.method === 'GET') {
+    const context = await authenticateRequest(request);
+    assertReadPermission(context);
+    const result = await listAdminBookingRequests(context, url.searchParams);
+    return json(response, 200, result);
+  }
+
+  const adminDetailParams = matchPath(url.pathname, '/admin/booking-requests/:id');
+  if (adminDetailParams && request.method === 'GET') {
+    const context = await authenticateRequest(request);
+    assertReadPermission(context);
+    const result = await getAdminBookingRequestDetail(context, adminDetailParams.id);
+    return json(response, 200, result);
+  }
+
+  const adminStatusParams = matchPath(url.pathname, '/admin/booking-requests/:id/status');
+  if (adminStatusParams && request.method === 'PATCH') {
+    const context = await authenticateRequest(request);
+    assertManagePermission(context);
+    const body = await parseJsonBody(request);
+    const result = await updateAdminBookingRequestStatus(context, adminStatusParams.id, body);
+    return json(response, 200, result);
+  }
+
+  const adminNoteParams = matchPath(url.pathname, '/admin/booking-requests/:id/notes');
+  if (adminNoteParams && request.method === 'POST') {
+    const context = await authenticateRequest(request);
+    assertManagePermission(context);
+    const body = await parseJsonBody(request);
+    const result = await addAdminBookingRequestNote(context, adminNoteParams.id, body);
+    return json(response, 201, result);
+  }
 
   const publicParams = matchPath(url.pathname, '/public/clinics/:slug/booking-requests');
   if (!publicParams || request.method !== 'POST') {
