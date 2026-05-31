@@ -5,6 +5,11 @@ const { getPool } = require('../../db');
 const { AppError } = require('../../common/errors');
 const { recordAuditLog } = require('../audit/service');
 const { resolvePublicClinicBySlug } = require('../public-content/clinic-resolver');
+const {
+  findOrCreateMemberForPublicIntake,
+  linkLeadToMember,
+  linkBookingRequestToMember
+} = require('../members/service');
 
 const VALID_REQUEST_TYPES = new Set(['consultation', 'booking_request', 'follow_up']);
 const VALID_INTEREST_TYPES = new Set(['service', 'promotion', 'package', 'general']);
@@ -174,6 +179,7 @@ function mapBookingRequestRow(row, options = {}) {
   return {
     id: Number(row.id),
     leadId: row.lead_id ? Number(row.lead_id) : null,
+    memberId: row.member_id ? Number(row.member_id) : null,
     lead,
     requestType: row.request_type,
     interestType: row.interest_type,
@@ -576,11 +582,46 @@ async function createPublicBookingRequest(slug, body) {
     );
 
     const bookingRequestId = Number(requestResult.rows[0].id);
+    const memberLink = await findOrCreateMemberForPublicIntake(
+      {
+        clinicId: scope.clinicId,
+        leadId: leadLink.leadId,
+        bookingRequestId,
+        name: normalized.name,
+        phone: normalized.phone,
+        email: normalized.email,
+        lineId: normalized.lineId,
+        source: 'public_booking_request',
+        consentSummary: {
+          consentAccepted: true,
+          source: 'public_booking_request'
+        }
+      },
+      client
+    );
+    await linkLeadToMember(
+      {
+        clinicId: scope.clinicId,
+        leadId: leadLink.leadId,
+        memberId: memberLink.member.id
+      },
+      client
+    );
+    await linkBookingRequestToMember(
+      {
+        clinicId: scope.clinicId,
+        bookingRequestId,
+        memberId: memberLink.member.id
+      },
+      client
+    );
+
     const summary = {
       source: 'public_booking_request',
       clinicId: scope.clinicId,
       bookingRequestId,
       leadId: leadLink.leadId,
+      memberId: memberLink.member.id,
       leadCreated: leadLink.created,
       requestType: normalized.requestType,
       interestType: interest.interestType,
