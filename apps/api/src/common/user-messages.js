@@ -162,6 +162,13 @@ const THAI_ERROR_MESSAGES = {
   MEMBER_NOT_FOUND: 'ไม่พบสมาชิกที่ต้องการ',
   MEMBER_PERMISSION_DENIED: 'คุณไม่มีสิทธิ์จัดการข้อมูลสมาชิกนี้',
   INVALID_MEMBER_PROFILE: 'ข้อมูลโปรไฟล์สมาชิกต้องเป็น JSON object เท่านั้น',
+  INVALID_MEMBER_ACCESS_PAYLOAD: 'ข้อมูลขอเข้าใช้งานสมาชิกไม่ครบถ้วนหรือไม่ถูกต้อง',
+  MEMBER_ACCESS_CONTACT_REQUIRED: 'กรุณาระบุอีเมล เบอร์โทรศัพท์ หรือ LINE ID สำหรับขอลิงก์เข้าใช้งาน',
+  INVALID_MEMBER_ACCESS_EMAIL: 'รูปแบบอีเมลสำหรับขอลิงก์เข้าใช้งานไม่ถูกต้อง',
+  INVALID_MEMBER_ACCESS_CHANNEL: 'ช่องทางรับลิงก์เข้าใช้งานไม่ถูกต้อง',
+  INVALID_MEMBER_ACCESS_TOKEN: 'ลิงก์เข้าใช้งานไม่ถูกต้องหรือไม่พร้อมใช้งาน',
+  MEMBER_ACCESS_TOKEN_EXPIRED: 'ลิงก์เข้าใช้งานหมดอายุแล้ว กรุณาขอลิงก์ใหม่',
+  MEMBER_ACCESS_FORBIDDEN: 'ไม่สามารถเข้าใช้งานข้อมูลสมาชิกนี้ได้',
   INTERNAL_SERVER_ERROR: 'ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง'
 };
 

@@ -178,6 +178,34 @@ async function submitPublicClinicBookingRequest(slug, payload) {
   return data;
 }
 
+async function requestMemberAccessLink(slug, payload) {
+  const response = await fetch(`${API_BASE}/public/clinics/${encodeURIComponent(slug)}/member-access/request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const code = data?.error?.code || 'MEMBER_ACCESS_REQUEST_FAILED';
+    const message = data?.error?.message || 'ขอลิงก์เข้าใช้งานไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+    throw new Error(`${code}: ${message}`);
+  }
+  return data;
+}
+
+async function verifyMemberAccessToken(slug, token) {
+  const response = await fetch(`${API_BASE}/public/clinics/${encodeURIComponent(slug)}/member-access/session?token=${encodeURIComponent(token)}`, {
+    headers: { 'Content-Type': 'application/json' }
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const code = data?.error?.code || 'INVALID_MEMBER_ACCESS_TOKEN';
+    const message = data?.error?.message || 'ลิงก์เข้าใช้งานไม่ถูกต้องหรือหมดอายุ';
+    throw new Error(`${code}: ${message}`);
+  }
+  return data;
+}
+
 async function apiFetch(path, options = {}) {
   const pathWithContext = withPublicClinicContext(path);
   try {
@@ -337,6 +365,16 @@ function openExternalUrl(url) {
   }
 }
 
+function parseHashRoute(route) {
+  const raw = route || '#/';
+  const withoutHash = raw.startsWith('#') ? raw.slice(1) : raw;
+  const [pathname = '/', query = ''] = withoutHash.split('?');
+  return {
+    pathname: pathname || '/',
+    searchParams: new URLSearchParams(query)
+  };
+}
+
 function formatThaiMoney(value, currency = 'THB') {
   const prefix = currency === 'THB' ? '฿' : `${currency} `;
   return `${prefix}${new Intl.NumberFormat('th-TH').format(Number(value || 0))}`;
@@ -469,7 +507,7 @@ export function App() {
 
   const renderPage = () => {
     if (clinicSlug) {
-      return <ClinicPublicShell clinicSlug={clinicSlug} />;
+      return <ClinicPublicShell clinicSlug={clinicSlug} currentRoute={currentRoute} />;
     }
 
     if (pathname === '/blog') {
@@ -567,7 +605,10 @@ export function App() {
         <nav>
           <ul className={clinicSlug ? 'nav-links' : 'nav-links saas-nav-links'}>
             {clinicSlug ? (
-              <li><a href={`/${clinicSlug}`} className="active">หน้าแรก</a></li>
+              <>
+                <li><a href={`/${clinicSlug}`} className={parseHashRoute(currentRoute).pathname === '/' ? 'active' : ''}>หน้าแรก</a></li>
+                <li><a href={`/${clinicSlug}#/member-access`} className={parseHashRoute(currentRoute).pathname === '/member-access' ? 'active' : ''}>สถานะของฉัน</a></li>
+              </>
             ) : (
               <>
                 <li><a href="/" className={pathname === '/' ? 'active' : ''}>หน้าแรก</a></li>
@@ -1164,6 +1205,186 @@ function ClinicWebsiteTemplate({ data, clinicSlug, offerings = {}, offeringsStat
 
       <ClinicFinalCta contactSettings={contactSettings} />
     </div>
+  );
+}
+
+function MemberAccessPage({ clinicSlug }) {
+  const hashInfo = parseHashRoute(window.location.hash || '#/member-access');
+  const pageToken = hashInfo.searchParams.get('token') || new URLSearchParams(window.location.search).get('token') || '';
+  const [contact, setContact] = useState('');
+  const [channel, setChannel] = useState('email');
+  const [honeypot, setHoneypot] = useState('');
+  const [status, setStatus] = useState({ type: 'idle', message: '' });
+  const [session, setSession] = useState(null);
+  const [tokenError, setTokenError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    async function verify() {
+      if (!pageToken) return;
+      setTokenError('');
+      setSession(null);
+      try {
+        const result = await verifyMemberAccessToken(clinicSlug, pageToken);
+        if (!active) return;
+        setSession(result);
+      } catch (err) {
+        if (!active) return;
+        setTokenError(err.message);
+      }
+    }
+    verify();
+    return () => {
+      active = false;
+    };
+  }, [clinicSlug, pageToken]);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setStatus({ type: 'idle', message: '' });
+
+    const trimmedContact = contact.trim();
+    if (!trimmedContact) {
+      setStatus({ type: 'error', message: 'กรุณาระบุช่องทางติดต่อสำหรับรับลิงก์' });
+      return;
+    }
+    if (!channel) {
+      setStatus({ type: 'error', message: 'กรุณาเลือกช่องทางรับลิงก์' });
+      return;
+    }
+    if (channel === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedContact)) {
+      setStatus({ type: 'error', message: 'รูปแบบอีเมลไม่ถูกต้อง' });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const result = await requestMemberAccessLink(clinicSlug, {
+        contact: trimmedContact,
+        channel,
+        honeypot
+      });
+      setStatus({
+        type: 'success',
+        message: result.devToken
+          ? `${result.message} Dev token: ${result.devToken}`
+          : result.message
+      });
+      setContact('');
+    } catch (err) {
+      setStatus({ type: 'error', message: err.message });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (pageToken) {
+    if (tokenError) {
+      return (
+        <section className="clinic-template-section member-access-panel" data-testid="member-access-token-error">
+          <h1>ไม่สามารถเปิดข้อมูลสมาชิกได้</h1>
+          <p>{tokenError}</p>
+          <a href={`/${clinicSlug}#/member-access`} className="cta-btn clinic-btn-primary">ขอลิงก์ใหม่</a>
+        </section>
+      );
+    }
+
+    if (!session) {
+      return (
+        <section className="clinic-template-section member-access-panel" data-testid="member-access-session">
+          <p>กำลังตรวจสอบลิงก์เข้าใช้งาน...</p>
+        </section>
+      );
+    }
+
+    const member = session.member || {};
+    const contactInfo = member.contact || {};
+    const bookings = Array.isArray(session.bookingRequests) ? session.bookingRequests : [];
+
+    return (
+      <section className="clinic-template-section member-access-panel" data-testid="member-access-session">
+        <div className="clinic-section-header">
+          <span className="clinic-eyebrow">Member Access</span>
+          <h1 data-testid="member-access-profile-name">{member.displayName || 'Member'}</h1>
+          <p data-testid="member-access-profile-contact">
+            {[contactInfo.emailMasked, contactInfo.phoneMasked, contactInfo.lineIdMasked].filter(Boolean).join(' · ') || 'ไม่มีข้อมูลติดต่อที่แสดงได้'}
+          </p>
+        </div>
+
+        <div className="member-access-bookings" data-testid="member-access-booking-list">
+          {bookings.length === 0 ? (
+            <div className="clinic-fallback-card">
+              <h4>ยังไม่มีคำขอนัดหมายที่เชื่อมกับโปรไฟล์นี้</h4>
+            </div>
+          ) : bookings.map((booking) => (
+            <div className="member-access-booking-row" data-testid={`member-access-booking-row-${booking.id}`} key={booking.id}>
+              <div>
+                <strong>{booking.requestType}</strong>
+                <span>{booking.interestType}</span>
+              </div>
+              <div>
+                <span className="member-access-status">{booking.status}</span>
+                <span>{booking.preferredDate || 'ไม่ระบุวัน'} {booking.preferredTimeWindow || ''}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="clinic-template-section member-access-panel">
+      <div className="clinic-section-header">
+        <span className="clinic-eyebrow">Member Access</span>
+        <h1>ตรวจสอบสถานะคำขอของฉัน</h1>
+        <p>รับลิงก์เข้าใช้งานแบบจำกัดเวลาเพื่อดูข้อมูลสมาชิกและสถานะคำขอที่เกี่ยวข้อง</p>
+      </div>
+
+      <form className="clinic-lead-form member-access-form" data-testid="member-access-request-form" onSubmit={handleSubmit}>
+        {status.type === 'success' && (
+          <div className="clinic-lead-alert success" data-testid="member-access-request-success">{status.message}</div>
+        )}
+        {status.type === 'error' && (
+          <div className="clinic-lead-alert error" data-testid="member-access-request-error">{status.message}</div>
+        )}
+
+        <label className="clinic-lead-field">
+          ช่องทางติดต่อ
+          <input
+            data-testid="member-access-contact"
+            type={channel === 'email' ? 'email' : 'text'}
+            value={contact}
+            onChange={(event) => setContact(event.target.value)}
+            placeholder={channel === 'email' ? 'jane@example.com' : channel === 'phone' ? '0899999999' : '@lineid'}
+          />
+        </label>
+
+        <label className="clinic-lead-field">
+          รับลิงก์ผ่าน
+          <select data-testid="member-access-channel" value={channel} onChange={(event) => setChannel(event.target.value)}>
+            <option value="email">Email</option>
+            <option value="phone">Phone</option>
+            <option value="line">LINE ID</option>
+          </select>
+        </label>
+
+        <input
+          data-testid="member-access-honeypot"
+          className="clinic-lead-honeypot"
+          value={honeypot}
+          onChange={(event) => setHoneypot(event.target.value)}
+          tabIndex="-1"
+          autoComplete="off"
+          aria-hidden="true"
+        />
+
+        <button className="cta-btn clinic-btn-primary clinic-lead-submit" data-testid="member-access-request-submit" type="submit" disabled={submitting}>
+          {submitting ? 'กำลังส่ง...' : 'ขอลิงก์เข้าใช้งาน'}
+        </button>
+      </form>
+    </section>
   );
 }
 
@@ -2069,7 +2290,7 @@ function ClinicFinalCta({ contactSettings }) {
   );
 }
 
-function ClinicPublicShell({ clinicSlug }) {
+function ClinicPublicShell({ clinicSlug, currentRoute }) {
   const [loading, setLoading] = useState(true);
   const [clinicData, setClinicData] = useState(null);
   const [errorStatus, setErrorStatus] = useState(null);
@@ -2155,6 +2376,16 @@ function ClinicPublicShell({ clinicSlug }) {
 
   if (!clinicData) {
     return null;
+  }
+
+  const hashInfo = parseHashRoute(currentRoute);
+  const hasTokenQuery = new URLSearchParams(window.location.search).has('token');
+  if (hashInfo.pathname === '/member-access' || hasTokenQuery) {
+    return (
+      <div className="public-container" data-testid="clinic-public-shell">
+        <MemberAccessPage clinicSlug={clinicSlug} />
+      </div>
+    );
   }
 
   return (
