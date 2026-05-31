@@ -180,6 +180,25 @@ function publicBookingPayload(overrides = {}) {
   };
 }
 
+test('Member Profile Foundation API - no public member portal endpoint is exposed in PR13A', async () => {
+  const response = createMockResponse();
+  const handled = await handleMemberRoutes(
+    { method: 'GET', headers: {}, socket: { remoteAddress: '127.13.0.250' } },
+    response,
+    new URL('http://localhost/public/clinics/demo/member'),
+    {
+      authenticateRequest: async () => {
+        throw new Error('Public member routes must not authenticate through admin member handlers.');
+      },
+      parseJsonBody: async () => ({}),
+      json
+    }
+  );
+
+  assert.equal(handled, false);
+  assert.equal(response.statusCode, null);
+});
+
 test('Member Profile Foundation API - Integration Tests', async (t) => {
   const pool = new Pool({ connectionString: loadConfig().databaseUrl });
   const uniqueId = Date.now() + Math.floor(Math.random() * 1000);
@@ -343,7 +362,11 @@ test('Member Profile Foundation API - Integration Tests', async (t) => {
       authenticateRequest: contextFor('owner')
     });
     assert.equal(res.statusCode, 200);
-    assert.ok(res.body.items.some((item) => item.id === memberFromLeadId));
+    const adminMember = res.body.items.find((item) => item.id === memberFromLeadId);
+    assert.ok(adminMember);
+    assert.equal(adminMember.phone, '0811111111');
+    assert.equal(adminMember.email, primaryEmail);
+    assert.equal(adminMember.lineId, '@memberpublic');
     assert.equal(res.body.items.some((item) => item.id === memberBId), false);
   });
 

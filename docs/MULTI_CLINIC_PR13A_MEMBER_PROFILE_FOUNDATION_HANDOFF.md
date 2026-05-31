@@ -53,6 +53,10 @@ Public booking request creation creates or reuses the CRM lead, inserts the book
 - `GET /admin/members/:id`
 - `PATCH /admin/members/:id`
 
+Admin list/detail responses are CRM/member profile responses for authenticated clinic staff. They include contact fields such as phone, email, and LINE ID for authorized admin readers. This is not an audit/event payload and is not a public member response contract.
+
+Future public member portal work must define a separate public response shape and must not reuse the admin member serializer or admin routes directly.
+
 PATCH is limited to:
 
 - `displayName`

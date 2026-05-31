@@ -157,7 +157,10 @@ function normalizeAdminUpdatePayload(body) {
   return normalized;
 }
 
-function mapMemberRow(row) {
+// Admin-only CRM/member profile serializer. It intentionally includes contact
+// fields for authorized clinic staff and must not be reused for public member
+// portal responses.
+function mapAdminMemberRow(row) {
   return {
     id: Number(row.id),
     clinicId: Number(row.clinic_id),
@@ -359,7 +362,7 @@ async function updateExistingMember(client, existing, payload) {
 
   if (assignments.length === 0) {
     return {
-      member: mapMemberRow(existing),
+      member: mapAdminMemberRow(existing),
       created: false,
       changedFields
     };
@@ -381,7 +384,7 @@ async function updateExistingMember(client, existing, payload) {
   );
 
   return {
-    member: mapMemberRow(result.rows[0]),
+    member: mapAdminMemberRow(result.rows[0]),
     created: false,
     changedFields
   };
@@ -434,7 +437,7 @@ async function findOrCreateMemberForPublicIntake(input, client = getPool()) {
     ]
   );
 
-  const member = mapMemberRow(result.rows[0]);
+  const member = mapAdminMemberRow(result.rows[0]);
   const summary = await recordMemberEvent(client, payload.clinicId, member.id, 'member.created', {
     ...payload,
     changedFields: ['member']
@@ -600,7 +603,7 @@ async function listMembersForAdmin(context, searchParams) {
   );
 
   return {
-    items: result.rows.map(mapMemberRow),
+    items: result.rows.map(mapAdminMemberRow),
     total: result.rows[0]?.total_count || 0,
     limit: filters.limit,
     offset: filters.offset
@@ -657,7 +660,7 @@ async function getMemberProfileForAdmin(context, memberId) {
 
   const row = result.rows[0];
   return {
-    ...mapMemberRow(row),
+    ...mapAdminMemberRow(row),
     lead: row.lead_id
       ? {
           id: Number(row.lead_id),
