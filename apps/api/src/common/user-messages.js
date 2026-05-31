@@ -155,6 +155,13 @@ const THAI_ERROR_MESSAGES = {
   BOOKING_REQUEST_PERMISSION_DENIED: 'คุณไม่มีสิทธิ์จัดการคำขอนัดหมายนี้',
   INVALID_BOOKING_REQUEST_NOTE: 'ข้อความ note ของคำขอนัดหมายไม่ถูกต้อง',
   PUBLIC_BOOKING_REQUEST_RATE_LIMITED: 'มีการส่งคำขอนัดหมายบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่',
+  INVALID_MEMBER_PAYLOAD: 'ข้อมูลสมาชิกไม่ครบถ้วนหรือไม่ถูกต้อง',
+  MEMBER_CONTACT_REQUIRED: 'กรุณาระบุเบอร์โทรศัพท์ อีเมล หรือ LINE ID อย่างน้อยหนึ่งช่องทาง',
+  INVALID_MEMBER_EMAIL: 'รูปแบบอีเมลสมาชิกไม่ถูกต้อง',
+  INVALID_MEMBER_STATUS: 'สถานะสมาชิกไม่ถูกต้อง',
+  MEMBER_NOT_FOUND: 'ไม่พบสมาชิกที่ต้องการ',
+  MEMBER_PERMISSION_DENIED: 'คุณไม่มีสิทธิ์จัดการข้อมูลสมาชิกนี้',
+  INVALID_MEMBER_PROFILE: 'ข้อมูลโปรไฟล์สมาชิกต้องเป็น JSON object เท่านั้น',
   INTERNAL_SERVER_ERROR: 'ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง'
 };
 

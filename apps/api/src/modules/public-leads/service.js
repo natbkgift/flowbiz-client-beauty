@@ -5,6 +5,10 @@ const { getPool } = require('../../db');
 const { AppError } = require('../../common/errors');
 const { recordAuditLog } = require('../audit/service');
 const { resolvePublicClinicBySlug } = require('../public-content/clinic-resolver');
+const {
+  findOrCreateMemberForPublicIntake,
+  linkLeadToMember
+} = require('../members/service');
 
 const VALID_INTEREST_TYPES = new Set(['service', 'promotion', 'package', 'general']);
 const VALID_PUBLIC_SOURCES = new Set(['clinic_public_website']);
@@ -276,11 +280,37 @@ async function createPublicClinicLead(slug, body) {
       );
     }
 
+    const memberLink = await findOrCreateMemberForPublicIntake(
+      {
+        clinicId: scope.clinicId,
+        leadId,
+        name: normalized.name,
+        phone: normalized.phone,
+        email: normalized.email,
+        lineId: normalized.lineId,
+        source: 'public_lead_capture',
+        consentSummary: {
+          consentAccepted: true,
+          source: 'public_lead_capture'
+        }
+      },
+      client
+    );
+    await linkLeadToMember(
+      {
+        clinicId: scope.clinicId,
+        leadId,
+        memberId: memberLink.member.id
+      },
+      client
+    );
+
     const summary = {
       source: 'public_lead_capture',
       publicSource: normalized.source,
       clinicId: scope.clinicId,
       leadId,
+      memberId: memberLink.member.id,
       interestType: interest.interestType,
       interestId: interest.interestId,
       hasPhone: Boolean(normalized.phone),
