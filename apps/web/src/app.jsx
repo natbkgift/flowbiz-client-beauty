@@ -6539,7 +6539,7 @@ function BookingRequestsPage() {
     try {
       const [data, slotOffers] = await Promise.all([
         api.getBookingRequest(sessionOptions, requestId),
-        api.listBookingSlotOffers(sessionOptions, requestId)
+        api.listBookingSlotOffers(sessionOptions, requestId).catch(() => ({ items: [] }))
       ]);
       setDetailState({ status: 'ready', data: { ...data, slotOffers: slotOffers.items || [] }, error: null });
       setSelectedStatus(data.status || 'new');

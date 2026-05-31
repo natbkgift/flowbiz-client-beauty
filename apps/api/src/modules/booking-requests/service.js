@@ -1440,7 +1440,7 @@ async function createAdminBookingRequestSlotOffer(context, bookingRequestId, bod
           updated_by_user_id,
           metadata_json
         )
-        values ($1, $2, $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12, $12, $13::jsonb)
+        values ($1, $2, $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb)
         returning *
       `,
       [
@@ -1455,6 +1455,7 @@ async function createAdminBookingRequestSlotOffer(context, bookingRequestId, bod
         normalized.offerStatus,
         normalized.offerNote,
         normalized.internalNote,
+        context.currentUser?.id || null,
         context.currentUser?.id || null,
         JSON.stringify({
           ...normalized.metadata,
