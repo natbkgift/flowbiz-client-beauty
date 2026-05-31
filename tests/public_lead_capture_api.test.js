@@ -339,6 +339,14 @@ test('Public Lead Capture API - Integration Tests', async (t) => {
     assert.doesNotMatch(serialized, /private@example\.com/);
     assert.doesNotMatch(serialized, /raw private message/);
 
+    const leadSummary = await pool.query(
+      'select notes_summary from leads where clinic_id = $1 and id = $2 limit 1',
+      [clinicAId, res.body.leadId]
+    );
+    assert.equal(leadSummary.rowCount, 1);
+    assert.match(leadSummary.rows[0].notes_summary, /message_provided=true/);
+    assert.doesNotMatch(leadSummary.rows[0].notes_summary, /raw private message/);
+
     const activity = await pool.query(
       "select event_data_json from lead_activity where clinic_id = $1 and lead_id = $2 and event_type = 'lead.created' limit 1",
       [clinicAId, res.body.leadId]

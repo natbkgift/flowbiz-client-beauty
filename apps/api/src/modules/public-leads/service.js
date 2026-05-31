@@ -185,7 +185,7 @@ function buildNotesSummary(payload, interest) {
     `interest=${interest.interestType}${interest.interestId ? `:${interest.interestId}` : ''}`
   ];
   if (payload.message) {
-    parts.push(`message=${payload.message}`);
+    parts.push('message_provided=true');
   }
   return parts.join('\n').slice(0, 2000);
 }
