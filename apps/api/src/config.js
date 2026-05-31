@@ -72,6 +72,12 @@ function loadConfig() {
     apiBaseUrl: process.env.API_BASE_URL || '',
     authTokenSecret,
     authTokenTtlHours: toPositiveInt(process.env.AUTH_TOKEN_TTL_HOURS, 12),
+    memberAccessTokenSecret: process.env.MEMBER_ACCESS_TOKEN_SECRET || authTokenSecret,
+    memberMagicLinkTtlMinutes: toPositiveInt(process.env.MEMBER_MAGIC_LINK_TTL_MINUTES, 15),
+    memberMagicLinkDevTokenEnabled: toBoolean(
+      process.env.MEMBER_MAGIC_LINK_DEV_TOKEN_ENABLED,
+      appEnv !== 'production'
+    ),
     inviteTokenSecret,
     inviteTokenTtlHours: toPositiveInt(process.env.INVITE_TOKEN_TTL_HOURS, 72),
     publicSignupEnabled: toBoolean(process.env.PUBLIC_SIGNUP_ENABLED, appEnv !== 'production'),

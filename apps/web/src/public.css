@@ -1993,6 +1993,49 @@ a {
   justify-self: start;
 }
 
+.member-access-panel {
+  background: rgba(19, 21, 26, 0.72);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+}
+
+.member-access-form {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.member-access-bookings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.member-access-booking-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: var(--bg-primary);
+}
+
+.member-access-booking-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.member-access-booking-row span {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.member-access-status {
+  color: var(--gold-primary) !important;
+  font-weight: 700;
+}
+
 /* Grid layout & cards */
 .clinic-grid-cards {
   display: grid;

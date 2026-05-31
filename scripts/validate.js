@@ -153,10 +153,13 @@ const requiredPaths = [
   'database/migrations/040_booking_requests.sql',
   'database/migrations/041_booking_request_admin_events.sql',
   'database/migrations/042_member_profile_foundation.sql',
+  'database/migrations/043_member_magic_links.sql',
   'apps/api/src/modules/booking-requests/service.js',
   'apps/api/src/modules/booking-requests/routes.js',
   'apps/api/src/modules/members/service.js',
   'apps/api/src/modules/members/routes.js',
+  'apps/api/src/modules/member-access/service.js',
+  'apps/api/src/modules/member-access/routes.js',
   'tests/clinic_offerings_admin_api.test.js',
   'tests/public_clinic_offerings_api.test.js',
   'docs/MULTI_CLINIC_PR10A_OFFERINGS_SCHEMA_API_HANDOFF.md',
@@ -171,6 +174,9 @@ const requiredPaths = [
   'tests/booking_request_admin_api.test.js',
   'tests/booking_request_admin_ui.test.js',
   'tests/member_profile_foundation_api.test.js',
+  'tests/member_magic_link_access_api.test.js',
+  'tests/member_magic_link_access_ui.test.js',
+  'docs/MULTI_CLINIC_PR13B_MAGIC_LINK_MEMBER_ACCESS_HANDOFF.md',
   'docs/MULTI_CLINIC_PR13A_MEMBER_PROFILE_FOUNDATION_HANDOFF.md',
   'docs/MULTI_CLINIC_PR12B_ADMIN_BOOKING_REQUEST_QUEUE_HANDOFF.md',
   'docs/MULTI_CLINIC_PR12A_BOOKING_REQUEST_WORKFLOW_HANDOFF.md'
@@ -299,7 +305,11 @@ function checkSyntax() {
     'tests/booking_request_admin_ui.test.js',
     'apps/api/src/modules/members/service.js',
     'apps/api/src/modules/members/routes.js',
-    'tests/member_profile_foundation_api.test.js'
+    'apps/api/src/modules/member-access/service.js',
+    'apps/api/src/modules/member-access/routes.js',
+    'tests/member_profile_foundation_api.test.js',
+    'tests/member_magic_link_access_api.test.js',
+    'tests/member_magic_link_access_ui.test.js'
   ];
 
   for (const file of jsFiles) {
