@@ -60,6 +60,9 @@ function assertWritePermission(context) {
  * Hard constraint: clinicId must NEVER come from request body.
  */
 function rejectClinicIdInBody(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new AppError(400, 'INVALID_REQUEST', 'Request body must be a JSON object.');
+  }
   if (body.clinicId !== undefined || body.clinic_id !== undefined) {
     throw new AppError(400, 'INVALID_REQUEST', 'clinicId cannot be overridden in the request body.');
   }

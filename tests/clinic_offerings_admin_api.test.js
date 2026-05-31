@@ -504,7 +504,21 @@ test('Clinic Offerings Admin API - Integration Tests', async (t) => {
     assert.equal(Number(dbCheck.rows[0].sort_order), 7);
   });
 
-  await t.test('14c. Reorder missing package service link returns 404', async () => {
+  await t.test('14c. Linked service cannot be deleted with a raw database error', async () => {
+    const res = await routeJson(handleClinicOfferingsRoutes, {
+      method: 'DELETE',
+      path: `/admin/clinic-offerings/services/${createdServiceId}`,
+      authenticateRequest: ownerAuthClinic1
+    });
+
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.body.error.code, 'INVALID_REQUEST');
+
+    const dbCheck = await pool.query('select 1 from clinic_services where id = $1', [createdServiceId]);
+    assert.equal(dbCheck.rowCount, 1);
+  });
+
+  await t.test('14d. Reorder missing package service link returns 404', async () => {
     const svcRes = await pool.query(
       `insert into clinic_services (clinic_id, service_key, name, slug, status)
        values ($1, $2, $3, $4, 'active') returning id`,
@@ -525,7 +539,7 @@ test('Clinic Offerings Admin API - Integration Tests', async (t) => {
     await pool.query('delete from clinic_services where id = $1', [unlinkedServiceId]);
   });
 
-  await t.test('14d. Reorder cross-tenant package service link returns 403', async () => {
+  await t.test('14e. Reorder cross-tenant package service link returns 403', async () => {
     const svcRes = await pool.query(
       `insert into clinic_services (clinic_id, service_key, name, slug, status)
        values ($1, $2, $3, $4, 'active') returning id`,
@@ -574,6 +588,26 @@ test('Clinic Offerings Admin API - Integration Tests', async (t) => {
       path: '/admin/clinic-offerings/services',
       authenticateRequest: ownerAuthClinic1,
       body: { name: 'Injected Clinic 2', clinic_id: testClinicId2 }
+    });
+    assert.equal(res2.statusCode, 400);
+    assert.equal(res2.body.error.code, 'INVALID_REQUEST');
+  });
+
+  await t.test('15a. Empty or non-object body is rejected with 400', async () => {
+    const res = await routeJson(handleClinicOfferingsRoutes, {
+      method: 'POST',
+      path: '/admin/clinic-offerings/services',
+      authenticateRequest: ownerAuthClinic1,
+      body: null
+    });
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.body.error.code, 'INVALID_REQUEST');
+
+    const res2 = await routeJson(handleClinicOfferingsRoutes, {
+      method: 'POST',
+      path: '/admin/clinic-offerings/services',
+      authenticateRequest: ownerAuthClinic1,
+      body: []
     });
     assert.equal(res2.statusCode, 400);
     assert.equal(res2.body.error.code, 'INVALID_REQUEST');

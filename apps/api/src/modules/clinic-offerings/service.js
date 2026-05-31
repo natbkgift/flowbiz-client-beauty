@@ -73,31 +73,35 @@ function normalizeSortOrder(value, fallback = 0) {
   return normalizeNumber(value, 'sortOrder', fallback, { integer: true });
 }
 
+function fallbackSlug(prefix, separator) {
+  return `${prefix}${separator}${Date.now()}${separator}${Math.floor(Math.random() * 1000000)}`;
+}
+
 /**
  * Convert a name/title to a URL-safe kebab-case slug.
- * Falls back to a timestamp if result is empty.
+ * Falls back to a timestamp plus random suffix if result is empty.
  */
 function toSlug(text) {
-  if (typeof text !== 'string') return `item-${Date.now()}`;
+  if (typeof text !== 'string') return fallbackSlug('item', '-');
   return text
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9\u0E00-\u0E7F]+/g, '-')
     .replace(/^-+|-+$/g, '')
-    || `item-${Date.now()}`;
+    || fallbackSlug('item', '-');
 }
 
 /**
  * Convert a name/title to a snake_case key.
  */
 function toKey(text) {
-  if (typeof text !== 'string') return `item_${Date.now()}`;
+  if (typeof text !== 'string') return fallbackSlug('item', '_');
   return text
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9\u0E00-\u0E7F]+/g, '_')
     .replace(/^_+|_+$/g, '')
-    || `item_${Date.now()}`;
+    || fallbackSlug('item', '_');
 }
 
 // ---------------------------------------------------------------------------
@@ -408,6 +412,14 @@ async function deleteService(clinicId, actorUserId, serviceId) {
   const existing = existingRes.rows[0] || null;
   assertSameClinic(existing, clinicId, 'SERVICE');
 
+  const linkCheck = await pool.query(
+    'select 1 from clinic_package_services where clinic_id = $1 and service_id = $2 limit 1',
+    [clinicId, serviceId]
+  );
+  if (linkCheck.rowCount > 0) {
+    throw new AppError(400, 'INVALID_REQUEST', 'Cannot delete service because it is linked to one or more packages.');
+  }
+
   await pool.query('delete from clinic_services where id = $1', [serviceId]);
 
   await recordAuditLog({
@@ -644,15 +656,22 @@ async function updatePromotion(clinicId, actorUserId, promotionId, body) {
   const metadata = body.metadata !== undefined ? body.metadata : existing.metadata_json;
   validateMetadata(metadata, 'metadata');
 
-  const startsAt = body.startsAt !== undefined ? (body.startsAt || null) : existing.starts_at;
-  const endsAt = body.endsAt !== undefined ? (body.endsAt || null) : existing.ends_at;
+  let startsAt = existing.starts_at;
+  if (body.startsAt !== undefined) {
+    startsAt = body.startsAt || null;
+    if (startsAt && isNaN(Date.parse(startsAt))) {
+      throw new AppError(400, 'INVALID_OFFERING_PAYLOAD', 'startsAt must be a valid date.');
+    }
+  }
 
-  if (startsAt && isNaN(Date.parse(startsAt))) {
-    throw new AppError(400, 'INVALID_OFFERING_PAYLOAD', 'startsAt must be a valid date.');
+  let endsAt = existing.ends_at;
+  if (body.endsAt !== undefined) {
+    endsAt = body.endsAt || null;
+    if (endsAt && isNaN(Date.parse(endsAt))) {
+      throw new AppError(400, 'INVALID_OFFERING_PAYLOAD', 'endsAt must be a valid date.');
+    }
   }
-  if (endsAt && isNaN(Date.parse(endsAt))) {
-    throw new AppError(400, 'INVALID_OFFERING_PAYLOAD', 'endsAt must be a valid date.');
-  }
+
   if (startsAt && endsAt && new Date(endsAt) < new Date(startsAt)) {
     throw new AppError(400, 'INVALID_OFFERING_PAYLOAD', 'endsAt must be >= startsAt.');
   }
