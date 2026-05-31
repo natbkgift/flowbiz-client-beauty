@@ -151,6 +151,7 @@ const existingOffer = {
   offerStatus: 'draft',
   offerNote: 'ทีมงานขอเสนอเวลา 14:00',
   internalNote: 'ลูกค้าสะดวกบ่าย',
+  customerResponseNote: 'ลูกค้าตอบว่าสะดวกเวลานี้',
   createdByUserId: 501,
   createdAt: '2026-06-10T11:00:00.000Z'
 };
@@ -208,6 +209,7 @@ test('Booking Slot Offer UI - detail renders section and existing offer list', a
   assert.ok(app.document.querySelector('[data-testid="booking-slot-offer-list"]'));
   assert.ok(app.document.querySelector('[data-testid="booking-slot-offer-row-71"]'));
   assert.match(app.document.body.textContent, /ทีมงานขอเสนอเวลา 14:00/);
+  assert.match(app.document.body.textContent, /ลูกค้าตอบว่าสะดวกเวลานี้/);
 });
 
 test('Booking Slot Offer UI - create form validates missing date and specific start time', async () => {

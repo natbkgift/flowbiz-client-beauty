@@ -370,6 +370,11 @@ test('Booking Slot Offer API - admin offer drafts', async (t) => {
   });
 
   await t.test('9. List offers returns only current clinic offers and rejects query override', async () => {
+    await pool.query(
+      'update clinic_booking_slot_offers set customer_response_note = $1 where id = $2',
+      ['admin-visible customer response note', offerAId]
+    );
+
     const override = await routeJson({
       path: `/admin/booking-requests/${bookingAId}/slot-offers`,
       authenticateRequest: contextFor('owner'),
@@ -385,6 +390,7 @@ test('Booking Slot Offer API - admin offer drafts', async (t) => {
     assert.equal(list.statusCode, 200);
     assert.ok(list.body.items.every((item) => item.bookingRequestId === bookingAId));
     assert.ok(list.body.items.some((item) => item.offerNote === 'ขอเสนอเวลา 14:00 ค่ะ'));
+    assert.ok(list.body.items.some((item) => item.id === offerAId && item.customerResponseNote === 'admin-visible customer response note'));
 
     const cross = await routeJson({
       path: `/admin/booking-requests/${bookingBId}/slot-offers`,
