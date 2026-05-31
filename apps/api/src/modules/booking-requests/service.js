@@ -19,7 +19,10 @@ const VALID_BOOKING_STATUSES = new Set(['new', 'contacted', 'confirmed', 'cancel
 const VALID_VISIT_TYPES = new Set(['consultation', 'treatment', 'follow_up', 'other']);
 const VALID_URGENCY_LEVELS = new Set(['normal', 'soon', 'urgent']);
 const VALID_SLOT_STATUSES = new Set(['requested', 'reviewing', 'offered', 'accepted', 'rejected', 'expired']);
+const VALID_SLOT_OFFER_TIME_WINDOWS = new Set(['morning', 'afternoon', 'evening', 'anytime', 'specific_time']);
+const VALID_SLOT_OFFER_STATUSES = new Set(['draft', 'ready_to_send', 'sent', 'accepted', 'declined', 'cancelled', 'expired']);
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const START_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 function trimString(value, maxLength) {
   if (value === undefined || value === null) return null;
@@ -252,6 +255,27 @@ function mapBookingRequestRow(row, options = {}) {
   };
 }
 
+function mapSlotOfferRow(row) {
+  return {
+    id: Number(row.id),
+    bookingRequestId: Number(row.booking_request_id),
+    leadId: row.lead_id ? Number(row.lead_id) : null,
+    memberId: row.member_id ? Number(row.member_id) : null,
+    offeredDate: formatDateOnly(row.offered_date),
+    offeredTimeWindow: row.offered_time_window,
+    offeredStartTime: row.offered_start_time || null,
+    durationMinutes: row.duration_minutes === null || row.duration_minutes === undefined ? null : Number(row.duration_minutes),
+    offerStatus: row.offer_status,
+    offerNote: row.offer_note || null,
+    internalNote: row.internal_note || null,
+    createdByUserId: row.created_by_user_id ? Number(row.created_by_user_id) : null,
+    updatedByUserId: row.updated_by_user_id ? Number(row.updated_by_user_id) : null,
+    metadata: row.metadata_json || {},
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
 function assertAdminContext(context) {
   if (!context?.currentClinic?.id) {
     throw new AppError(403, 'CLINIC_CONTEXT_REQUIRED', 'Clinic context is required.');
@@ -270,6 +294,114 @@ function normalizeBookingNotePayload(body) {
   }
 
   return { note };
+}
+
+function trimRequiredString(value, maxLength, code, fieldName) {
+  if (typeof value !== 'string') {
+    throw new AppError(400, code, `${fieldName} is required.`);
+  }
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > maxLength) {
+    throw new AppError(400, code, `${fieldName} must be between 1 and ${maxLength} characters.`);
+  }
+  return trimmed;
+}
+
+function trimOptionalString(value, maxLength, code, fieldName) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string') {
+    throw new AppError(400, code, `${fieldName} must be a string.`);
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.length > maxLength) {
+    throw new AppError(400, code, `${fieldName} must be ${maxLength} characters or less.`);
+  }
+  return trimmed;
+}
+
+function normalizeSlotOfferDate(value) {
+  const trimmed = trimRequiredString(value, 10, 'INVALID_SLOT_OFFER_DATE', 'offeredDate');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    throw new AppError(400, 'INVALID_SLOT_OFFER_DATE', 'offeredDate must be YYYY-MM-DD.');
+  }
+  const parsed = new Date(`${trimmed}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== trimmed) {
+    throw new AppError(400, 'INVALID_SLOT_OFFER_DATE', 'offeredDate must be a valid date.');
+  }
+  if (trimmed < todayDateString()) {
+    throw new AppError(400, 'INVALID_SLOT_OFFER_DATE', 'offeredDate cannot be in the past.');
+  }
+  return trimmed;
+}
+
+function normalizeSlotOfferTimeWindow(value) {
+  const normalized = trimRequiredString(value, 40, 'INVALID_SLOT_OFFER_TIME_WINDOW', 'offeredTimeWindow');
+  if (!VALID_SLOT_OFFER_TIME_WINDOWS.has(normalized)) {
+    throw new AppError(400, 'INVALID_SLOT_OFFER_TIME_WINDOW', 'offeredTimeWindow is invalid.');
+  }
+  return normalized;
+}
+
+function normalizeSlotOfferStartTime(value, offeredTimeWindow) {
+  if (value === undefined || value === null || value === '') {
+    if (offeredTimeWindow === 'specific_time') {
+      throw new AppError(400, 'INVALID_SLOT_OFFER_START_TIME', 'offeredStartTime is required for specific_time.');
+    }
+    return null;
+  }
+  const normalized = trimRequiredString(value, 10, 'INVALID_SLOT_OFFER_START_TIME', 'offeredStartTime');
+  if (!START_TIME_PATTERN.test(normalized)) {
+    throw new AppError(400, 'INVALID_SLOT_OFFER_START_TIME', 'offeredStartTime must be HH:mm.');
+  }
+  return normalized;
+}
+
+function normalizeSlotOfferDuration(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 5 || parsed > 480) {
+    throw new AppError(400, 'INVALID_SLOT_OFFER_DURATION', 'durationMinutes must be between 5 and 480.');
+  }
+  return parsed;
+}
+
+function normalizeSlotOfferStatus(value, fallback = 'draft') {
+  const normalized = trimString(value, 40) || fallback;
+  if (!VALID_SLOT_OFFER_STATUSES.has(normalized)) {
+    throw new AppError(400, 'INVALID_SLOT_OFFER_STATUS', 'offerStatus is invalid.');
+  }
+  return normalized;
+}
+
+function normalizeSlotOfferMetadata(value) {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new AppError(400, 'INVALID_SLOT_OFFER_PAYLOAD', 'metadata must be a JSON object.');
+  }
+  return value;
+}
+
+function normalizeCreateSlotOfferPayload(body) {
+  rejectAdminClinicOverride(body);
+  const offeredTimeWindow = normalizeSlotOfferTimeWindow(body.offeredTimeWindow);
+  return {
+    offeredDate: normalizeSlotOfferDate(body.offeredDate),
+    offeredTimeWindow,
+    offeredStartTime: normalizeSlotOfferStartTime(body.offeredStartTime, offeredTimeWindow),
+    durationMinutes: normalizeSlotOfferDuration(body.durationMinutes),
+    offerStatus: normalizeSlotOfferStatus(body.offerStatus, 'draft'),
+    offerNote: trimOptionalString(body.offerNote, 500, 'INVALID_SLOT_OFFER_PAYLOAD', 'offerNote'),
+    internalNote: trimOptionalString(body.internalNote, 1000, 'INVALID_SLOT_OFFER_PAYLOAD', 'internalNote'),
+    metadata: normalizeSlotOfferMetadata(body.metadata)
+  };
+}
+
+function normalizeUpdateSlotOfferStatusPayload(body) {
+  rejectAdminClinicOverride(body);
+  return {
+    offerStatus: normalizeSlotOfferStatus(body.offerStatus, null)
+  };
 }
 
 function todayDateString() {
@@ -1230,6 +1362,275 @@ async function updateAdminBookingRequestSlotStatus(context, bookingRequestId, bo
   };
 }
 
+async function listAdminBookingRequestSlotOffers(context, bookingRequestId, searchParams = new URLSearchParams()) {
+  assertAdminContext(context);
+  rejectAdminClinicOverrideQuery(searchParams);
+  const normalizedId = asPositiveInteger(bookingRequestId, 'bookingRequestId');
+  const client = getPool();
+
+  const bookingResult = await client.query(
+    `
+      select id
+      from clinic_booking_requests
+      where clinic_id = $1 and id = $2
+      limit 1
+    `,
+    [context.currentClinic.id, normalizedId]
+  );
+
+  if (bookingResult.rowCount === 0) {
+    throw new AppError(404, 'BOOKING_REQUEST_NOT_FOUND', 'Booking request not found.');
+  }
+
+  const result = await client.query(
+    `
+      select *
+      from clinic_booking_slot_offers
+      where clinic_id = $1 and booking_request_id = $2
+      order by created_at desc, id desc
+    `,
+    [context.currentClinic.id, normalizedId]
+  );
+
+  return {
+    items: result.rows.map(mapSlotOfferRow)
+  };
+}
+
+async function createAdminBookingRequestSlotOffer(context, bookingRequestId, body) {
+  assertAdminContext(context);
+  const normalizedId = asPositiveInteger(bookingRequestId, 'bookingRequestId');
+  const normalized = normalizeCreateSlotOfferPayload(body);
+  const client = await getPool().connect();
+  let committed = false;
+  let offer = null;
+
+  try {
+    await client.query('begin');
+    const bookingResult = await client.query(
+      `
+        select id, lead_id, member_id
+        from clinic_booking_requests
+        where clinic_id = $1 and id = $2
+        for update
+      `,
+      [context.currentClinic.id, normalizedId]
+    );
+
+    if (bookingResult.rowCount === 0) {
+      throw new AppError(404, 'BOOKING_REQUEST_NOT_FOUND', 'Booking request not found.');
+    }
+
+    const booking = bookingResult.rows[0];
+    const offerResult = await client.query(
+      `
+        insert into clinic_booking_slot_offers (
+          clinic_id,
+          booking_request_id,
+          lead_id,
+          member_id,
+          offered_date,
+          offered_time_window,
+          offered_start_time,
+          duration_minutes,
+          offer_status,
+          offer_note,
+          internal_note,
+          created_by_user_id,
+          updated_by_user_id,
+          metadata_json
+        )
+        values ($1, $2, $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12, $12, $13::jsonb)
+        returning *
+      `,
+      [
+        context.currentClinic.id,
+        normalizedId,
+        booking.lead_id || null,
+        booking.member_id || null,
+        normalized.offeredDate,
+        normalized.offeredTimeWindow,
+        normalized.offeredStartTime,
+        normalized.durationMinutes,
+        normalized.offerStatus,
+        normalized.offerNote,
+        normalized.internalNote,
+        context.currentUser?.id || null,
+        JSON.stringify({
+          ...normalized.metadata,
+          source: 'admin_queue'
+        })
+      ]
+    );
+    offer = mapSlotOfferRow(offerResult.rows[0]);
+
+    await client.query(
+      `
+        update clinic_booking_requests
+        set slot_status = 'offered',
+            updated_at = now()
+        where clinic_id = $1 and id = $2
+      `,
+      [context.currentClinic.id, normalizedId]
+    );
+
+    const summary = {
+      source: 'admin_slot_offer_draft',
+      bookingRequestId: normalizedId,
+      offerId: offer.id,
+      leadId: booking.lead_id ? Number(booking.lead_id) : null,
+      memberId: booking.member_id ? Number(booking.member_id) : null,
+      offeredDateProvided: Boolean(normalized.offeredDate),
+      offeredTimeWindow: normalized.offeredTimeWindow,
+      offeredStartTimeProvided: Boolean(normalized.offeredStartTime),
+      durationMinutes: normalized.durationMinutes,
+      offerStatus: normalized.offerStatus,
+      offerNoteProvided: Boolean(normalized.offerNote),
+      internalNoteProvided: Boolean(normalized.internalNote)
+    };
+
+    if (booking.lead_id) {
+      await client.query(
+        `
+          insert into lead_activity (clinic_id, lead_id, event_type, event_data_json)
+          values ($1, $2, 'booking_request.slot_offer_created', $3::jsonb)
+        `,
+        [context.currentClinic.id, booking.lead_id, JSON.stringify({ summary })]
+      );
+    }
+
+    await recordAuditLog(
+      {
+        clinicId: context.currentClinic.id,
+        entityType: 'clinic_booking_slot_offer',
+        entityId: offer.id,
+        actionType: 'clinic_booking_slot_offer.created',
+        actorUserId: context.currentUser?.id || null,
+        contextJson: { summary }
+      },
+      client
+    );
+
+    await client.query('commit');
+    committed = true;
+  } catch (error) {
+    if (!committed) {
+      await client.query('rollback').catch(() => {});
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return {
+    success: true,
+    offer,
+    bookingRequest: await getAdminBookingRequestDetail(context, normalizedId)
+  };
+}
+
+async function updateAdminBookingRequestSlotOfferStatus(context, bookingRequestId, offerId, body) {
+  assertAdminContext(context);
+  const normalizedBookingId = asPositiveInteger(bookingRequestId, 'bookingRequestId');
+  const normalizedOfferId = asPositiveInteger(offerId, 'offerId');
+  const normalized = normalizeUpdateSlotOfferStatusPayload(body);
+  const client = await getPool().connect();
+  let committed = false;
+  let offer = null;
+
+  try {
+    await client.query('begin');
+    const existingResult = await client.query(
+      `
+        select o.*, br.lead_id as booking_lead_id, br.member_id as booking_member_id
+        from clinic_booking_slot_offers o
+        inner join clinic_booking_requests br
+          on br.clinic_id = o.clinic_id
+          and br.id = o.booking_request_id
+        where o.clinic_id = $1
+          and o.booking_request_id = $2
+          and o.id = $3
+        for update
+      `,
+      [context.currentClinic.id, normalizedBookingId, normalizedOfferId]
+    );
+
+    if (existingResult.rowCount === 0) {
+      throw new AppError(404, 'SLOT_OFFER_NOT_FOUND', 'Slot offer not found.');
+    }
+
+    const existing = existingResult.rows[0];
+    const updateResult = await client.query(
+      `
+        update clinic_booking_slot_offers
+        set offer_status = $4,
+            updated_by_user_id = $5,
+            updated_at = now()
+        where clinic_id = $1
+          and booking_request_id = $2
+          and id = $3
+        returning *
+      `,
+      [
+        context.currentClinic.id,
+        normalizedBookingId,
+        normalizedOfferId,
+        normalized.offerStatus,
+        context.currentUser?.id || null
+      ]
+    );
+    offer = mapSlotOfferRow(updateResult.rows[0]);
+
+    const summary = {
+      source: 'admin_slot_offer_draft',
+      bookingRequestId: normalizedBookingId,
+      offerId: normalizedOfferId,
+      leadId: existing.booking_lead_id ? Number(existing.booking_lead_id) : null,
+      memberId: existing.booking_member_id ? Number(existing.booking_member_id) : null,
+      fromOfferStatus: existing.offer_status,
+      toOfferStatus: normalized.offerStatus,
+      changedFields: ['offerStatus']
+    };
+
+    if (existing.booking_lead_id) {
+      await client.query(
+        `
+          insert into lead_activity (clinic_id, lead_id, event_type, event_data_json)
+          values ($1, $2, 'booking_request.slot_offer_status_changed', $3::jsonb)
+        `,
+        [context.currentClinic.id, existing.booking_lead_id, JSON.stringify({ summary })]
+      );
+    }
+
+    await recordAuditLog(
+      {
+        clinicId: context.currentClinic.id,
+        entityType: 'clinic_booking_slot_offer',
+        entityId: normalizedOfferId,
+        actionType: 'clinic_booking_slot_offer.status_changed',
+        actorUserId: context.currentUser?.id || null,
+        contextJson: { summary }
+      },
+      client
+    );
+
+    await client.query('commit');
+    committed = true;
+  } catch (error) {
+    if (!committed) {
+      await client.query('rollback').catch(() => {});
+    }
+    throw error;
+  } finally {
+    client.release();
+  }
+
+  return {
+    success: true,
+    offer
+  };
+}
+
 module.exports = {
   createPublicBookingRequest,
   validateBookingRequestPayload,
@@ -1237,8 +1638,12 @@ module.exports = {
   getAdminBookingRequestDetail,
   updateAdminBookingRequestStatus,
   updateAdminBookingRequestSlotStatus,
+  listAdminBookingRequestSlotOffers,
+  createAdminBookingRequestSlotOffer,
+  updateAdminBookingRequestSlotOfferStatus,
   addAdminBookingRequestNote,
   normalizeAdminFilters,
   normalizeBookingNotePayload,
+  normalizeCreateSlotOfferPayload,
   escapeLikePattern
 };

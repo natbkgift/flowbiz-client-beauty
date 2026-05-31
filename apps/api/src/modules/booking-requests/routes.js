@@ -9,6 +9,9 @@ const {
   getAdminBookingRequestDetail,
   updateAdminBookingRequestStatus,
   updateAdminBookingRequestSlotStatus,
+  listAdminBookingRequestSlotOffers,
+  createAdminBookingRequestSlotOffer,
+  updateAdminBookingRequestSlotOfferStatus,
   addAdminBookingRequestNote
 } = require('./service');
 
@@ -37,6 +40,15 @@ function assertManagePermission(context) {
   const normalizedRole = context.currentMembership?.role;
   if (!['owner', 'manager', 'marketing', 'sales', 'admin'].includes(role) && normalizedRole !== 'admin') {
     throw new AppError(403, 'BOOKING_REQUEST_PERMISSION_DENIED', 'Booking request management permission is required.');
+  }
+}
+
+function assertSlotOfferManagePermission(context) {
+  assertClinicContext(context);
+  const role = getBookingQueueRole(context);
+  const normalizedRole = context.currentMembership?.role;
+  if (!['owner', 'manager', 'marketing', 'sales', 'admin'].includes(role) && normalizedRole !== 'admin') {
+    throw new AppError(403, 'SLOT_OFFER_PERMISSION_DENIED', 'Slot offer management permission is required.');
   }
 }
 
@@ -74,6 +86,36 @@ async function handleBookingRequestRoutes(request, response, url, tools) {
     const body = await parseJsonBody(request);
     const result = await updateAdminBookingRequestSlotStatus(context, adminSlotStatusParams.id, body);
     return json(response, 200, result);
+  }
+
+  const adminSlotOfferStatusParams = matchPath(url.pathname, '/admin/booking-requests/:id/slot-offers/:offerId/status');
+  if (adminSlotOfferStatusParams && request.method === 'PATCH') {
+    const context = await authenticateRequest(request);
+    assertSlotOfferManagePermission(context);
+    const body = await parseJsonBody(request);
+    const result = await updateAdminBookingRequestSlotOfferStatus(
+      context,
+      adminSlotOfferStatusParams.id,
+      adminSlotOfferStatusParams.offerId,
+      body
+    );
+    return json(response, 200, result);
+  }
+
+  const adminSlotOffersParams = matchPath(url.pathname, '/admin/booking-requests/:id/slot-offers');
+  if (adminSlotOffersParams && request.method === 'GET') {
+    const context = await authenticateRequest(request);
+    assertReadPermission(context);
+    const result = await listAdminBookingRequestSlotOffers(context, adminSlotOffersParams.id, url.searchParams);
+    return json(response, 200, result);
+  }
+
+  if (adminSlotOffersParams && request.method === 'POST') {
+    const context = await authenticateRequest(request);
+    assertSlotOfferManagePermission(context);
+    const body = await parseJsonBody(request);
+    const result = await createAdminBookingRequestSlotOffer(context, adminSlotOffersParams.id, body);
+    return json(response, 201, result);
   }
 
   const adminNoteParams = matchPath(url.pathname, '/admin/booking-requests/:id/notes');
