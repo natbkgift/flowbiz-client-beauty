@@ -1293,7 +1293,7 @@ function MemberAccessPage({ clinicSlug }) {
 
     if (!session) {
       return (
-        <section className="clinic-template-section member-access-panel" data-testid="member-access-session">
+        <section className="clinic-template-section member-access-panel" data-testid="member-access-session-loading">
           <p>กำลังตรวจสอบลิงก์เข้าใช้งาน...</p>
         </section>
       );
@@ -1915,6 +1915,11 @@ const ClinicBookingRequestForm = React.forwardRef(function ClinicBookingRequestF
     interestId: '',
     preferredDate: '',
     preferredTimeWindow: 'anytime',
+    alternativePreferredDate: '',
+    alternativeTimeWindow: '',
+    visitType: 'consultation',
+    urgency: 'normal',
+    slotNotes: '',
     preferredContactMethod: 'any',
     message: '',
     consentAccepted: false,
@@ -1951,11 +1956,19 @@ const ClinicBookingRequestForm = React.forwardRef(function ClinicBookingRequestF
       return 'รูปแบบอีเมลไม่ถูกต้อง';
     }
     if (form.preferredDate) {
-      const today = new Date();
-      const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const todayString = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Bangkok' }).format(new Date());
       if (!/^\d{4}-\d{2}-\d{2}$/.test(form.preferredDate) || form.preferredDate < todayString) {
         return 'วันที่ต้องการนัดหมายไม่ถูกต้อง';
       }
+    }
+    if (form.alternativePreferredDate) {
+      const todayString = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Bangkok' }).format(new Date());
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(form.alternativePreferredDate) || form.alternativePreferredDate < todayString) {
+        return 'วันที่สำรองไม่ถูกต้อง';
+      }
+    }
+    if (form.slotNotes.length > 500) {
+      return 'หมายเหตุเวลาที่สะดวกต้องไม่เกิน 500 ตัวอักษร';
     }
     if (form.message.length > 1000) {
       return 'ข้อความต้องไม่เกิน 1000 ตัวอักษร';
@@ -1988,6 +2001,11 @@ const ClinicBookingRequestForm = React.forwardRef(function ClinicBookingRequestF
       interestId: form.interestId ? Number(form.interestId) : undefined,
       preferredDate: form.preferredDate || undefined,
       preferredTimeWindow: form.preferredTimeWindow,
+      alternativePreferredDate: form.alternativePreferredDate || undefined,
+      alternativeTimeWindow: form.alternativeTimeWindow || undefined,
+      visitType: form.visitType,
+      urgency: form.urgency,
+      slotRequest: form.slotNotes.trim() ? { notes: form.slotNotes.trim() } : {},
       preferredContactMethod: form.preferredContactMethod,
       message: form.message.trim(),
       consentAccepted: form.consentAccepted,
@@ -2010,6 +2028,11 @@ const ClinicBookingRequestForm = React.forwardRef(function ClinicBookingRequestF
         interestId: '',
         preferredDate: '',
         preferredTimeWindow: 'anytime',
+        alternativePreferredDate: '',
+        alternativeTimeWindow: '',
+        visitType: 'consultation',
+        urgency: 'normal',
+        slotNotes: '',
         preferredContactMethod: 'any',
         message: '',
         consentAccepted: false,
@@ -2096,6 +2119,50 @@ const ClinicBookingRequestForm = React.forwardRef(function ClinicBookingRequestF
             <option value="afternoon">ช่วงบ่าย</option>
             <option value="evening">ช่วงเย็น</option>
           </select>
+        </label>
+
+        <div className="clinic-lead-field clinic-lead-field-wide">
+          <h3 style={{ margin: 0, fontSize: '1rem' }}>เวลาที่สะดวก</h3>
+        </div>
+
+        <label className="clinic-lead-field">
+          <span>วันที่สำรอง</span>
+          <input data-testid="clinic-booking-alt-date" type="date" value={form.alternativePreferredDate} onChange={(event) => updateField('alternativePreferredDate', event.target.value)} />
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>ช่วงเวลาสำรอง</span>
+          <select data-testid="clinic-booking-alt-time-window" value={form.alternativeTimeWindow} onChange={(event) => updateField('alternativeTimeWindow', event.target.value)}>
+            <option value="">ไม่ระบุ</option>
+            <option value="anytime">เวลาใดก็ได้</option>
+            <option value="morning">ช่วงเช้า</option>
+            <option value="afternoon">ช่วงบ่าย</option>
+            <option value="evening">ช่วงเย็น</option>
+          </select>
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>ประเภทการเข้ารับบริการ</span>
+          <select data-testid="clinic-booking-visit-type" value={form.visitType} onChange={(event) => updateField('visitType', event.target.value)}>
+            <option value="consultation">ปรึกษา</option>
+            <option value="treatment">ทำหัตถการ</option>
+            <option value="follow_up">ติดตามผล</option>
+            <option value="other">อื่นๆ</option>
+          </select>
+        </label>
+
+        <label className="clinic-lead-field">
+          <span>ความเร่งด่วน</span>
+          <select data-testid="clinic-booking-urgency" value={form.urgency} onChange={(event) => updateField('urgency', event.target.value)}>
+            <option value="normal">ปกติ</option>
+            <option value="soon">เร็วๆ นี้</option>
+            <option value="urgent">เร่งด่วน</option>
+          </select>
+        </label>
+
+        <label className="clinic-lead-field clinic-lead-field-wide">
+          <span>หมายเหตุเวลาที่สะดวก</span>
+          <textarea data-testid="clinic-booking-slot-notes" value={form.slotNotes} maxLength={500} onChange={(event) => updateField('slotNotes', event.target.value)} rows={3} />
         </label>
 
         <label className="clinic-lead-field">

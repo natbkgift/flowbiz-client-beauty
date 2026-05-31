@@ -8,6 +8,7 @@ const {
   listAdminBookingRequests,
   getAdminBookingRequestDetail,
   updateAdminBookingRequestStatus,
+  updateAdminBookingRequestSlotStatus,
   addAdminBookingRequestNote
 } = require('./service');
 
@@ -63,6 +64,15 @@ async function handleBookingRequestRoutes(request, response, url, tools) {
     assertManagePermission(context);
     const body = await parseJsonBody(request);
     const result = await updateAdminBookingRequestStatus(context, adminStatusParams.id, body);
+    return json(response, 200, result);
+  }
+
+  const adminSlotStatusParams = matchPath(url.pathname, '/admin/booking-requests/:id/slot-status');
+  if (adminSlotStatusParams && request.method === 'PATCH') {
+    const context = await authenticateRequest(request);
+    assertManagePermission(context);
+    const body = await parseJsonBody(request);
+    const result = await updateAdminBookingRequestSlotStatus(context, adminSlotStatusParams.id, body);
     return json(response, 200, result);
   }
 
