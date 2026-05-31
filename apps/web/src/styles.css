@@ -212,6 +212,20 @@ button {
   background: rgba(180, 83, 9, 0.08);
 }
 
+.pill.status-draft,
+.pill.status-inactive,
+.pill.status-archived {
+  color: var(--text-muted);
+  border-color: rgba(80, 53, 24, 0.16);
+  background: rgba(80, 53, 24, 0.06);
+}
+
+.pill.status-active {
+  color: var(--accent-strong);
+  border-color: rgba(15, 118, 110, 0.24);
+  background: rgba(15, 118, 110, 0.1);
+}
+
 .page-shell {
   margin-top: 22px;
   display: flex;
@@ -531,6 +545,27 @@ button {
 
 .blog-settings-subheading {
   margin-top: 12px;
+}
+
+.clinic-offerings-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.clinic-offerings-page .data-table .inline-actions {
+  gap: 6px;
+}
+
+.clinic-offerings-page .data-table button {
+  padding: 7px 10px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+}
+
+.clinic-offerings-page input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
 }
 
 .blog-editor-actions {

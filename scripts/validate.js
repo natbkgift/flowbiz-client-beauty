@@ -150,7 +150,10 @@ const requiredPaths = [
   'apps/api/src/modules/clinic-offerings/routes.js',
   'tests/clinic_offerings_admin_api.test.js',
   'tests/public_clinic_offerings_api.test.js',
-  'docs/MULTI_CLINIC_PR10A_OFFERINGS_SCHEMA_API_HANDOFF.md'
+  'docs/MULTI_CLINIC_PR10A_OFFERINGS_SCHEMA_API_HANDOFF.md',
+  'tests/clinic_offerings_admin_ui.test.js',
+  'tests/public_clinic_offerings_rendering.test.js',
+  'docs/MULTI_CLINIC_PR10B_OFFERINGS_ADMIN_UI_PUBLIC_RENDERING_HANDOFF.md'
 ];
 
 function checkFiles() {
@@ -261,7 +264,9 @@ function checkSyntax() {
     'apps/api/src/modules/clinic-offerings/service.js',
     'apps/api/src/modules/clinic-offerings/routes.js',
     'tests/clinic_offerings_admin_api.test.js',
-    'tests/public_clinic_offerings_api.test.js'
+    'tests/public_clinic_offerings_api.test.js',
+    'tests/clinic_offerings_admin_ui.test.js',
+    'tests/public_clinic_offerings_rendering.test.js'
   ];
 
   for (const file of jsFiles) {
