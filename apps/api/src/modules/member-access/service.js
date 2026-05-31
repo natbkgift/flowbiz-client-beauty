@@ -18,7 +18,18 @@ function trimString(value, maxLength, code = 'INVALID_MEMBER_ACCESS_PAYLOAD') {
   }
   const trimmed = value.trim();
   if (!trimmed) return null;
-  return trimmed.length > maxLength ? trimmed.slice(0, maxLength) : trimmed;
+  if (trimmed.length > maxLength) {
+    throw new AppError(400, code, 'String field is too long.');
+  }
+  return trimmed;
+}
+
+function trimHoneypot(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') {
+    throw new AppError(400, 'INVALID_MEMBER_ACCESS_PAYLOAD', 'Expected string field.');
+  }
+  return value.trim() || null;
 }
 
 function rejectClinicOverride(body) {
@@ -38,12 +49,12 @@ function rejectClinicOverrideQuery(searchParams) {
 
 function normalizeRequestPayload(body) {
   rejectClinicOverride(body);
-  const honeypot = trimString(body.honeypot, 200);
+  const honeypot = trimHoneypot(body.honeypot);
   if (honeypot) {
     return { isBot: true };
   }
 
-  const contact = trimString(body.contact, 160, 'MEMBER_ACCESS_CONTACT_REQUIRED');
+  const contact = trimString(body.contact, 160, 'INVALID_MEMBER_ACCESS_PAYLOAD');
   const channel = trimString(body.channel, 40, 'INVALID_MEMBER_ACCESS_CHANNEL');
 
   if (!contact) {
@@ -150,10 +161,16 @@ function mapPublicBookingRequest(row) {
     status: row.status,
     requestType: row.request_type,
     interestType: row.interest_type,
-    preferredDate: row.preferred_date ? String(row.preferred_date).slice(0, 10) : null,
+    preferredDate: formatDateOnly(row.preferred_date),
     preferredTimeWindow: row.preferred_time_window || null,
     createdAt: row.created_at
   };
+}
+
+function formatDateOnly(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
 }
 
 async function resolveActiveClinicForRequest(slug) {
@@ -176,26 +193,42 @@ async function resolveActiveClinicOrThrow(slug) {
 }
 
 async function findMemberByContact(client, clinicId, channel, contact) {
-  const lookup = {
-    email: { clause: 'lower(email) = lower($2)', value: contact },
-    phone: { clause: 'phone = $2', value: contact },
-    line: { clause: 'line_id = $2', value: contact }
-  }[channel];
-
-  if (!lookup) return null;
-
-  const result = await client.query(
-    `
+  let query;
+  if (channel === 'email') {
+    query = `
       select *
       from clinic_members
       where clinic_id = $1
-        and ${lookup.clause}
+        and lower(email) = lower($2)
         and status = 'active'
       order by updated_at desc, id desc
       limit 1
-    `,
-    [clinicId, lookup.value]
-  );
+    `;
+  } else if (channel === 'phone') {
+    query = `
+      select *
+      from clinic_members
+      where clinic_id = $1
+        and phone = $2
+        and status = 'active'
+      order by updated_at desc, id desc
+      limit 1
+    `;
+  } else if (channel === 'line') {
+    query = `
+      select *
+      from clinic_members
+      where clinic_id = $1
+        and line_id = $2
+        and status = 'active'
+      order by updated_at desc, id desc
+      limit 1
+    `;
+  } else {
+    return null;
+  }
+
+  const result = await client.query(query, [clinicId, contact]);
 
   return result.rows[0] || null;
 }
@@ -430,5 +463,6 @@ module.exports = {
   maskLineId,
   hashAccessToken,
   createAccessToken,
-  findMemberByContact
+  findMemberByContact,
+  mapPublicBookingRequest
 };

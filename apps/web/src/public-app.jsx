@@ -368,7 +368,8 @@ function openExternalUrl(url) {
 function parseHashRoute(route) {
   const raw = route || '#/';
   const withoutHash = raw.startsWith('#') ? raw.slice(1) : raw;
-  const [pathname = '/', query = ''] = withoutHash.split('?');
+  const [rawPathname = '/', query = ''] = withoutHash.split('?');
+  const pathname = rawPathname && rawPathname.startsWith('/') ? rawPathname : `/${rawPathname || ''}`;
   return {
     pathname: pathname || '/',
     searchParams: new URLSearchParams(query)

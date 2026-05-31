@@ -23,7 +23,7 @@ function createMockResponse() {
   };
 }
 
-async function routeJson({ method = 'GET', path, body = {}, searchParams = {} }) {
+async function routeJson({ method = 'GET', path, body = {}, searchParams = {}, remoteAddress }) {
   const response = createMockResponse();
   const suffix = Object.keys(searchParams).length ? `?${new URLSearchParams(searchParams).toString()}` : '';
   const url = new URL(`http://localhost${path}${suffix}`);
@@ -33,7 +33,7 @@ async function routeJson({ method = 'GET', path, body = {}, searchParams = {} })
       {
         method,
         headers: { 'user-agent': 'member-access-test-agent' },
-        socket: { remoteAddress: `127.13.1.${Math.floor(Math.random() * 200) + 1}` }
+        socket: { remoteAddress: remoteAddress || `127.13.1.${Math.floor(Math.random() * 200) + 1}` }
       },
       response,
       url,
@@ -152,6 +152,56 @@ test('Member Magic Link Access API - route is public and not handled by admin me
 
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.success, true);
+});
+
+test('Member Magic Link Access API - validates overlong fields instead of truncating', async () => {
+  const requestRes = await routeJson({
+    method: 'POST',
+    path: '/public/clinics/unknown-magic/member-access/request',
+    body: { contact: `${'a'.repeat(170)}@example.com`, channel: 'email', honeypot: '' }
+  });
+
+  assert.equal(requestRes.statusCode, 400);
+  assert.equal(requestRes.body.error.code, 'INVALID_MEMBER_ACCESS_PAYLOAD');
+
+  const sessionRes = await routeJson({
+    method: 'GET',
+    path: '/public/clinics/unknown-magic/member-access/session',
+    searchParams: { token: 'x'.repeat(301) }
+  });
+
+  assert.equal(sessionRes.statusCode, 400);
+  assert.equal(sessionRes.body.error.code, 'INVALID_MEMBER_ACCESS_TOKEN');
+});
+
+test('Member Magic Link Access API - session endpoint rate limits before token verification', async () => {
+  let lastResponse = null;
+  for (let i = 0; i < 61; i += 1) {
+    lastResponse = await routeJson({
+      method: 'GET',
+      path: '/public/clinics/unknown-magic/member-access/session',
+      searchParams: { token: 'invalid-token', clinic_id: '1' },
+      remoteAddress: '127.13.1.251'
+    });
+  }
+
+  assert.equal(lastResponse.statusCode, 429);
+  assert.equal(lastResponse.body.error.code, 'RATE_LIMIT_EXCEEDED');
+});
+
+test('Member Magic Link Access API - public booking serializer formats Date preferred_date', () => {
+  const { mapPublicBookingRequest } = require('../apps/api/src/modules/member-access/service');
+  const booking = mapPublicBookingRequest({
+    id: 1,
+    status: 'contacted',
+    request_type: 'booking_request',
+    interest_type: 'service',
+    preferred_date: new Date('2099-06-15T00:00:00.000Z'),
+    preferred_time_window: 'afternoon',
+    created_at: '2099-06-01T00:00:00.000Z'
+  });
+
+  assert.equal(booking.preferredDate, '2099-06-15');
 });
 
 test('Member Magic Link Access API - Integration Tests', async (t) => {

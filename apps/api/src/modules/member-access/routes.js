@@ -32,6 +32,11 @@ async function handleMemberAccessRoutes(request, response, url, tools) {
 
   const sessionParams = matchPath(url.pathname, '/public/clinics/:slug/member-access/session');
   if (sessionParams && request.method === 'GET') {
+    const limitCheck = checkRateLimit(request, 60, 60000);
+    if (!limitCheck.allowed) {
+      throw new AppError(429, 'RATE_LIMIT_EXCEEDED', limitCheck.message);
+    }
+
     if (url.searchParams.has('clinicId') || url.searchParams.has('clinic_id')) {
       throw new AppError(400, 'INVALID_MEMBER_ACCESS_PAYLOAD', 'clinicId cannot be supplied for public member access.');
     }
