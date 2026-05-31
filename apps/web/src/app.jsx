@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { key: 'dashboard', label: 'แดชบอร์ด', caption: 'ภาพรวมกิจกรรมคลินิก' },
   { key: 'clinics', label: 'จัดการคลินิก', caption: 'เพิ่ม แก้ไข และควบคุมคลินิก' },
   { key: 'clinic-website', label: 'เว็บไซต์คลินิก', caption: 'ตั้งค่าเว็บ โลโก้ สี และหน้าแรก' },
+  { key: 'clinic-offerings', label: 'บริการและแพ็กเกจ', caption: 'จัดการบริการ โปรโมชั่น และแพ็กเกจ' },
   { key: 'unified-inbox', label: 'กล่องแชทรวม', caption: 'แชทโซเชียลและ AI co-pilot' },
   { key: 'roas-analytics', label: 'ROAS และสะสมแต้ม', caption: 'ค่าโฆษณา CAC และแนะนำเพื่อน' },
   { key: 'ai-agent-console', label: 'คอนโซล AI Agent', caption: 'กฎ Agent และคิว HITL' },
@@ -535,6 +536,60 @@ function createApiClient(apiBaseUrl) {
     },
     reorderClinicHomepageSections(session, body) {
       return request('/admin/clinic-website/sections/reorder', { ...session, method: 'PATCH', body });
+    },
+    listClinicServices(session) {
+      return request('/admin/clinic-offerings/services', session);
+    },
+    createClinicService(session, body) {
+      return request('/admin/clinic-offerings/services', { ...session, method: 'POST', body });
+    },
+    updateClinicService(session, serviceId, body) {
+      return request(`/admin/clinic-offerings/services/${serviceId}`, { ...session, method: 'PATCH', body });
+    },
+    deleteClinicService(session, serviceId) {
+      return request(`/admin/clinic-offerings/services/${serviceId}`, { ...session, method: 'DELETE' });
+    },
+    reorderClinicServices(session, body) {
+      return request('/admin/clinic-offerings/services/reorder', { ...session, method: 'PATCH', body });
+    },
+    listClinicPromotions(session) {
+      return request('/admin/clinic-offerings/promotions', session);
+    },
+    createClinicPromotion(session, body) {
+      return request('/admin/clinic-offerings/promotions', { ...session, method: 'POST', body });
+    },
+    updateClinicPromotion(session, promotionId, body) {
+      return request(`/admin/clinic-offerings/promotions/${promotionId}`, { ...session, method: 'PATCH', body });
+    },
+    deleteClinicPromotion(session, promotionId) {
+      return request(`/admin/clinic-offerings/promotions/${promotionId}`, { ...session, method: 'DELETE' });
+    },
+    reorderClinicPromotions(session, body) {
+      return request('/admin/clinic-offerings/promotions/reorder', { ...session, method: 'PATCH', body });
+    },
+    listClinicPackages(session) {
+      return request('/admin/clinic-offerings/packages', session);
+    },
+    createClinicPackage(session, body) {
+      return request('/admin/clinic-offerings/packages', { ...session, method: 'POST', body });
+    },
+    updateClinicPackage(session, packageId, body) {
+      return request(`/admin/clinic-offerings/packages/${packageId}`, { ...session, method: 'PATCH', body });
+    },
+    deleteClinicPackage(session, packageId) {
+      return request(`/admin/clinic-offerings/packages/${packageId}`, { ...session, method: 'DELETE' });
+    },
+    reorderClinicPackages(session, body) {
+      return request('/admin/clinic-offerings/packages/reorder', { ...session, method: 'PATCH', body });
+    },
+    addClinicPackageService(session, packageId, body) {
+      return request(`/admin/clinic-offerings/packages/${packageId}/services`, { ...session, method: 'POST', body });
+    },
+    removeClinicPackageService(session, packageId, serviceId) {
+      return request(`/admin/clinic-offerings/packages/${packageId}/services/${serviceId}`, { ...session, method: 'DELETE' });
+    },
+    reorderClinicPackageServices(session, packageId, body) {
+      return request(`/admin/clinic-offerings/packages/${packageId}/services/reorder`, { ...session, method: 'PATCH', body });
     }
   };
 }
@@ -4437,6 +4492,869 @@ function ClinicsPage() {
   );
 }
 
+const OFFERING_STATUS_OPTIONS = [
+  { value: 'draft', label: 'ร่าง' },
+  { value: 'active', label: 'เผยแพร่' },
+  { value: 'inactive', label: 'ปิดใช้งาน' },
+  { value: 'archived', label: 'เก็บถาวร' }
+];
+
+function emptyServiceForm() {
+  return {
+    id: null,
+    name: '',
+    category: '',
+    shortDescription: '',
+    durationMinutes: '',
+    priceMin: '',
+    priceMax: '',
+    currency: 'THB',
+    status: 'draft',
+    isFeatured: false,
+    sortOrder: '',
+    imageUrl: ''
+  };
+}
+
+function emptyPromotionForm() {
+  return {
+    id: null,
+    title: '',
+    subtitle: '',
+    badgeLabel: '',
+    startsAt: '',
+    endsAt: '',
+    status: 'draft',
+    isFeatured: false,
+    sortOrder: '',
+    imageUrl: '',
+    ctaLabel: '',
+    ctaUrl: ''
+  };
+}
+
+function emptyPackageForm() {
+  return {
+    id: null,
+    name: '',
+    summary: '',
+    price: '',
+    currency: 'THB',
+    status: 'draft',
+    isFeatured: false,
+    sortOrder: '',
+    imageUrl: ''
+  };
+}
+
+function compactPayload(payload, options = {}) {
+  const keepNull = Boolean(options.keepNull);
+  const next = {};
+
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value === '' || value === undefined || (value === null && !keepNull)) {
+      return;
+    }
+
+    next[key] = value;
+  });
+
+  return next;
+}
+
+function parseOptionalNumber(value) {
+  if (value === '' || value === null || value === undefined) {
+    return undefined;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function isHttpUrlOrBlank(value) {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    return ['http:', 'https:'].includes(parsed.protocol);
+  } catch (_) {
+    return false;
+  }
+}
+
+function optionalTextPayloadValue(value, allowClears = false) {
+  const trimmed = String(value || '').trim();
+  return trimmed || (allowClears ? null : undefined);
+}
+
+function optionalNumberPayloadValue(value, allowClears = false) {
+  if (value === '' || value === null || value === undefined) {
+    return allowClears ? null : undefined;
+  }
+
+  const parsed = parseOptionalNumber(value);
+  return parsed === undefined ? undefined : parsed;
+}
+
+function hasInvalidOptionalNumber(value) {
+  return value !== '' && value !== null && value !== undefined && parseOptionalNumber(value) === undefined;
+}
+
+function formatAdminOfferingPrice(item, kind) {
+  const currency = item.currency || 'THB';
+  const money = (value) => `${currency} ${formatNumber(value)}`;
+
+  if (kind === 'service') {
+    if (item.priceMin != null && item.priceMax != null && Number(item.priceMax) !== Number(item.priceMin)) {
+      return `${money(item.priceMin)} - ${money(item.priceMax)}`;
+    }
+    if (item.priceMin != null) {
+      return `เริ่มต้น ${money(item.priceMin)}`;
+    }
+    if (item.priceMax != null) {
+      return money(item.priceMax);
+    }
+    return 'สอบถามราคา';
+  }
+
+  if (item.price != null) {
+    return money(item.price);
+  }
+
+  return 'สอบถามราคา';
+}
+
+function buildServicePayload(form, options = {}) {
+  const allowClears = Boolean(options.allowClears);
+  return compactPayload({
+    name: form.name.trim(),
+    category: optionalTextPayloadValue(form.category, allowClears),
+    shortDescription: optionalTextPayloadValue(form.shortDescription, allowClears),
+    durationMinutes: optionalNumberPayloadValue(form.durationMinutes, allowClears),
+    priceMin: optionalNumberPayloadValue(form.priceMin, allowClears),
+    priceMax: optionalNumberPayloadValue(form.priceMax, allowClears),
+    currency: form.currency.trim() || 'THB',
+    status: form.status,
+    isFeatured: Boolean(form.isFeatured),
+    sortOrder: parseOptionalNumber(form.sortOrder),
+    imageUrl: optionalTextPayloadValue(form.imageUrl, allowClears)
+  }, { keepNull: allowClears });
+}
+
+function buildPromotionPayload(form, options = {}) {
+  const allowClears = Boolean(options.allowClears);
+  return compactPayload({
+    title: form.title.trim(),
+    subtitle: optionalTextPayloadValue(form.subtitle, allowClears),
+    badgeLabel: optionalTextPayloadValue(form.badgeLabel, allowClears),
+    startsAt: optionalTextPayloadValue(form.startsAt, allowClears),
+    endsAt: optionalTextPayloadValue(form.endsAt, allowClears),
+    status: form.status,
+    isFeatured: Boolean(form.isFeatured),
+    sortOrder: parseOptionalNumber(form.sortOrder),
+    imageUrl: optionalTextPayloadValue(form.imageUrl, allowClears),
+    ctaLabel: optionalTextPayloadValue(form.ctaLabel, allowClears),
+    ctaUrl: optionalTextPayloadValue(form.ctaUrl, allowClears)
+  }, { keepNull: allowClears });
+}
+
+function buildPackagePayload(form, options = {}) {
+  const allowClears = Boolean(options.allowClears);
+  return compactPayload({
+    name: form.name.trim(),
+    summary: optionalTextPayloadValue(form.summary, allowClears),
+    price: optionalNumberPayloadValue(form.price, allowClears),
+    currency: form.currency.trim() || 'THB',
+    status: form.status,
+    isFeatured: Boolean(form.isFeatured),
+    sortOrder: parseOptionalNumber(form.sortOrder),
+    imageUrl: optionalTextPayloadValue(form.imageUrl, allowClears)
+  }, { keepNull: allowClears });
+}
+
+function ClinicOfferingsAdminPage() {
+  const api = useApi();
+  const sessionOptions = useSessionRequestOptions();
+  const { session } = useTenant();
+  const role = session?.currentMembership?.role || '';
+  const canWrite = ['owner', 'manager', 'marketing'].includes(role);
+  const [activeTab, setActiveTab] = useState('services');
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [message, setMessage] = useState(null);
+  const [services, setServices] = useState([]);
+  const [promotions, setPromotions] = useState([]);
+  const [packages, setPackages] = useState([]);
+  const [serviceForm, setServiceForm] = useState(emptyServiceForm);
+  const [promotionForm, setPromotionForm] = useState(emptyPromotionForm);
+  const [packageForm, setPackageForm] = useState(emptyPackageForm);
+  const [selectedPackageId, setSelectedPackageId] = useState('');
+  const [serviceLinkForm, setServiceLinkForm] = useState({ serviceId: '', quantity: '1' });
+  const [linkedServices, setLinkedServices] = useState({});
+
+  const [state] = usePageData(async () => {
+    const [servicesResult, promotionsResult, packagesResult] = await Promise.all([
+      api.listClinicServices(sessionOptions),
+      api.listClinicPromotions(sessionOptions),
+      api.listClinicPackages(sessionOptions)
+    ]);
+
+    return {
+      services: servicesResult.items || [],
+      promotions: promotionsResult.items || [],
+      packages: packagesResult.items || []
+    };
+  }, [api, sessionOptions, refreshToken]);
+
+  useEffect(() => {
+    if (state.status === 'ready' && state.data) {
+      setServices(state.data.services || []);
+      setPromotions(state.data.promotions || []);
+      setPackages(state.data.packages || []);
+
+      if (!selectedPackageId && state.data.packages?.length) {
+        setSelectedPackageId(String(state.data.packages[0].id));
+      }
+    }
+  }, [state.status, state.data, selectedPackageId]);
+
+  function refreshOfferings() {
+    setRefreshToken((value) => value + 1);
+  }
+
+  function handleError(error) {
+    setMessage({ kind: 'error', message: describeError(error) });
+  }
+
+  async function handleSaveService(event) {
+    event.preventDefault();
+    setMessage(null);
+
+    if (!canWrite) {
+      setMessage({ kind: 'error', message: 'คุณไม่มีสิทธิ์แก้ไขบริการ โปรโมชั่น หรือแพ็กเกจของคลินิกนี้' });
+      return;
+    }
+
+    if (!serviceForm.name.trim()) {
+      setMessage({ kind: 'error', message: 'กรุณาระบุชื่อบริการ' });
+      return;
+    }
+
+    const priceMin = parseOptionalNumber(serviceForm.priceMin);
+    const priceMax = parseOptionalNumber(serviceForm.priceMax);
+    const durationMinutes = parseOptionalNumber(serviceForm.durationMinutes);
+
+    if (
+      hasInvalidOptionalNumber(serviceForm.priceMin)
+      || hasInvalidOptionalNumber(serviceForm.priceMax)
+      || hasInvalidOptionalNumber(serviceForm.durationMinutes)
+    ) {
+      setMessage({ kind: 'error', message: 'กรุณาระบุตัวเลขของราคาและระยะเวลาให้ถูกต้อง' });
+      return;
+    }
+
+    if (priceMin != null && priceMin < 0) {
+      setMessage({ kind: 'error', message: 'ราคาต่ำสุดต้องไม่น้อยกว่า 0' });
+      return;
+    }
+
+    if (priceMax != null && priceMax < 0) {
+      setMessage({ kind: 'error', message: 'ราคาสูงสุดต้องไม่น้อยกว่า 0' });
+      return;
+    }
+
+    if (priceMin != null && priceMax != null && priceMax < priceMin) {
+      setMessage({ kind: 'error', message: 'ราคาสูงสุดต้องมากกว่าหรือเท่ากับราคาต่ำสุด' });
+      return;
+    }
+
+    if (durationMinutes != null && durationMinutes < 0) {
+      setMessage({ kind: 'error', message: 'ระยะเวลาต้องไม่น้อยกว่า 0' });
+      return;
+    }
+
+    if (!isHttpUrlOrBlank(serviceForm.imageUrl)) {
+      setMessage({ kind: 'error', message: 'Image URL ต้องขึ้นต้นด้วย http:// หรือ https://' });
+      return;
+    }
+
+    const payload = buildServicePayload(serviceForm, { allowClears: Boolean(serviceForm.id) });
+
+    try {
+      if (serviceForm.id) {
+        await api.updateClinicService(sessionOptions, serviceForm.id, payload);
+        setMessage({ kind: 'success', message: 'บันทึกบริการสำเร็จ' });
+      } else {
+        await api.createClinicService(sessionOptions, payload);
+        setMessage({ kind: 'success', message: 'เพิ่มบริการสำเร็จ' });
+      }
+      setServiceForm(emptyServiceForm());
+      refreshOfferings();
+    } catch (error) {
+      handleError(error);
+    }
+  }
+
+  async function handleSavePromotion(event) {
+    event.preventDefault();
+    setMessage(null);
+
+    if (!canWrite) {
+      setMessage({ kind: 'error', message: 'คุณไม่มีสิทธิ์แก้ไขบริการ โปรโมชั่น หรือแพ็กเกจของคลินิกนี้' });
+      return;
+    }
+
+    if (!promotionForm.title.trim()) {
+      setMessage({ kind: 'error', message: 'กรุณาระบุชื่อโปรโมชั่น' });
+      return;
+    }
+
+    if (!isHttpUrlOrBlank(promotionForm.imageUrl) || !isHttpUrlOrBlank(promotionForm.ctaUrl)) {
+      setMessage({ kind: 'error', message: 'URL ต้องขึ้นต้นด้วย http:// หรือ https://' });
+      return;
+    }
+
+    if (promotionForm.startsAt && promotionForm.endsAt && new Date(promotionForm.endsAt) < new Date(promotionForm.startsAt)) {
+      setMessage({ kind: 'error', message: 'วันสิ้นสุดต้องไม่ก่อนวันเริ่มต้น' });
+      return;
+    }
+
+    const payload = buildPromotionPayload(promotionForm, { allowClears: Boolean(promotionForm.id) });
+
+    try {
+      if (promotionForm.id) {
+        await api.updateClinicPromotion(sessionOptions, promotionForm.id, payload);
+        setMessage({ kind: 'success', message: 'บันทึกโปรโมชั่นสำเร็จ' });
+      } else {
+        await api.createClinicPromotion(sessionOptions, payload);
+        setMessage({ kind: 'success', message: 'เพิ่มโปรโมชั่นสำเร็จ' });
+      }
+      setPromotionForm(emptyPromotionForm());
+      refreshOfferings();
+    } catch (error) {
+      handleError(error);
+    }
+  }
+
+  async function handleSavePackage(event) {
+    event.preventDefault();
+    setMessage(null);
+
+    if (!canWrite) {
+      setMessage({ kind: 'error', message: 'คุณไม่มีสิทธิ์แก้ไขบริการ โปรโมชั่น หรือแพ็กเกจของคลินิกนี้' });
+      return;
+    }
+
+    if (!packageForm.name.trim()) {
+      setMessage({ kind: 'error', message: 'กรุณาระบุชื่อแพ็กเกจ' });
+      return;
+    }
+
+    const price = parseOptionalNumber(packageForm.price);
+    if (hasInvalidOptionalNumber(packageForm.price)) {
+      setMessage({ kind: 'error', message: 'กรุณาระบุตัวเลขของราคาให้ถูกต้อง' });
+      return;
+    }
+
+    if (price != null && price < 0) {
+      setMessage({ kind: 'error', message: 'ราคาต้องไม่น้อยกว่า 0' });
+      return;
+    }
+
+    if (!isHttpUrlOrBlank(packageForm.imageUrl)) {
+      setMessage({ kind: 'error', message: 'Image URL ต้องขึ้นต้นด้วย http:// หรือ https://' });
+      return;
+    }
+
+    const payload = buildPackagePayload(packageForm, { allowClears: Boolean(packageForm.id) });
+
+    try {
+      if (packageForm.id) {
+        await api.updateClinicPackage(sessionOptions, packageForm.id, payload);
+        setMessage({ kind: 'success', message: 'บันทึกแพ็กเกจสำเร็จ' });
+      } else {
+        await api.createClinicPackage(sessionOptions, payload);
+        setMessage({ kind: 'success', message: 'เพิ่มแพ็กเกจสำเร็จ' });
+      }
+      setPackageForm(emptyPackageForm());
+      refreshOfferings();
+    } catch (error) {
+      handleError(error);
+    }
+  }
+
+  async function handleDelete(kind, id) {
+    if (!canWrite || !window.confirm('ยืนยันการลบรายการนี้?')) {
+      return;
+    }
+
+    setMessage(null);
+
+    try {
+      if (kind === 'service') {
+        await api.deleteClinicService(sessionOptions, id);
+      } else if (kind === 'promotion') {
+        await api.deleteClinicPromotion(sessionOptions, id);
+      } else {
+        await api.deleteClinicPackage(sessionOptions, id);
+      }
+      setMessage({ kind: 'success', message: 'ลบรายการสำเร็จ' });
+      refreshOfferings();
+    } catch (error) {
+      handleError(error);
+    }
+  }
+
+  async function handleMove(kind, index, direction) {
+    if (!canWrite) return;
+
+    const list = kind === 'service' ? services : kind === 'promotion' ? promotions : packages;
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= list.length) return;
+
+    const reordered = [...list];
+    [reordered[index], reordered[nextIndex]] = [reordered[nextIndex], reordered[index]];
+    const payload = { items: reordered.map((item, sortOrder) => ({ id: item.id, sortOrder })) };
+
+    try {
+      if (kind === 'service') {
+        setServices(reordered);
+        await api.reorderClinicServices(sessionOptions, payload);
+      } else if (kind === 'promotion') {
+        setPromotions(reordered);
+        await api.reorderClinicPromotions(sessionOptions, payload);
+      } else {
+        setPackages(reordered);
+        await api.reorderClinicPackages(sessionOptions, payload);
+      }
+      setMessage({ kind: 'success', message: 'จัดเรียงรายการสำเร็จ' });
+      refreshOfferings();
+    } catch (error) {
+      handleError(error);
+      refreshOfferings();
+    }
+  }
+
+  async function handleAddServiceToPackage(event) {
+    event.preventDefault();
+    setMessage(null);
+
+    if (!canWrite) {
+      setMessage({ kind: 'error', message: 'คุณไม่มีสิทธิ์แก้ไขบริการ โปรโมชั่น หรือแพ็กเกจของคลินิกนี้' });
+      return;
+    }
+
+    if (!selectedPackageId || !serviceLinkForm.serviceId) {
+      setMessage({ kind: 'error', message: 'กรุณาเลือกแพ็กเกจและบริการ' });
+      return;
+    }
+
+    const quantity = parseInt(serviceLinkForm.quantity, 10);
+    const payload = {
+      serviceId: Number(serviceLinkForm.serviceId),
+      quantity: Number.isNaN(quantity) ? 1 : Math.max(1, quantity),
+      sortOrder: (linkedServices[selectedPackageId] || []).length
+    };
+
+    try {
+      const link = await api.addClinicPackageService(sessionOptions, selectedPackageId, payload);
+      setLinkedServices((current) => ({
+        ...current,
+        [selectedPackageId]: [
+          ...(current[selectedPackageId] || []).filter((item) => String(item.serviceId) !== String(link.serviceId)),
+          link
+        ]
+      }));
+      setServiceLinkForm({ serviceId: '', quantity: '1' });
+      setMessage({ kind: 'success', message: 'เพิ่มบริการในแพ็กเกจสำเร็จ' });
+    } catch (error) {
+      handleError(error);
+    }
+  }
+
+  async function handleRemoveServiceFromPackage(serviceId) {
+    if (!canWrite || !selectedPackageId) return;
+
+    try {
+      await api.removeClinicPackageService(sessionOptions, selectedPackageId, serviceId);
+      setLinkedServices((current) => ({
+        ...current,
+        [selectedPackageId]: (current[selectedPackageId] || []).filter((item) => String(item.serviceId) !== String(serviceId))
+      }));
+      setMessage({ kind: 'success', message: 'นำบริการออกจากแพ็กเกจแล้ว' });
+    } catch (error) {
+      handleError(error);
+    }
+  }
+
+  function renderStatusSelect(value, onChange, testId, disabled = false) {
+    return (
+      <select value={value} onChange={(event) => onChange(event.target.value)} data-testid={testId} disabled={disabled}>
+        {OFFERING_STATUS_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+    );
+  }
+
+  if (state.status === 'loading' || state.status === 'idle') {
+    return <LoadingCard label="กำลังโหลดบริการ โปรโมชั่น และแพ็กเกจ..." />;
+  }
+
+  if (state.status === 'error') {
+    if (state.error?.status === 403) {
+      return (
+        <Card variant="notice" className="error-card" data-testid="clinic-offerings-permission-error">
+          <h3 className="section-heading">ไม่มีสิทธิ์แก้ไข</h3>
+          <p className="muted">คุณไม่มีสิทธิ์แก้ไขบริการ โปรโมชั่น หรือแพ็กเกจของคลินิกนี้</p>
+          <p className="muted">กรุณาใช้บัญชี Clinic Owner, Manager หรือ Marketing</p>
+        </Card>
+      );
+    }
+    return <ErrorCard error={state.error} />;
+  }
+
+  const selectedPackageLinks = linkedServices[selectedPackageId] || [];
+
+  return (
+    <PageShell
+      title="บริการ โปรโมชั่น และแพ็กเกจ"
+      intro="จัดการ offerings ของคลินิกเพื่อใช้แสดงบนเว็บไซต์สาธารณะและเตรียมต่อยอด workflow การขาย"
+    >
+      <div className="clinic-offerings-page" data-testid="clinic-offerings-page">
+        <StatusBanner state={message} testId="clinic-offerings-status" />
+        {!canWrite ? (
+          <Card variant="notice" className="notice-card" data-testid="clinic-offerings-readonly-notice">
+            <h3 className="section-heading">โหมดอ่านอย่างเดียว</h3>
+            <p className="muted">คุณไม่มีสิทธิ์แก้ไขบริการ โปรโมชั่น หรือแพ็กเกจของคลินิกนี้</p>
+            <p className="muted">กรุณาใช้บัญชี Clinic Owner, Manager หรือ Marketing</p>
+          </Card>
+        ) : null}
+
+        <div className="blog-editor-tabs" data-testid="clinic-offerings-tabs">
+          <button type="button" className={`primary-button ${activeTab === 'services' ? '' : 'ghost-button'}`} onClick={() => setActiveTab('services')} data-testid="clinic-offerings-tab-services">บริการ</button>
+          <button type="button" className={`primary-button ${activeTab === 'promotions' ? '' : 'ghost-button'}`} onClick={() => setActiveTab('promotions')} data-testid="clinic-offerings-tab-promotions">โปรโมชั่น</button>
+          <button type="button" className={`primary-button ${activeTab === 'packages' ? '' : 'ghost-button'}`} onClick={() => setActiveTab('packages')} data-testid="clinic-offerings-tab-packages">แพ็กเกจ</button>
+        </div>
+
+        {activeTab === 'services' ? (
+          <div className="blog-editor-layout">
+            <Card variant="section" className="section-card">
+              <div className="split-header compact-gap">
+                <div>
+                  <h2 className="section-heading">รายการบริการ</h2>
+                  <p className="muted">เรียงตามลำดับที่จะแสดงในหน้า public</p>
+                </div>
+                <button type="button" className="secondary-button" onClick={refreshOfferings} data-testid="clinic-offerings-refresh">รีเฟรช</button>
+              </div>
+              <div className="table-shell">
+                <table className="data-table" data-testid="clinic-offerings-services-table">
+                  <thead>
+                    <tr>
+                      <th>ชื่อ</th>
+                      <th>หมวดหมู่</th>
+                      <th>ราคา</th>
+                      <th>สถานะ</th>
+                      <th>จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {services.map((service, index) => (
+                      <tr key={service.id} data-testid={`clinic-offerings-service-row-${service.id}`}>
+                        <td>
+                          <strong>{service.name}</strong>
+                          {service.isFeatured ? <span className="pill">Featured</span> : null}
+                        </td>
+                        <td>{service.category || '-'}</td>
+                        <td>{formatAdminOfferingPrice(service, 'service')}</td>
+                        <td><span className={`pill status-${service.status}`}>{service.status}</span></td>
+                        <td>
+                          <div className="inline-actions">
+                            <button type="button" className="secondary-button" onClick={() => setServiceForm({ ...emptyServiceForm(), ...service, durationMinutes: service.durationMinutes ?? '', priceMin: service.priceMin ?? '', priceMax: service.priceMax ?? '', imageUrl: service.imageUrl || '' })} data-testid={`clinic-offerings-service-edit-${service.id}`}>แก้ไข</button>
+                            <button type="button" className="secondary-button" onClick={() => handleMove('service', index, -1)} disabled={!canWrite || index === 0} data-testid={`clinic-offerings-service-up-${service.id}`}>ขึ้น</button>
+                            <button type="button" className="secondary-button" onClick={() => handleMove('service', index, 1)} disabled={!canWrite || index === services.length - 1} data-testid={`clinic-offerings-service-down-${service.id}`}>ลง</button>
+                            <button type="button" className="danger-button" onClick={() => handleDelete('service', service.id)} disabled={!canWrite} data-testid={`clinic-offerings-service-delete-${service.id}`}>ลบ</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            <Card variant="section" className="section-card">
+              <h2 className="section-heading">{serviceForm.id ? 'แก้ไขบริการ' : 'เพิ่มบริการ'}</h2>
+              <form className="form-grid" onSubmit={handleSaveService} data-testid="clinic-offerings-service-form">
+                <label className="field">
+                  <span>ชื่อบริการ</span>
+                  <input value={serviceForm.name} onChange={(event) => setServiceForm({ ...serviceForm, name: event.target.value })} data-testid="clinic-offerings-service-name" disabled={!canWrite} />
+                </label>
+                <label className="field">
+                  <span>หมวดหมู่</span>
+                  <input value={serviceForm.category || ''} onChange={(event) => setServiceForm({ ...serviceForm, category: event.target.value })} data-testid="clinic-offerings-service-category" disabled={!canWrite} />
+                </label>
+                <label className="field field-span-2">
+                  <span>คำอธิบายสั้น</span>
+                  <textarea value={serviceForm.shortDescription || ''} onChange={(event) => setServiceForm({ ...serviceForm, shortDescription: event.target.value })} data-testid="clinic-offerings-service-short-description" disabled={!canWrite} />
+                </label>
+                <label className="field">
+                  <span>ระยะเวลา (นาที)</span>
+                  <input type="number" min="0" value={serviceForm.durationMinutes ?? ''} onChange={(event) => setServiceForm({ ...serviceForm, durationMinutes: event.target.value })} data-testid="clinic-offerings-service-duration" disabled={!canWrite} />
+                </label>
+                <label className="field">
+                  <span>สถานะ</span>
+                  {renderStatusSelect(serviceForm.status, (value) => setServiceForm({ ...serviceForm, status: value }), 'clinic-offerings-service-status', !canWrite)}
+                </label>
+                <label className="field">
+                  <span>ราคาต่ำสุด</span>
+                  <input type="number" min="0" value={serviceForm.priceMin ?? ''} onChange={(event) => setServiceForm({ ...serviceForm, priceMin: event.target.value })} data-testid="clinic-offerings-service-price-min" disabled={!canWrite} />
+                </label>
+                <label className="field">
+                  <span>ราคาสูงสุด</span>
+                  <input type="number" min="0" value={serviceForm.priceMax ?? ''} onChange={(event) => setServiceForm({ ...serviceForm, priceMax: event.target.value })} data-testid="clinic-offerings-service-price-max" disabled={!canWrite} />
+                </label>
+                <label className="field">
+                  <span>Image URL</span>
+                  <input value={serviceForm.imageUrl || ''} onChange={(event) => setServiceForm({ ...serviceForm, imageUrl: event.target.value })} data-testid="clinic-offerings-service-image-url" disabled={!canWrite} />
+                </label>
+                <label className="field">
+                  <span>ลำดับ</span>
+                  <input type="number" value={serviceForm.sortOrder ?? ''} onChange={(event) => setServiceForm({ ...serviceForm, sortOrder: event.target.value })} data-testid="clinic-offerings-service-sort-order" disabled={!canWrite} />
+                </label>
+                <label className="field">
+                  <span>Featured</span>
+                  <input type="checkbox" checked={Boolean(serviceForm.isFeatured)} onChange={(event) => setServiceForm({ ...serviceForm, isFeatured: event.target.checked })} data-testid="clinic-offerings-service-featured" disabled={!canWrite} />
+                </label>
+                <div className="inline-actions field-span-2">
+                  <Button type="submit" data-testid="clinic-offerings-service-save" disabled={!canWrite}>{serviceForm.id ? 'บันทึกบริการ' : 'เพิ่มบริการ'}</Button>
+                  <button type="button" className="secondary-button" onClick={() => setServiceForm(emptyServiceForm())}>ล้างฟอร์ม</button>
+                </div>
+              </form>
+            </Card>
+          </div>
+        ) : null}
+
+        {activeTab === 'promotions' ? (
+          <div className="blog-editor-layout">
+            <Card variant="section" className="section-card">
+              <h2 className="section-heading">รายการโปรโมชั่น</h2>
+              <div className="table-shell">
+                <table className="data-table" data-testid="clinic-offerings-promotions-table">
+                  <thead>
+                    <tr>
+                      <th>ชื่อ</th>
+                      <th>ช่วงเวลา</th>
+                      <th>สถานะ</th>
+                      <th>จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {promotions.map((promotion, index) => (
+                      <tr key={promotion.id} data-testid={`clinic-offerings-promotion-row-${promotion.id}`}>
+                        <td>
+                          <strong>{promotion.title}</strong>
+                          {promotion.badgeLabel ? <span className="pill">{promotion.badgeLabel}</span> : null}
+                        </td>
+                        <td>{promotion.startsAt ? formatDateTime(promotion.startsAt) : '-'} / {promotion.endsAt ? formatDateTime(promotion.endsAt) : '-'}</td>
+                        <td><span className={`pill status-${promotion.status}`}>{promotion.status}</span></td>
+                        <td>
+                          <div className="inline-actions">
+                            <button type="button" className="secondary-button" onClick={() => setPromotionForm({ ...emptyPromotionForm(), ...promotion, imageUrl: promotion.imageUrl || '', ctaUrl: promotion.ctaUrl || '', startsAt: promotion.startsAt ? promotion.startsAt.slice(0, 10) : '', endsAt: promotion.endsAt ? promotion.endsAt.slice(0, 10) : '' })} data-testid={`clinic-offerings-promotion-edit-${promotion.id}`}>แก้ไข</button>
+                            <button type="button" className="secondary-button" onClick={() => handleMove('promotion', index, -1)} disabled={!canWrite || index === 0}>ขึ้น</button>
+                            <button type="button" className="secondary-button" onClick={() => handleMove('promotion', index, 1)} disabled={!canWrite || index === promotions.length - 1}>ลง</button>
+                            <button type="button" className="danger-button" onClick={() => handleDelete('promotion', promotion.id)} disabled={!canWrite}>ลบ</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            <Card variant="section" className="section-card">
+              <h2 className="section-heading">{promotionForm.id ? 'แก้ไขโปรโมชั่น' : 'เพิ่มโปรโมชั่น'}</h2>
+              <form className="form-grid" onSubmit={handleSavePromotion} data-testid="clinic-offerings-promotion-form">
+                <label className="field">
+                  <span>ชื่อโปรโมชั่น</span>
+                  <input value={promotionForm.title} onChange={(event) => setPromotionForm({ ...promotionForm, title: event.target.value })} data-testid="clinic-offerings-promotion-title" disabled={!canWrite} />
+                </label>
+                <label className="field">
+                  <span>ป้ายกำกับ</span>
+                  <input value={promotionForm.badgeLabel || ''} onChange={(event) => setPromotionForm({ ...promotionForm, badgeLabel: event.target.value })} data-testid="clinic-offerings-promotion-badge" disabled={!canWrite} />
+                </label>
+                <label className="field field-span-2">
+                  <span>คำอธิบายย่อย</span>
+                  <textarea value={promotionForm.subtitle || ''} onChange={(event) => setPromotionForm({ ...promotionForm, subtitle: event.target.value })} data-testid="clinic-offerings-promotion-subtitle" disabled={!canWrite} />
+                </label>
+                <label className="field">
+                  <span>วันเริ่มต้น</span>
+                  <input type="date" value={promotionForm.startsAt || ''} onChange={(event) => setPromotionForm({ ...promotionForm, startsAt: event.target.value })} data-testid="clinic-offerings-promotion-starts-at" disabled={!canWrite} />
+                </label>
+                <label className="field">
+                  <span>วันสิ้นสุด</span>
+                  <input type="date" value={promotionForm.endsAt || ''} onChange={(event) => setPromotionForm({ ...promotionForm, endsAt: event.target.value })} data-testid="clinic-offerings-promotion-ends-at" disabled={!canWrite} />
+                </label>
+                <label className="field">
+                  <span>สถานะ</span>
+                  {renderStatusSelect(promotionForm.status, (value) => setPromotionForm({ ...promotionForm, status: value }), 'clinic-offerings-promotion-status', !canWrite)}
+                </label>
+                <label className="field">
+                  <span>ลำดับ</span>
+                  <input type="number" value={promotionForm.sortOrder ?? ''} onChange={(event) => setPromotionForm({ ...promotionForm, sortOrder: event.target.value })} data-testid="clinic-offerings-promotion-sort-order" disabled={!canWrite} />
+                </label>
+                <label className="field">
+                  <span>CTA Label</span>
+                  <input value={promotionForm.ctaLabel || ''} onChange={(event) => setPromotionForm({ ...promotionForm, ctaLabel: event.target.value })} data-testid="clinic-offerings-promotion-cta-label" disabled={!canWrite} />
+                </label>
+                <label className="field">
+                  <span>CTA URL</span>
+                  <input value={promotionForm.ctaUrl || ''} onChange={(event) => setPromotionForm({ ...promotionForm, ctaUrl: event.target.value })} data-testid="clinic-offerings-promotion-cta-url" disabled={!canWrite} />
+                </label>
+                <label className="field">
+                  <span>Image URL</span>
+                  <input value={promotionForm.imageUrl || ''} onChange={(event) => setPromotionForm({ ...promotionForm, imageUrl: event.target.value })} data-testid="clinic-offerings-promotion-image-url" disabled={!canWrite} />
+                </label>
+                <label className="field">
+                  <span>Featured</span>
+                  <input type="checkbox" checked={Boolean(promotionForm.isFeatured)} onChange={(event) => setPromotionForm({ ...promotionForm, isFeatured: event.target.checked })} data-testid="clinic-offerings-promotion-featured" disabled={!canWrite} />
+                </label>
+                <div className="inline-actions field-span-2">
+                  <Button type="submit" data-testid="clinic-offerings-promotion-save" disabled={!canWrite}>{promotionForm.id ? 'บันทึกโปรโมชั่น' : 'เพิ่มโปรโมชั่น'}</Button>
+                  <button type="button" className="secondary-button" onClick={() => setPromotionForm(emptyPromotionForm())}>ล้างฟอร์ม</button>
+                </div>
+              </form>
+            </Card>
+          </div>
+        ) : null}
+
+        {activeTab === 'packages' ? (
+          <div className="blog-editor-layout">
+            <Card variant="section" className="section-card">
+              <h2 className="section-heading">รายการแพ็กเกจ</h2>
+              <div className="table-shell">
+                <table className="data-table" data-testid="clinic-offerings-packages-table">
+                  <thead>
+                    <tr>
+                      <th>ชื่อ</th>
+                      <th>ราคา</th>
+                      <th>สถานะ</th>
+                      <th>จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {packages.map((pkg, index) => (
+                      <tr key={pkg.id} data-testid={`clinic-offerings-package-row-${pkg.id}`}>
+                        <td>
+                          <strong>{pkg.name}</strong>
+                          {pkg.summary ? <p className="muted">{pkg.summary}</p> : null}
+                        </td>
+                        <td>{formatAdminOfferingPrice(pkg, 'package')}</td>
+                        <td><span className={`pill status-${pkg.status}`}>{pkg.status}</span></td>
+                        <td>
+                          <div className="inline-actions">
+                            <button type="button" className="secondary-button" onClick={() => { setPackageForm({ ...emptyPackageForm(), ...pkg, price: pkg.price ?? '', imageUrl: pkg.imageUrl || '' }); setSelectedPackageId(String(pkg.id)); }} data-testid={`clinic-offerings-package-edit-${pkg.id}`}>แก้ไข</button>
+                            <button type="button" className="secondary-button" onClick={() => handleMove('package', index, -1)} disabled={!canWrite || index === 0}>ขึ้น</button>
+                            <button type="button" className="secondary-button" onClick={() => handleMove('package', index, 1)} disabled={!canWrite || index === packages.length - 1}>ลง</button>
+                            <button type="button" className="danger-button" onClick={() => handleDelete('package', pkg.id)} disabled={!canWrite}>ลบ</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            <div className="blog-editor-main">
+              <Card variant="section" className="section-card">
+                <h2 className="section-heading">{packageForm.id ? 'แก้ไขแพ็กเกจ' : 'เพิ่มแพ็กเกจ'}</h2>
+                <form className="form-grid" onSubmit={handleSavePackage} data-testid="clinic-offerings-package-form">
+                  <label className="field">
+                    <span>ชื่อแพ็กเกจ</span>
+                    <input value={packageForm.name} onChange={(event) => setPackageForm({ ...packageForm, name: event.target.value })} data-testid="clinic-offerings-package-name" disabled={!canWrite} />
+                  </label>
+                  <label className="field">
+                    <span>ราคา</span>
+                    <input type="number" min="0" value={packageForm.price ?? ''} onChange={(event) => setPackageForm({ ...packageForm, price: event.target.value })} data-testid="clinic-offerings-package-price" disabled={!canWrite} />
+                  </label>
+                  <label className="field field-span-2">
+                    <span>สรุปแพ็กเกจ</span>
+                    <textarea value={packageForm.summary || ''} onChange={(event) => setPackageForm({ ...packageForm, summary: event.target.value })} data-testid="clinic-offerings-package-summary" disabled={!canWrite} />
+                  </label>
+                  <label className="field">
+                    <span>สถานะ</span>
+                    {renderStatusSelect(packageForm.status, (value) => setPackageForm({ ...packageForm, status: value }), 'clinic-offerings-package-status', !canWrite)}
+                  </label>
+                  <label className="field">
+                    <span>ลำดับ</span>
+                    <input type="number" value={packageForm.sortOrder ?? ''} onChange={(event) => setPackageForm({ ...packageForm, sortOrder: event.target.value })} data-testid="clinic-offerings-package-sort-order" disabled={!canWrite} />
+                  </label>
+                  <label className="field">
+                    <span>Image URL</span>
+                    <input value={packageForm.imageUrl || ''} onChange={(event) => setPackageForm({ ...packageForm, imageUrl: event.target.value })} data-testid="clinic-offerings-package-image-url" disabled={!canWrite} />
+                  </label>
+                  <label className="field">
+                    <span>Featured</span>
+                    <input type="checkbox" checked={Boolean(packageForm.isFeatured)} onChange={(event) => setPackageForm({ ...packageForm, isFeatured: event.target.checked })} data-testid="clinic-offerings-package-featured" disabled={!canWrite} />
+                  </label>
+                  <div className="inline-actions field-span-2">
+                    <Button type="submit" data-testid="clinic-offerings-package-save" disabled={!canWrite}>{packageForm.id ? 'บันทึกแพ็กเกจ' : 'เพิ่มแพ็กเกจ'}</Button>
+                    <button type="button" className="secondary-button" onClick={() => setPackageForm(emptyPackageForm())}>ล้างฟอร์ม</button>
+                  </div>
+                </form>
+              </Card>
+
+              <Card variant="section" className="section-card" data-testid="clinic-offerings-package-services-panel">
+                <h2 className="section-heading">บริการในแพ็กเกจ</h2>
+                <form className="form-grid" onSubmit={handleAddServiceToPackage} data-testid="clinic-offerings-package-service-form">
+                  <label className="field">
+                    <span>แพ็กเกจ</span>
+                    <select value={selectedPackageId} onChange={(event) => setSelectedPackageId(event.target.value)} data-testid="clinic-offerings-package-service-package" disabled={!canWrite}>
+                      <option value="">เลือกแพ็กเกจ</option>
+                      {packages.map((pkg) => <option key={pkg.id} value={pkg.id}>{pkg.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>บริการ</span>
+                    <select value={serviceLinkForm.serviceId} onChange={(event) => setServiceLinkForm({ ...serviceLinkForm, serviceId: event.target.value })} data-testid="clinic-offerings-package-service-service" disabled={!canWrite}>
+                      <option value="">เลือกบริการ</option>
+                      {services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="field">
+                    <span>จำนวน</span>
+                    <input type="number" min="1" value={serviceLinkForm.quantity} onChange={(event) => setServiceLinkForm({ ...serviceLinkForm, quantity: event.target.value })} data-testid="clinic-offerings-package-service-quantity" disabled={!canWrite} />
+                  </label>
+                  <div className="inline-actions">
+                    <Button type="submit" data-testid="clinic-offerings-package-service-add" disabled={!canWrite}>เพิ่มบริการในแพ็กเกจ</Button>
+                  </div>
+                </form>
+                <ul className="stack-list" data-testid="clinic-offerings-package-service-list">
+                  {selectedPackageLinks.map((link) => {
+                    const service = services.find((item) => String(item.id) === String(link.serviceId));
+                    return (
+                      <li key={link.serviceId} className="stack-item" data-testid={`clinic-offerings-package-service-row-${link.serviceId}`}>
+                        <div className="split-header">
+                          <span>{service?.name || `Service #${link.serviceId}`} x {link.quantity}</span>
+                          <button type="button" className="danger-button" onClick={() => handleRemoveServiceFromPackage(link.serviceId)} disabled={!canWrite} data-testid={`clinic-offerings-package-service-remove-${link.serviceId}`}>นำออก</button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Card>
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </PageShell>
+  );
+}
+
 function ClinicWebsiteEditorPage() {
   const api = useApi();
   const sessionOptions = useSessionRequestOptions();
@@ -5417,6 +6335,8 @@ function renderPage(route) {
       return <ClinicsPage />;
     case 'clinic-website':
       return <ClinicWebsiteEditorPage />;
+    case 'clinic-offerings':
+      return <ClinicOfferingsAdminPage />;
     case 'unified-inbox':
       return <UnifiedInboxPage />;
     case 'roas-analytics':

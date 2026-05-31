@@ -1872,6 +1872,35 @@ a {
   margin-top: 0.75rem;
 }
 
+.clinic-offerings-inline-state {
+  margin: 1.5rem auto 0;
+  max-width: 960px;
+  padding: 0.9rem 1.2rem;
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  background: rgba(19, 21, 26, 0.72);
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.clinic-offerings-inline-state.error {
+  border-color: rgba(212, 175, 55, 0.35);
+  color: var(--gold-hover);
+}
+
+.clinic-offering-price {
+  margin-top: 0.25rem;
+  color: var(--gold-primary);
+  font-family: var(--font-heading);
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.clinic-card-cta {
+  margin-top: 0.5rem;
+  width: fit-content;
+}
+
 /* Grid layout & cards */
 .clinic-grid-cards {
   display: grid;

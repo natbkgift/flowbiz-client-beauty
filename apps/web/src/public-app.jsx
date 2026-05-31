@@ -118,6 +118,36 @@ async function getPublicClinicBySlug(slug) {
   }
 }
 
+async function getPublicClinicServices(slug) {
+  const url = `${API_BASE}/public/clinics/${encodeURIComponent(slug)}/services`;
+  const response = await fetch(url, { headers: { 'Content-Type': 'application/json' } });
+  if (!response.ok) {
+    throw new Error('โหลดบริการไม่สำเร็จ');
+  }
+  const payload = await response.json();
+  return Array.isArray(payload.items) ? payload.items : [];
+}
+
+async function getPublicClinicPromotions(slug) {
+  const url = `${API_BASE}/public/clinics/${encodeURIComponent(slug)}/promotions`;
+  const response = await fetch(url, { headers: { 'Content-Type': 'application/json' } });
+  if (!response.ok) {
+    throw new Error('โหลดโปรโมชั่นไม่สำเร็จ');
+  }
+  const payload = await response.json();
+  return Array.isArray(payload.items) ? payload.items : [];
+}
+
+async function getPublicClinicPackages(slug) {
+  const url = `${API_BASE}/public/clinics/${encodeURIComponent(slug)}/packages`;
+  const response = await fetch(url, { headers: { 'Content-Type': 'application/json' } });
+  if (!response.ok) {
+    throw new Error('โหลดแพ็กเกจไม่สำเร็จ');
+  }
+  const payload = await response.json();
+  return Array.isArray(payload.items) ? payload.items : [];
+}
+
 async function apiFetch(path, options = {}) {
   const pathWithContext = withPublicClinicContext(path);
   try {
@@ -275,6 +305,39 @@ function openExternalUrl(url) {
   if (popup) {
     popup.opener = null;
   }
+}
+
+function formatThaiMoney(value, currency = 'THB') {
+  const prefix = currency === 'THB' ? '฿' : `${currency} `;
+  return `${prefix}${new Intl.NumberFormat('th-TH').format(Number(value || 0))}`;
+}
+
+function formatPublicServicePrice(service) {
+  if (service.priceMin != null && service.priceMax != null && Number(service.priceMax) !== Number(service.priceMin)) {
+    return `${formatThaiMoney(service.priceMin, service.currency)} - ${formatThaiMoney(service.priceMax, service.currency)}`;
+  }
+
+  if (service.priceMin != null) {
+    return `เริ่มต้น ${formatThaiMoney(service.priceMin, service.currency)}`;
+  }
+
+  if (service.priceMax != null) {
+    return formatThaiMoney(service.priceMax, service.currency);
+  }
+
+  return 'สอบถามราคา';
+}
+
+function formatPublicPackagePrice(pkg) {
+  if (pkg.price != null) {
+    return formatThaiMoney(pkg.price, pkg.currency);
+  }
+
+  return 'สอบถามราคา';
+}
+
+function plainOfferingText(value) {
+  return String(value || '').replace(/<[^>]*>/g, '').trim();
 }
 
 const MOCK_FORUM_TOPICS = [
@@ -932,7 +995,7 @@ function buildClinicThemeStyle(brandingSettings) {
   };
 }
 
-function ClinicWebsiteTemplate({ data, clinicSlug }) {
+function ClinicWebsiteTemplate({ data, clinicSlug, offerings = {}, offeringsStatus = 'idle' }) {
   const {
     clinic,
     websiteSettings = {},
@@ -975,9 +1038,23 @@ function ClinicWebsiteTemplate({ data, clinicSlug }) {
 
       <ClinicTrustSection homepageSections={activeSections} />
 
-      <ClinicServicesPreview homepageSections={activeSections} />
+      {offeringsStatus === 'loading' ? (
+        <div className="clinic-offerings-inline-state" data-testid="clinic-template-offerings-loading">
+          กำลังโหลดบริการ โปรโมชั่น และแพ็กเกจ...
+        </div>
+      ) : null}
 
-      <ClinicPromotionsPreview homepageSections={activeSections} />
+      {offeringsStatus === 'error' ? (
+        <div className="clinic-offerings-inline-state error" data-testid="clinic-template-offerings-error">
+          ไม่สามารถโหลดบริการ โปรโมชั่น และแพ็กเกจล่าสุดได้ในขณะนี้
+        </div>
+      ) : null}
+
+      <ClinicServicesPreview homepageSections={activeSections} services={offerings.services || []} />
+
+      <ClinicPromotionsPreview homepageSections={activeSections} promotions={offerings.promotions || []} />
+
+      <ClinicPackagesPreview homepageSections={activeSections} packages={offerings.packages || []} />
 
       <ClinicAboutSection websiteSettings={websiteSettings} />
 
@@ -1017,11 +1094,9 @@ function ClinicHeroSection({ clinic, websiteSettings, brandingSettings, contactS
           <div className="clinic-logo-placeholder" data-testid="clinic-template-logo">✨</div>
         )}
 
-        <h1 className="clinic-title" data-testid="clinic-name" data-testid-override="clinic-template-title">
+        <h1 className="clinic-title" data-testid="clinic-template-title">
           {displayName}
         </h1>
-        {/* Hidden element with data-testid="clinic-template-title" to meet test requirements */}
-        <span data-testid="clinic-template-title" style={{ display: 'none' }}>{displayName}</span>
 
         {tagline && (
           <p className="clinic-tagline" data-testid="clinic-template-tagline">
@@ -1086,11 +1161,15 @@ function ClinicTrustSection({ homepageSections }) {
   );
 }
 
-function ClinicServicesPreview({ homepageSections }) {
+function ClinicServicesPreview({ homepageSections, services = [] }) {
   const serviceSec = homepageSections.find(s => s.sectionType === 'services_preview' || s.sectionKey === 'services_preview');
   
   let items = [];
-  if (serviceSec && serviceSec.content && Array.isArray(serviceSec.content.items)) {
+  const hasApiItems = Array.isArray(services) && services.length > 0;
+
+  if (hasApiItems) {
+    items = services;
+  } else if (serviceSec && serviceSec.content && Array.isArray(serviceSec.content.items)) {
     items = serviceSec.content.items;
   }
 
@@ -1114,10 +1193,16 @@ function ClinicServicesPreview({ homepageSections }) {
       </div>
       <div className="clinic-grid-cards">
         {items.map((svc, idx) => (
-          <div className="clinic-glass-card" key={idx}>
+          <div
+            className="clinic-glass-card"
+            key={svc?.id || svc?.slug || idx}
+            data-testid={hasApiItems ? `clinic-template-service-card-${svc.id}` : undefined}
+          >
             <div className="clinic-card-icon">💉</div>
-            <h3 className="clinic-card-title">{svc?.title}</h3>
-            <p className="clinic-card-desc">{svc?.description}</p>
+            <h3 className="clinic-card-title">{plainOfferingText(hasApiItems ? svc?.name : svc?.title)}</h3>
+            <p className="clinic-card-desc">{plainOfferingText(hasApiItems ? (svc?.shortDescription || svc?.category || '') : svc?.description)}</p>
+            {hasApiItems ? <p className="clinic-offering-price">{formatPublicServicePrice(svc)}</p> : null}
+            {hasApiItems && svc?.durationMinutes != null ? <p className="clinic-card-desc">{svc.durationMinutes} นาที</p> : null}
           </div>
         ))}
       </div>
@@ -1125,11 +1210,15 @@ function ClinicServicesPreview({ homepageSections }) {
   );
 }
 
-function ClinicPromotionsPreview({ homepageSections }) {
-  const promoSec = homepageSections.find(s => s.sectionType === 'promotions_preview' || s.sectionKey === 'promotions_preview' || s.sectionType === 'packages_preview' || s.sectionKey === 'packages_preview');
+function ClinicPromotionsPreview({ homepageSections, promotions = [] }) {
+  const promoSec = homepageSections.find(s => s.sectionType === 'promotions_preview' || s.sectionKey === 'promotions_preview');
 
   let items = [];
-  if (promoSec && promoSec.content && Array.isArray(promoSec.content.items)) {
+  const hasApiItems = Array.isArray(promotions) && promotions.length > 0;
+
+  if (hasApiItems) {
+    items = promotions;
+  } else if (promoSec && promoSec.content && Array.isArray(promoSec.content.items)) {
     items = promoSec.content.items;
   }
 
@@ -1150,14 +1239,63 @@ function ClinicPromotionsPreview({ homepageSections }) {
       ) : (
         <div className="clinic-grid-cards">
           {items.map((promo, idx) => (
-            <div className="clinic-glass-card" key={idx} style={{ borderTop: '2px solid var(--clinic-primary)' }}>
-              {promo?.tag && <span className="clinic-promo-badge">{promo.tag}</span>}
-              <h3 className="clinic-card-title" style={{ marginTop: promo?.tag ? '1rem' : '0' }}>{promo?.title}</h3>
-              <p className="clinic-card-desc">{promo?.description}</p>
+            <div
+              className="clinic-glass-card"
+              key={promo?.id || promo?.slug || idx}
+              style={{ borderTop: '2px solid var(--clinic-primary)' }}
+              data-testid={hasApiItems ? `clinic-template-promotion-card-${promo.id}` : undefined}
+            >
+              {(hasApiItems ? promo?.badgeLabel : promo?.tag) && <span className="clinic-promo-badge">{hasApiItems ? promo.badgeLabel : promo.tag}</span>}
+              <h3 className="clinic-card-title" style={{ marginTop: (hasApiItems ? promo?.badgeLabel : promo?.tag) ? '1rem' : '0' }}>{plainOfferingText(promo?.title)}</h3>
+              <p className="clinic-card-desc">{plainOfferingText(hasApiItems ? (promo?.subtitle || '') : promo?.description)}</p>
+              {hasApiItems && promo?.ctaUrl && isSafeUrl(promo.ctaUrl) ? (
+                <button type="button" className="cta-btn secondary clinic-card-cta" onClick={() => openExternalUrl(promo.ctaUrl)}>
+                  {promo.ctaLabel || 'ดูรายละเอียด'}
+                </button>
+              ) : null}
             </div>
           ))}
         </div>
       )}
+    </section>
+  );
+}
+
+function ClinicPackagesPreview({ homepageSections, packages = [] }) {
+  const packageSec = homepageSections.find(s => s.sectionType === 'packages_preview' || s.sectionKey === 'packages_preview');
+  let items = [];
+  const hasApiItems = Array.isArray(packages) && packages.length > 0;
+
+  if (hasApiItems) {
+    items = packages;
+  } else if (packageSec && packageSec.content && Array.isArray(packageSec.content.items)) {
+    items = packageSec.content.items;
+  }
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="clinic-template-section clinic-template-packages" data-testid="clinic-template-packages">
+      <div className="clinic-section-header">
+        <span className="clinic-eyebrow">Packages</span>
+        <h2>แพ็กเกจดูแลต่อเนื่อง</h2>
+      </div>
+      <div className="clinic-grid-cards">
+        {items.map((pkg, idx) => (
+          <div
+            className="clinic-glass-card"
+            key={pkg?.id || pkg?.slug || idx}
+            data-testid={hasApiItems ? `clinic-template-package-card-${pkg.id}` : undefined}
+          >
+            <div className="clinic-card-icon">💎</div>
+            <h3 className="clinic-card-title">{plainOfferingText(hasApiItems ? pkg?.name : pkg?.title)}</h3>
+            <p className="clinic-card-desc">{plainOfferingText(hasApiItems ? (pkg?.summary || '') : pkg?.description)}</p>
+            {hasApiItems ? <p className="clinic-offering-price">{formatPublicPackagePrice(pkg)}</p> : null}
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
@@ -1321,17 +1459,45 @@ function ClinicPublicShell({ clinicSlug }) {
   const [loading, setLoading] = useState(true);
   const [clinicData, setClinicData] = useState(null);
   const [errorStatus, setErrorStatus] = useState(null);
+  const [offeringsState, setOfferingsState] = useState({
+    status: 'idle',
+    data: { services: [], promotions: [], packages: [] }
+  });
 
   useEffect(() => {
     let active = true;
     async function load() {
       setLoading(true);
       setErrorStatus(null);
+      setOfferingsState({ status: 'idle', data: { services: [], promotions: [], packages: [] } });
       try {
         const result = await getPublicClinicBySlug(clinicSlug);
         if (!active) return;
         if (result.status === 200) {
           setClinicData(result.data);
+          setLoading(false);
+          setOfferingsState({ status: 'loading', data: { services: [], promotions: [], packages: [] } });
+
+          try {
+            const [services, promotions, packages] = await Promise.all([
+              getPublicClinicServices(clinicSlug),
+              getPublicClinicPromotions(clinicSlug),
+              getPublicClinicPackages(clinicSlug)
+            ]);
+
+            if (!active) return;
+            setOfferingsState({
+              status: 'ready',
+              data: { services, promotions, packages }
+            });
+          } catch (offeringsError) {
+            console.warn('Public offerings fetch failed, rendering clinic template fallback:', offeringsError.message);
+            if (!active) return;
+            setOfferingsState({
+              status: 'error',
+              data: { services: [], promotions: [], packages: [] }
+            });
+          }
         } else {
           setErrorStatus(result.status);
         }
@@ -1379,7 +1545,12 @@ function ClinicPublicShell({ clinicSlug }) {
 
   return (
     <div className="public-container" data-testid="clinic-public-shell">
-      <ClinicWebsiteTemplate data={clinicData} clinicSlug={clinicSlug} />
+      <ClinicWebsiteTemplate
+        data={clinicData}
+        clinicSlug={clinicSlug}
+        offerings={offeringsState.data}
+        offeringsStatus={offeringsState.status}
+      />
     </div>
   );
 }
