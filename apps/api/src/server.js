@@ -52,6 +52,7 @@ const { handleClinicRoutes } = require('./modules/clinics/routes');
 const { handleClinicWebsiteRoutes } = require('./modules/clinic-website/routes');
 const { handleClinicOfferingsRoutes } = require('./modules/clinic-offerings/routes');
 const { handlePublicContentRoutes } = require('./modules/public-content/routes');
+const { handlePublicLeadRoutes } = require('./modules/public-leads/routes');
 
 
 const config = loadConfig();
@@ -413,6 +414,10 @@ async function routeRequest(request, response) {
   }
 
   if (await handleClinicOfferingsRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
+    return;
+  }
+
+  if (await handlePublicLeadRoutes(request, response, url, { parseJsonBody, json })) {
     return;
   }
 
