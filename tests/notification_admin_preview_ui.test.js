@@ -197,3 +197,44 @@ test('Notification Drafts UI - detail view shows subject message metadata and no
   assert.doesNotMatch(buttonText, /\bapprove\b/);
   assert.doesNotMatch(buttonText, /\bretry\b/);
 });
+
+test('Notification Drafts UI - ignores stale detail responses after rapid selection changes', async () => {
+  const firstDraft = {
+    ...notificationDraft,
+    id: 91,
+    subject: 'First delayed draft',
+    message: 'First delayed draft content.'
+  };
+  const secondDraft = {
+    ...notificationDraft,
+    id: 92,
+    subject: 'Latest selected draft',
+    message: 'Latest selected draft content.',
+    idempotencyKey: 'tenant:1001:event:slot_offer.accepted:source:slot_offer:72:recipient:admin:501:channel:email',
+    sourceId: '72'
+  };
+
+  const app = await loadAdminApp({
+    routes: notificationRoutes({
+      list: { status: 200, body: { items: [firstDraft, secondDraft], total: 2, limit: 50, offset: 0 } },
+      detail: async () => new Promise((resolve) => {
+        setTimeout(() => resolve({ status: 200, body: firstDraft }), 80);
+      }),
+      extra: {
+        'GET /admin/notification-drafts/92': { status: 200, body: secondDraft }
+      }
+    })
+  });
+
+  click(app.window, await waitFor(() => app.document.querySelector('[data-testid="notification-draft-row-91"]')));
+  click(app.window, await waitFor(() => app.document.querySelector('[data-testid="notification-draft-row-92"]')));
+
+  await waitFor(() => /Latest selected draft content/.test(
+    app.document.querySelector('[data-testid="notification-draft-message"]')?.textContent || ''
+  ));
+  await new Promise((resolve) => setTimeout(resolve, 120));
+
+  const messageText = app.document.querySelector('[data-testid="notification-draft-message"]').textContent;
+  assert.match(messageText, /Latest selected draft content/);
+  assert.doesNotMatch(messageText, /First delayed draft content/);
+});

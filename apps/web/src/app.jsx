@@ -6518,6 +6518,7 @@ function NotificationDraftsPage() {
   const [refreshToken, setRefreshToken] = useState(0);
   const [selectedId, setSelectedId] = useState(null);
   const [detailState, setDetailState] = useState({ status: 'idle', data: null, error: null });
+  const latestSelectedIdRef = useRef(null);
 
   const [listState] = usePageData(
     () => api.listNotificationDrafts(sessionOptions, { ...appliedFilters, limit: 50, offset: 0 }),
@@ -6540,19 +6541,25 @@ function NotificationDraftsPage() {
   function applyFilters(event) {
     event.preventDefault();
     setSelectedId(null);
+    latestSelectedIdRef.current = null;
     setDetailState({ status: 'idle', data: null, error: null });
     setAppliedFilters({ ...filterDraft });
   }
 
   async function loadDetail(draftId) {
     setSelectedId(draftId);
+    latestSelectedIdRef.current = draftId;
     setDetailState({ status: 'loading', data: null, error: null });
 
     try {
       const data = await api.getNotificationDraft(sessionOptions, draftId);
-      setDetailState({ status: 'ready', data, error: null });
+      if (latestSelectedIdRef.current === draftId) {
+        setDetailState({ status: 'ready', data, error: null });
+      }
     } catch (error) {
-      setDetailState({ status: 'error', data: null, error });
+      if (latestSelectedIdRef.current === draftId) {
+        setDetailState({ status: 'error', data: null, error });
+      }
     }
   }
 

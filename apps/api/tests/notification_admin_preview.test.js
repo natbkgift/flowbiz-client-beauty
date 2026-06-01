@@ -253,6 +253,29 @@ test('Notification Admin Preview API - read-only tenant-scoped drafts', async (t
     });
     assert.equal(override.statusCode, 400);
     assert.equal(override.body.error.code, 'INVALID_REQUEST');
+
+    const malformedLimit = await routeJson({
+      path: '/admin/notification-drafts',
+      authenticateRequest: contextFor(),
+      searchParams: { limit: '12abc' }
+    });
+    assert.equal(malformedLimit.statusCode, 400);
+    assert.equal(malformedLimit.body.error.code, 'INVALID_NOTIFICATION_DRAFT_QUERY');
+
+    const malformedOffset = await routeJson({
+      path: '/admin/notification-drafts',
+      authenticateRequest: contextFor(),
+      searchParams: { offset: '1.5' }
+    });
+    assert.equal(malformedOffset.statusCode, 400);
+    assert.equal(malformedOffset.body.error.code, 'INVALID_NOTIFICATION_DRAFT_QUERY');
+
+    const malformedDraftId = await routeJson({
+      path: `/admin/notification-drafts/${draftAId}abc`,
+      authenticateRequest: contextFor()
+    });
+    assert.equal(malformedDraftId.statusCode, 400);
+    assert.equal(malformedDraftId.body.error.code, 'INVALID_NOTIFICATION_DRAFT_QUERY');
   });
 
   await t.test('7. API is read-only and does not create outbound delivery records', async () => {

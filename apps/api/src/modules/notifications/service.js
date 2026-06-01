@@ -111,7 +111,11 @@ function trimString(value, maxLength) {
 
 function asPositiveInteger(value, fallback, fieldName) {
   if (value === undefined || value === null || value === '') return fallback;
-  const parsed = Number.parseInt(value, 10);
+  const stringValue = String(value);
+  if (!/^\d+$/.test(stringValue)) {
+    throw new AppError(400, 'INVALID_NOTIFICATION_DRAFT_QUERY', `${fieldName} must be a positive integer.`);
+  }
+  const parsed = Number.parseInt(stringValue, 10);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     throw new AppError(400, 'INVALID_NOTIFICATION_DRAFT_QUERY', `${fieldName} must be a positive integer.`);
   }
@@ -120,7 +124,11 @@ function asPositiveInteger(value, fallback, fieldName) {
 
 function asNonNegativeInteger(value, fallback, fieldName) {
   if (value === undefined || value === null || value === '') return fallback;
-  const parsed = Number.parseInt(value, 10);
+  const stringValue = String(value);
+  if (!/^\d+$/.test(stringValue)) {
+    throw new AppError(400, 'INVALID_NOTIFICATION_DRAFT_QUERY', `${fieldName} must be a non-negative integer.`);
+  }
+  const parsed = Number.parseInt(stringValue, 10);
   if (!Number.isInteger(parsed) || parsed < 0) {
     throw new AppError(400, 'INVALID_NOTIFICATION_DRAFT_QUERY', `${fieldName} must be a non-negative integer.`);
   }
