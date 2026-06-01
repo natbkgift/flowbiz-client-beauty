@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { key: 'clinic-website', label: 'เว็บไซต์คลินิก', caption: 'ตั้งค่าเว็บ โลโก้ สี และหน้าแรก' },
   { key: 'clinic-offerings', label: 'บริการและแพ็กเกจ', caption: 'จัดการบริการ โปรโมชั่น และแพ็กเกจ' },
   { key: 'booking-requests', label: 'คำขอนัดหมาย', caption: 'ติดตามคำขอนัดหมายจากหน้าเว็บ' },
+  { key: 'notification-drafts', label: 'ร่างการแจ้งเตือน', caption: 'Preview only สำหรับข้อความที่ยังไม่ส่ง' },
   { key: 'unified-inbox', label: 'กล่องแชทรวม', caption: 'แชทโซเชียลและ AI co-pilot' },
   { key: 'roas-analytics', label: 'ROAS และสะสมแต้ม', caption: 'ค่าโฆษณา CAC และแนะนำเพื่อน' },
   { key: 'ai-agent-console', label: 'คอนโซล AI Agent', caption: 'กฎ Agent และคิว HITL' },
@@ -622,6 +623,19 @@ function createApiClient(apiBaseUrl) {
     },
     addBookingRequestNote(session, requestId, body) {
       return request(`/admin/booking-requests/${requestId}/notes`, { ...session, method: 'POST', body });
+    },
+    listNotificationDrafts(session, params = {}) {
+      const search = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          search.set(key, value);
+        }
+      });
+      const suffix = search.toString() ? `?${search.toString()}` : '';
+      return request(`/admin/notification-drafts${suffix}`, session);
+    },
+    getNotificationDraft(session, draftId) {
+      return request(`/admin/notification-drafts/${draftId}`, session);
     }
   };
 }
@@ -6469,6 +6483,305 @@ function todayBangkokDateString() {
   }).format(new Date());
 }
 
+const NOTIFICATION_EVENT_OPTIONS = [
+  { value: '', label: 'ทุก event' },
+  { value: 'slot_offer.sent', label: 'slot_offer.sent' },
+  { value: 'slot_offer.accepted', label: 'slot_offer.accepted' },
+  { value: 'slot_offer.declined', label: 'slot_offer.declined' },
+  { value: 'booking_request.status_changed', label: 'booking_request.status_changed' }
+];
+
+const NOTIFICATION_CHANNEL_OPTIONS = [
+  { value: '', label: 'ทุกช่องทาง' },
+  { value: 'line', label: 'LINE' },
+  { value: 'email', label: 'Email' },
+  { value: 'sms', label: 'SMS' }
+];
+
+function notificationMessagePreview(value) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '-';
+  return text.length > 96 ? `${text.slice(0, 96)}...` : text;
+}
+
+function NotificationDraftsPage() {
+  const api = useApi();
+  const sessionOptions = useSessionRequestOptions();
+  const [filterDraft, setFilterDraft] = useState({
+    eventType: '',
+    channel: '',
+    status: 'draft',
+    sourceType: '',
+    sourceId: ''
+  });
+  const [appliedFilters, setAppliedFilters] = useState(filterDraft);
+  const [refreshToken, setRefreshToken] = useState(0);
+  const [selectedId, setSelectedId] = useState(null);
+  const [detailState, setDetailState] = useState({ status: 'idle', data: null, error: null });
+
+  const [listState] = usePageData(
+    () => api.listNotificationDrafts(sessionOptions, { ...appliedFilters, limit: 50, offset: 0 }),
+    [
+      api,
+      sessionOptions,
+      appliedFilters.eventType,
+      appliedFilters.channel,
+      appliedFilters.status,
+      appliedFilters.sourceType,
+      appliedFilters.sourceId,
+      refreshToken
+    ]
+  );
+
+  function updateFilter(fieldName, value) {
+    setFilterDraft((current) => ({ ...current, [fieldName]: value }));
+  }
+
+  function applyFilters(event) {
+    event.preventDefault();
+    setSelectedId(null);
+    setDetailState({ status: 'idle', data: null, error: null });
+    setAppliedFilters({ ...filterDraft });
+  }
+
+  async function loadDetail(draftId) {
+    setSelectedId(draftId);
+    setDetailState({ status: 'loading', data: null, error: null });
+
+    try {
+      const data = await api.getNotificationDraft(sessionOptions, draftId);
+      setDetailState({ status: 'ready', data, error: null });
+    } catch (error) {
+      setDetailState({ status: 'error', data: null, error });
+    }
+  }
+
+  if (listState.status === 'loading' || listState.status === 'idle') {
+    return <LoadingCard label="กำลังโหลดร่างการแจ้งเตือน..." />;
+  }
+
+  if (listState.status === 'error') {
+    return (
+      <PageShell title="ร่างการแจ้งเตือน" intro="Preview only - Draft only - Not sent">
+        <ErrorCard error={listState.error} />
+      </PageShell>
+    );
+  }
+
+  const items = listState.data?.items || [];
+  const detail = detailState.data;
+
+  return (
+    <PageShell
+      title="ร่างการแจ้งเตือน"
+      intro="Preview only - Draft only - Not sent"
+    >
+      <div className="notification-drafts-page" data-testid="notification-drafts-page">
+        <div className="alert-banner warning" data-testid="notification-drafts-safety">
+          Preview only - no notification has been sent. รายการนี้เป็นร่างเท่านั้น
+        </div>
+
+        <Card variant="section" className="section-card">
+          <form className="notification-drafts-filters" data-testid="notification-drafts-filters" onSubmit={applyFilters}>
+            <label className="field">
+              <span>Event</span>
+              <select
+                value={filterDraft.eventType}
+                onChange={(event) => updateFilter('eventType', event.target.value)}
+                data-testid="notification-drafts-event-filter"
+              >
+                {NOTIFICATION_EVENT_OPTIONS.map((option) => (
+                  <option key={option.value || 'all-events'} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Channel</span>
+              <select
+                value={filterDraft.channel}
+                onChange={(event) => updateFilter('channel', event.target.value)}
+                data-testid="notification-drafts-channel-filter"
+              >
+                {NOTIFICATION_CHANNEL_OPTIONS.map((option) => (
+                  <option key={option.value || 'all-channels'} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Status</span>
+              <select
+                value={filterDraft.status}
+                onChange={(event) => updateFilter('status', event.target.value)}
+                data-testid="notification-drafts-status-filter"
+              >
+                <option value="draft">Draft</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Source Type</span>
+              <input
+                value={filterDraft.sourceType}
+                onChange={(event) => updateFilter('sourceType', event.target.value)}
+                placeholder="slot_offer"
+                data-testid="notification-drafts-source-type-filter"
+              />
+            </label>
+            <label className="field">
+              <span>Source ID</span>
+              <input
+                value={filterDraft.sourceId}
+                onChange={(event) => updateFilter('sourceId', event.target.value)}
+                placeholder="123"
+                data-testid="notification-drafts-source-id-filter"
+              />
+            </label>
+            <div className="booking-filter-actions">
+              <Button type="submit" data-testid="notification-drafts-filter-submit">ค้นหา</Button>
+            </div>
+          </form>
+        </Card>
+
+        <div className="notification-drafts-layout">
+          <Card variant="section" className="section-card">
+            <div className="split-header compact-gap">
+              <div>
+                <h3 className="section-heading">Notification Drafts</h3>
+                <p className="muted">ทั้งหมด {listState.data?.total || 0} รายการ</p>
+              </div>
+              <button type="button" className="secondary-button" onClick={() => setRefreshToken((value) => value + 1)}>
+                รีเฟรช
+              </button>
+            </div>
+            {items.length === 0 ? (
+              <EmptyState title="No notification drafts yet." message="เมื่อระบบสร้างร่างการแจ้งเตือน รายการจะแสดงที่นี่" testId="notification-drafts-empty" />
+            ) : (
+              <div className="table-shell">
+                <table className="data-table" data-testid="notification-drafts-list">
+                  <thead>
+                    <tr>
+                      <th>Created</th>
+                      <th>Event</th>
+                      <th>Recipient</th>
+                      <th>Channel</th>
+                      <th>Status</th>
+                      <th>Source</th>
+                      <th>Message Preview</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((item) => (
+                      <tr
+                        key={item.id}
+                        className={String(selectedId) === String(item.id) ? 'selected-row' : ''}
+                        onClick={() => loadDetail(item.id)}
+                        data-testid={`notification-draft-row-${item.id}`}
+                      >
+                        <td>{formatDateTime(item.createdAt)}</td>
+                        <td>
+                          <strong>{item.eventType}</strong>
+                          <div className="muted">Generated by event</div>
+                        </td>
+                        <td>
+                          {item.recipientRef || '-'}
+                          <div className="muted">{item.recipientType}{item.recipientId ? ` #${item.recipientId}` : ''}</div>
+                        </td>
+                        <td>{item.channel}</td>
+                        <td>
+                          <span className="pill status-draft">Draft</span>
+                          <div className="muted">Not sent</div>
+                        </td>
+                        <td>{item.sourceType}:{item.sourceId}</td>
+                        <td>{notificationMessagePreview(item.message)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
+          <Card variant="section" className="section-card" data-testid="notification-draft-detail">
+            {detailState.status === 'idle' ? (
+              <EmptyState title="เลือกร่างเพื่อดูรายละเอียด" message="คลิกรายการจากตารางด้านซ้ายเพื่อเปิดเนื้อหาแบบ preview" />
+            ) : null}
+            {detailState.status === 'loading' ? <LoadingState label="กำลังโหลดรายละเอียดร่าง..." /> : null}
+            {detailState.status === 'error' ? <ErrorCard error={detailState.error} /> : null}
+            {detailState.status === 'ready' && detail ? (
+              <div className="notification-draft-detail-panel">
+                <div className="split-header compact-gap">
+                  <div>
+                    <h3 className="section-heading">{detail.title || 'Notification Draft'}</h3>
+                    <p className="muted">Draft #{detail.id} / Preview only / Not sent</p>
+                  </div>
+                  <span className="pill status-draft">Draft</span>
+                </div>
+                <dl className="booking-detail-grid">
+                  <div>
+                    <dt>Title</dt>
+                    <dd>{detail.title || '-'}</dd>
+                  </div>
+                  <div>
+                    <dt>Subject</dt>
+                    <dd data-testid="notification-draft-subject">{detail.subject || '-'}</dd>
+                  </div>
+                  <div>
+                    <dt>Event Type</dt>
+                    <dd>{detail.eventType}</dd>
+                  </div>
+                  <div>
+                    <dt>Recipient Type</dt>
+                    <dd>{detail.recipientType}</dd>
+                  </div>
+                  <div>
+                    <dt>Recipient Ref</dt>
+                    <dd>{detail.recipientRef || '-'}</dd>
+                  </div>
+                  <div>
+                    <dt>Channel</dt>
+                    <dd>{detail.channel}</dd>
+                  </div>
+                  <div>
+                    <dt>Status</dt>
+                    <dd><span className="pill status-draft">Draft</span></dd>
+                  </div>
+                  <div>
+                    <dt>Source Type</dt>
+                    <dd>{detail.sourceType}</dd>
+                  </div>
+                  <div>
+                    <dt>Source ID</dt>
+                    <dd>{detail.sourceId}</dd>
+                  </div>
+                  <div>
+                    <dt>Idempotency Key</dt>
+                    <dd>{detail.idempotencyKey}</dd>
+                  </div>
+                  <div>
+                    <dt>Created At</dt>
+                    <dd>{formatDateTime(detail.createdAt)}</dd>
+                  </div>
+                  <div>
+                    <dt>Updated At</dt>
+                    <dd>{formatDateTime(detail.updatedAt)}</dd>
+                  </div>
+                </dl>
+                <div className="booking-message-box" data-testid="notification-draft-message">
+                  <strong>Full Message</strong>
+                  <p>{detail.message || '-'}</p>
+                </div>
+                <div className="booking-message-box" data-testid="notification-draft-metadata">
+                  <strong>Metadata</strong>
+                  <pre className="metadata-preview">{safeJsonStringify(detail.metadata)}</pre>
+                </div>
+              </div>
+            ) : null}
+          </Card>
+        </div>
+      </div>
+    </PageShell>
+  );
+}
+
 const INITIAL_SLOT_OFFER_FORM = {
   offeredDate: '',
   offeredTimeWindow: 'specific_time',
@@ -7231,6 +7544,8 @@ function renderPage(route) {
       return <ClinicOfferingsAdminPage />;
     case 'booking-requests':
       return <BookingRequestsPage />;
+    case 'notification-drafts':
+      return <NotificationDraftsPage />;
     case 'unified-inbox':
       return <UnifiedInboxPage />;
     case 'roas-analytics':

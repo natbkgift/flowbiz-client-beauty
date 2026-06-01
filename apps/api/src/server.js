@@ -56,6 +56,7 @@ const { handlePublicLeadRoutes } = require('./modules/public-leads/routes');
 const { handleBookingRequestRoutes } = require('./modules/booking-requests/routes');
 const { handleMemberRoutes } = require('./modules/members/routes');
 const { handleMemberAccessRoutes } = require('./modules/member-access/routes');
+const { handleNotificationRoutes } = require('./modules/notifications/routes');
 
 
 const config = loadConfig();
@@ -425,6 +426,10 @@ async function routeRequest(request, response) {
   }
 
   if (await handleBookingRequestRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
+    return;
+  }
+
+  if (await handleNotificationRoutes(request, response, url, { authenticateRequest, json })) {
     return;
   }
 

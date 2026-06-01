@@ -583,6 +583,13 @@ button {
   align-items: end;
 }
 
+.notification-drafts-filters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(150px, 1fr)) auto;
+  gap: 12px;
+  align-items: end;
+}
+
 .booking-filter-actions {
   display: flex;
   align-items: end;
@@ -595,17 +602,41 @@ button {
   align-items: start;
 }
 
+.notification-drafts-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(360px, 0.95fr);
+  gap: 18px;
+  align-items: start;
+}
+
 .booking-requests-page .data-table tr {
   min-height: 64px;
 }
 
-.booking-requests-page .data-table tbody tr {
+.booking-requests-page .data-table tbody tr,
+.notification-drafts-page .data-table tbody tr {
   cursor: pointer;
 }
 
 .booking-requests-page .data-table tbody tr:hover,
-.booking-requests-page .data-table tbody tr.selected-row {
+.booking-requests-page .data-table tbody tr.selected-row,
+.notification-drafts-page .data-table tbody tr:hover,
+.notification-drafts-page .data-table tbody tr.selected-row {
   background: rgba(15, 118, 110, 0.08);
+}
+
+.notification-draft-detail-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.metadata-preview {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.88rem;
+  color: var(--text);
 }
 
 .booking-detail-grid {
@@ -861,7 +892,9 @@ button {
   .blog-editor-layout,
   .forum-moderator-layout.with-detail,
   .booking-requests-layout,
+  .notification-drafts-layout,
   .booking-requests-filters,
+  .notification-drafts-filters,
   .booking-detail-grid,
   .booking-status-editor,
   .booking-slot-offer-grid {

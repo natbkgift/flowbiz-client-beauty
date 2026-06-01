@@ -18,6 +18,16 @@ const CONTACT_METHOD_CHANNEL = {
   phone: 'sms'
 };
 
+const ADMIN_NOTIFICATION_DRAFT_ROLES = new Set([
+  'owner',
+  'manager',
+  'marketing',
+  'sales',
+  'staff',
+  'admin',
+  'operator'
+]);
+
 const UNSAFE_METADATA_KEYS = new Set([
   'customerName',
   'fullName',
@@ -87,6 +97,81 @@ function sanitizeMetadata(value) {
     metadata[key] = entryValue;
     return metadata;
   }, {});
+}
+
+function trimString(value, maxLength) {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'string') {
+    throw new AppError(400, 'INVALID_NOTIFICATION_DRAFT_QUERY', 'Expected string query value.');
+  }
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.length > maxLength ? trimmed.slice(0, maxLength) : trimmed;
+}
+
+function asPositiveInteger(value, fallback, fieldName) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new AppError(400, 'INVALID_NOTIFICATION_DRAFT_QUERY', `${fieldName} must be a positive integer.`);
+  }
+  return parsed;
+}
+
+function asNonNegativeInteger(value, fallback, fieldName) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new AppError(400, 'INVALID_NOTIFICATION_DRAFT_QUERY', `${fieldName} must be a non-negative integer.`);
+  }
+  return parsed;
+}
+
+function rejectAdminClinicOverrideQuery(searchParams) {
+  if (searchParams.has('clinicId') || searchParams.has('clinic_id')) {
+    throw new AppError(400, 'INVALID_REQUEST', 'clinicId cannot be overridden in the query string.');
+  }
+}
+
+function assertAdminNotificationPreviewContext(context) {
+  if (!context?.currentClinic?.id) {
+    throw new AppError(403, 'CLINIC_CONTEXT_REQUIRED', 'Clinic context is required.');
+  }
+
+  const role = context.currentMembership?.legacyRole || context.currentMembership?.role;
+  const normalizedRole = context.currentMembership?.role;
+  if (!ADMIN_NOTIFICATION_DRAFT_ROLES.has(role) && !ADMIN_NOTIFICATION_DRAFT_ROLES.has(normalizedRole)) {
+    throw new AppError(403, 'NOTIFICATION_DRAFT_PERMISSION_DENIED', 'Notification draft preview permission is required.');
+  }
+}
+
+function normalizeAdminDraftFilters(searchParams) {
+  rejectAdminClinicOverrideQuery(searchParams);
+
+  const eventType = trimString(searchParams.get('eventType'), 120);
+  if (eventType && !SUPPORTED_EVENT_TYPES.has(eventType)) {
+    throw new AppError(400, 'INVALID_NOTIFICATION_DRAFT_QUERY', 'eventType is invalid.');
+  }
+
+  const channel = trimString(searchParams.get('channel'), 40);
+  if (channel && !['line', 'email', 'sms'].includes(channel)) {
+    throw new AppError(400, 'INVALID_NOTIFICATION_DRAFT_QUERY', 'channel is invalid.');
+  }
+
+  const status = trimString(searchParams.get('status'), 40);
+  if (status && status !== 'draft') {
+    throw new AppError(400, 'INVALID_NOTIFICATION_DRAFT_QUERY', 'status is invalid.');
+  }
+
+  return {
+    eventType,
+    channel,
+    status,
+    sourceType: trimString(searchParams.get('sourceType'), 80),
+    sourceId: trimString(searchParams.get('sourceId'), 160),
+    limit: Math.min(asPositiveInteger(searchParams.get('limit'), 50, 'limit'), 100),
+    offset: asNonNegativeInteger(searchParams.get('offset'), 0, 'offset')
+  };
 }
 
 function recipientRef(recipientType, recipientId, fallback) {
@@ -374,12 +459,90 @@ async function createNotificationDraftForEvent(input, client = getPool()) {
   throw new AppError(400, 'UNSUPPORTED_NOTIFICATION_EVENT', 'Notification event type is not supported.');
 }
 
+async function listAdminNotificationDrafts(context, searchParams = new URLSearchParams(), client = getPool()) {
+  assertAdminNotificationPreviewContext(context);
+  const filters = normalizeAdminDraftFilters(searchParams);
+  const values = [context.currentClinic.id];
+  const clauses = ['clinic_id = $1'];
+
+  if (filters.eventType) {
+    values.push(filters.eventType);
+    clauses.push(`event_type = $${values.length}`);
+  }
+
+  if (filters.channel) {
+    values.push(filters.channel);
+    clauses.push(`channel = $${values.length}`);
+  }
+
+  if (filters.status) {
+    values.push(filters.status);
+    clauses.push(`status = $${values.length}`);
+  }
+
+  if (filters.sourceType) {
+    values.push(filters.sourceType);
+    clauses.push(`source_type = $${values.length}`);
+  }
+
+  if (filters.sourceId) {
+    values.push(filters.sourceId);
+    clauses.push(`source_id = $${values.length}`);
+  }
+
+  values.push(filters.limit);
+  const limitPosition = values.length;
+  values.push(filters.offset);
+  const offsetPosition = values.length;
+
+  const result = await client.query(
+    `
+      select *, count(*) over()::int as total_count
+      from notification_drafts
+      where ${clauses.join(' and ')}
+      order by created_at desc, id desc
+      limit $${limitPosition}
+      offset $${offsetPosition}
+    `,
+    values
+  );
+
+  return {
+    items: result.rows.map((row) => mapNotificationDraftRow(row)),
+    total: result.rows[0]?.total_count || 0,
+    limit: filters.limit,
+    offset: filters.offset
+  };
+}
+
+async function getAdminNotificationDraft(context, draftId, client = getPool()) {
+  assertAdminNotificationPreviewContext(context);
+  const normalizedId = asPositiveInteger(draftId, null, 'draftId');
+  const result = await client.query(
+    `
+      select *
+      from notification_drafts
+      where clinic_id = $1 and id = $2
+      limit 1
+    `,
+    [context.currentClinic.id, normalizedId]
+  );
+
+  if (result.rowCount === 0) {
+    throw new AppError(404, 'NOTIFICATION_DRAFT_NOT_FOUND', 'Notification draft not found.');
+  }
+
+  return mapNotificationDraftRow(result.rows[0]);
+}
+
 module.exports = {
   SUPPORTED_EVENT_TYPES,
   buildNotificationDraft,
   buildIdempotencyKey,
   createNotificationDraft,
   createNotificationDraftForEvent,
+  listAdminNotificationDrafts,
+  getAdminNotificationDraft,
   channelForContactMethod,
   sanitizeMetadata
 };
