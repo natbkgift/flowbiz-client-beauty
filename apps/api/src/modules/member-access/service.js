@@ -5,6 +5,7 @@ const { getPool } = require('../../db');
 const { loadConfig } = require('../../config');
 const { AppError } = require('../../common/errors');
 const { recordAuditLog } = require('../audit/service');
+const { createNotificationDraftForEvent } = require('../notifications/service');
 const { resolvePublicClinicBySlug } = require('../public-content/clinic-resolver');
 
 const GENERIC_REQUEST_MESSAGE = 'หากพบข้อมูลสมาชิก ระบบจะส่งลิงก์เข้าใช้งานให้ตามช่องทางที่ระบุ';
@@ -726,6 +727,15 @@ async function respondToMemberSlotOffer(slug, offerId, body, requestMeta = {}) {
           : 'clinic_booking_slot_offer.customer_declined',
         actorUserId: null,
         contextJson: { summary }
+      },
+      client
+    );
+
+    await createNotificationDraftForEvent(
+      {
+        tenantId: clinicId,
+        eventType: normalized.response === 'accepted' ? 'slot_offer.accepted' : 'slot_offer.declined',
+        sourceId: normalizedOfferId
       },
       client
     );
