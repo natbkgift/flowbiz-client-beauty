@@ -171,6 +171,8 @@ const THAI_ERROR_MESSAGES = {
   INVALID_SLOT_OFFER_RESPONSE: 'ข้อมูลตอบกลับข้อเสนอเวลานัดไม่ถูกต้อง',
   SLOT_OFFER_RESPONSE_NOT_ALLOWED: 'ข้อเสนอเวลานัดนี้ไม่อยู่ในสถานะที่ตอบกลับได้',
   SLOT_OFFER_ALREADY_RESPONDED: 'ข้อเสนอเวลานัดนี้ถูกตอบกลับแล้ว',
+  INVALID_NOTIFICATION_DRAFT: 'ข้อมูลร่างการแจ้งเตือนไม่ครบถ้วนหรือไม่ถูกต้อง',
+  UNSUPPORTED_NOTIFICATION_EVENT: 'ประเภทเหตุการณ์การแจ้งเตือนนี้ยังไม่รองรับ',
   PUBLIC_BOOKING_REQUEST_RATE_LIMITED: 'มีการส่งคำขอนัดหมายบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่',
   INVALID_MEMBER_PAYLOAD: 'ข้อมูลสมาชิกไม่ครบถ้วนหรือไม่ถูกต้อง',
   MEMBER_CONTACT_REQUIRED: 'กรุณาระบุเบอร์โทรศัพท์ อีเมล หรือ LINE ID อย่างน้อยหนึ่งช่องทาง',
