@@ -4,6 +4,7 @@ const { randomUUID } = require('node:crypto');
 const { getPool } = require('../../db');
 const { AppError } = require('../../common/errors');
 const { recordAuditLog } = require('../audit/service');
+const { createNotificationDraftForEvent } = require('../notifications/service');
 const { resolvePublicClinicBySlug } = require('../public-content/clinic-resolver');
 const {
   findOrCreateMemberForPublicIntake,
@@ -1173,6 +1174,19 @@ async function updateAdminBookingRequestStatus(context, bookingRequestId, body) 
       client
     );
 
+    await createNotificationDraftForEvent(
+      {
+        tenantId: context.currentClinic.id,
+        eventType: 'booking_request.status_changed',
+        sourceId: normalizedId,
+        metadata: {
+          fromStatus: existing.status,
+          toStatus: nextStatus
+        }
+      },
+      client
+    );
+
     await client.query('commit');
     committed = true;
   } catch (error) {
@@ -1515,6 +1529,17 @@ async function createAdminBookingRequestSlotOffer(context, bookingRequestId, bod
       client
     );
 
+    if (normalized.offerStatus === 'sent') {
+      await createNotificationDraftForEvent(
+        {
+          tenantId: context.currentClinic.id,
+          eventType: 'slot_offer.sent',
+          sourceId: offer.id
+        },
+        client
+      );
+    }
+
     await client.query('commit');
     committed = true;
   } catch (error) {
@@ -1617,6 +1642,17 @@ async function updateAdminBookingRequestSlotOfferStatus(context, bookingRequestI
       },
       client
     );
+
+    if (existing.offer_status !== 'sent' && normalized.offerStatus === 'sent') {
+      await createNotificationDraftForEvent(
+        {
+          tenantId: context.currentClinic.id,
+          eventType: 'slot_offer.sent',
+          sourceId: normalizedOfferId
+        },
+        client
+      );
+    }
 
     await client.query('commit');
     committed = true;
