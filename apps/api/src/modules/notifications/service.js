@@ -58,8 +58,12 @@ function channelForContactMethod(method) {
   return CONTACT_METHOD_CHANNEL[method] || 'line';
 }
 
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype;
+}
+
 function sanitizeMetadata(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+  if (!isPlainObject(value)) {
     return {};
   }
 
@@ -68,14 +72,14 @@ function sanitizeMetadata(value) {
       return metadata;
     }
 
-    if (entryValue && typeof entryValue === 'object' && !Array.isArray(entryValue)) {
+    if (isPlainObject(entryValue)) {
       metadata[key] = sanitizeMetadata(entryValue);
       return metadata;
     }
 
     if (Array.isArray(entryValue)) {
       metadata[key] = entryValue.map((item) => (
-        item && typeof item === 'object' && !Array.isArray(item) ? sanitizeMetadata(item) : item
+        isPlainObject(item) ? sanitizeMetadata(item) : item
       ));
       return metadata;
     }
@@ -114,6 +118,9 @@ function buildNotificationDraft(input) {
   }
 
   const template = renderNotificationTemplate(eventType);
+  if (!template) {
+    throw new AppError(500, 'NOTIFICATION_TEMPLATE_NOT_FOUND', `Template not found for event type: ${eventType}`);
+  }
   const sourceType = input.sourceType || (eventType.startsWith('slot_offer.') ? 'slot_offer' : 'booking_request');
   const sourceId = normalizeSourceId(input.sourceId);
   const recipientType = input.recipientType;
@@ -229,7 +236,7 @@ async function loadSlotOfferDraftContext(client, tenantId, sourceId) {
       inner join clinic_booking_requests br
         on br.clinic_id = o.clinic_id
         and br.id = o.booking_request_id
-      where o.clinic_id = $1 and o.id = $2
+      where o.clinic_id = $1 and o.id = $2::bigint
       limit 1
     `,
     [tenantId, sourceId]
@@ -247,7 +254,7 @@ async function loadBookingRequestDraftContext(client, tenantId, sourceId) {
     `
       select id, lead_id, member_id, preferred_contact_method, status, slot_status
       from clinic_booking_requests
-      where clinic_id = $1 and id = $2
+      where clinic_id = $1 and id = $2::bigint
       limit 1
     `,
     [tenantId, sourceId]
