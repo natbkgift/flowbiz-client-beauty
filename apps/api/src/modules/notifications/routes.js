@@ -5,6 +5,10 @@ const {
   listAdminNotificationDrafts,
   getAdminNotificationDraft
 } = require('./service');
+const {
+  dryRunNotificationDraftDelivery,
+  listNotificationDraftDeliveryAttempts
+} = require('./delivery-service');
 
 async function handleNotificationRoutes(request, response, url, tools) {
   const { authenticateRequest, json } = tools;
@@ -19,6 +23,20 @@ async function handleNotificationRoutes(request, response, url, tools) {
   if (detailParams && request.method === 'GET') {
     const context = await authenticateRequest(request);
     const result = await getAdminNotificationDraft(context, detailParams.id);
+    return json(response, 200, result);
+  }
+
+  const dryRunParams = matchPath(url.pathname, '/admin/notification-drafts/:id/dry-run-delivery');
+  if (dryRunParams && request.method === 'POST') {
+    const context = await authenticateRequest(request);
+    const result = await dryRunNotificationDraftDelivery(context, dryRunParams.id);
+    return json(response, 201, result);
+  }
+
+  const attemptsParams = matchPath(url.pathname, '/admin/notification-drafts/:id/delivery-attempts');
+  if (attemptsParams && request.method === 'GET') {
+    const context = await authenticateRequest(request);
+    const result = await listNotificationDraftDeliveryAttempts(context, attemptsParams.id);
     return json(response, 200, result);
   }
 

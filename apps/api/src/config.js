@@ -90,6 +90,8 @@ function loadConfig() {
     lineChannelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
     lineChannelSecret: process.env.LINE_CHANNEL_SECRET || '',
     lineRealSendEnabled: toBoolean(process.env.LINE_REAL_SEND_ENABLED, false),
+    notificationRealDeliveryEnabled: toBoolean(process.env.NOTIFICATION_REAL_DELIVERY_ENABLED, false),
+    notificationDryRunEnabled: toBoolean(process.env.NOTIFICATION_DRY_RUN_ENABLED, true),
     aiProvider: toEnum(process.env.AI_PROVIDER, ['mock', 'gemini', 'openai'], 'mock'),
     geminiApiKey: process.env.GEMINI_API_KEY || '',
     openaiApiKey: process.env.OPENAI_API_KEY || '',
