@@ -1,7 +1,10 @@
 'use strict';
 
+const { loadConfig } = require('../../config');
 const { matchPath } = require('../../common/routing');
+const { getNotificationProviderReadiness } = require('./provider-readiness');
 const {
+  assertAdminNotificationPreviewContext,
   listAdminNotificationDrafts,
   getAdminNotificationDraft
 } = require('./service');
@@ -12,6 +15,14 @@ const {
 
 async function handleNotificationRoutes(request, response, url, tools) {
   const { authenticateRequest, json } = tools;
+
+  if (url.pathname === '/admin/notification-provider-readiness' && request.method === 'GET') {
+    const context = await authenticateRequest(request);
+    assertAdminNotificationPreviewContext(context);
+    return json(response, 200, {
+      notificationProviders: getNotificationProviderReadiness(loadConfig())
+    });
+  }
 
   if (url.pathname === '/admin/notification-drafts' && request.method === 'GET') {
     const context = await authenticateRequest(request);

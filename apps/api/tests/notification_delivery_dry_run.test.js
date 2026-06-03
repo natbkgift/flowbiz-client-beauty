@@ -291,7 +291,7 @@ test('Notification Delivery Dry Run - tenant-scoped dry-run attempts', async (t)
 
     await assert.rejects(
       () => deliverNotificationDraft(null, draftAId, { config: { notificationRealDeliveryEnabled: true } }),
-      (error) => error instanceof AppError && error.code === 'INVALID_NOTIFICATION_DELIVERY_MODE'
+      (error) => error instanceof AppError && error.code === 'NOTIFICATION_GLOBAL_KILL_SWITCH_ACTIVE'
     );
 
     const context = await contextFor()();
@@ -336,7 +336,11 @@ test('Notification Delivery Dry Run - tenant-scoped dry-run attempts', async (t)
       'INVALID_NOTIFICATION_DELIVERY_MODE',
       'NOTIFICATION_DRY_RUN_DISABLED',
       'UNSUPPORTED_NOTIFICATION_CHANNEL',
-      'NOTIFICATION_REAL_DELIVERY_DISABLED'
+      'NOTIFICATION_REAL_DELIVERY_DISABLED',
+      'NOTIFICATION_GLOBAL_KILL_SWITCH_ACTIVE',
+      'NOTIFICATION_PROVIDER_DISABLED',
+      'NOTIFICATION_PROVIDER_NOT_CONFIGURED',
+      'NOTIFICATION_PROVIDER_SECRET_MISSING'
     ]) {
       assert.equal(typeof THAI_ERROR_MESSAGES[code], 'string');
       assert.ok(THAI_ERROR_MESSAGES[code].length > 0);

@@ -45,6 +45,11 @@ function toEnum(value, allowedValues, fallback) {
   return allowedValues.includes(normalized) ? normalized : fallback;
 }
 
+function optionalString(value) {
+  const normalized = String(value || '').trim();
+  return normalized || null;
+}
+
 function loadConfig() {
   const appEnv = process.env.APP_ENV || 'development';
   const localTokenSecret = 'flowbiz_local_token_secret_change_me';
@@ -63,6 +68,11 @@ function loadConfig() {
       throw new Error('Production DATABASE_URL must be configured with a non-local database.');
     }
   }
+
+  const notificationDryRunEnabled = toBoolean(process.env.NOTIFICATION_DRY_RUN_ENABLED, true);
+  const notificationRealDeliveryEnabled = toBoolean(process.env.NOTIFICATION_REAL_DELIVERY_ENABLED, false);
+  const notificationGlobalKillSwitch = toBoolean(process.env.NOTIFICATION_GLOBAL_KILL_SWITCH, true);
+  const notificationLineChannelAccessToken = optionalString(process.env.NOTIFICATION_LINE_CHANNEL_ACCESS_TOKEN);
 
   return {
     appEnv,
@@ -90,8 +100,30 @@ function loadConfig() {
     lineChannelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '',
     lineChannelSecret: process.env.LINE_CHANNEL_SECRET || '',
     lineRealSendEnabled: toBoolean(process.env.LINE_REAL_SEND_ENABLED, false),
-    notificationRealDeliveryEnabled: toBoolean(process.env.NOTIFICATION_REAL_DELIVERY_ENABLED, false),
-    notificationDryRunEnabled: toBoolean(process.env.NOTIFICATION_DRY_RUN_ENABLED, true),
+    notificationRealDeliveryEnabled,
+    notificationDryRunEnabled,
+    notificationGlobalKillSwitch,
+    notifications: {
+      dryRunEnabled: notificationDryRunEnabled,
+      realDeliveryEnabled: notificationRealDeliveryEnabled,
+      globalKillSwitch: notificationGlobalKillSwitch,
+      email: {
+        enabled: toBoolean(process.env.NOTIFICATION_EMAIL_ENABLED, false),
+        provider: toEnum(process.env.NOTIFICATION_EMAIL_PROVIDER, ['none', 'smtp', 'sendgrid', 'ses', 'mailgun'], 'none'),
+        from: optionalString(process.env.NOTIFICATION_EMAIL_FROM),
+        replyTo: optionalString(process.env.NOTIFICATION_EMAIL_REPLY_TO)
+      },
+      line: {
+        enabled: toBoolean(process.env.NOTIFICATION_LINE_ENABLED, false),
+        provider: toEnum(process.env.NOTIFICATION_LINE_PROVIDER, ['none', 'line'], 'none'),
+        channelAccessTokenConfigured: Boolean(notificationLineChannelAccessToken)
+      },
+      sms: {
+        enabled: toBoolean(process.env.NOTIFICATION_SMS_ENABLED, false),
+        provider: toEnum(process.env.NOTIFICATION_SMS_PROVIDER, ['none', 'twilio', 'vonage'], 'none'),
+        from: optionalString(process.env.NOTIFICATION_SMS_FROM)
+      }
+    },
     aiProvider: toEnum(process.env.AI_PROVIDER, ['mock', 'gemini', 'openai'], 'mock'),
     geminiApiKey: process.env.GEMINI_API_KEY || '',
     openaiApiKey: process.env.OPENAI_API_KEY || '',
