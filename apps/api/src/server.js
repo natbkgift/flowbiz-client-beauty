@@ -429,7 +429,7 @@ async function routeRequest(request, response) {
     return;
   }
 
-  if (await handleNotificationRoutes(request, response, url, { authenticateRequest, json })) {
+  if (await handleNotificationRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
     return;
   }
 
