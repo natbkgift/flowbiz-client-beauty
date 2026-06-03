@@ -2,7 +2,7 @@
 
 const { AppError } = require('../../common/errors');
 const { getNotificationChannelConfig, normalizeNotificationProviderConfig } = require('./provider-config');
-const { hasRequiredProviderConfig } = require('./provider-readiness');
+const { hasRequiredProviderConfig, isSupportedEmailProvider } = require('./provider-readiness');
 
 function assertNotificationDryRunAllowed(config = {}) {
   const normalized = normalizeNotificationProviderConfig(config);
@@ -35,11 +35,19 @@ function assertNotificationRealDeliveryAllowed(channel, config = {}) {
     throw new AppError(403, 'NOTIFICATION_PROVIDER_NOT_CONFIGURED', 'Notification provider is not configured.');
   }
 
+  if (channel === 'email' && !isSupportedEmailProvider(channelConfig.provider)) {
+    throw new AppError(403, 'NOTIFICATION_EMAIL_PROVIDER_NOT_READY', 'Email provider is not ready for real delivery.');
+  }
+
   if (!hasRequiredProviderConfig(channel, channelConfig)) {
     throw new AppError(403, 'NOTIFICATION_PROVIDER_SECRET_MISSING', 'Notification provider required configuration is missing.');
   }
 
-  throw new AppError(400, 'INVALID_NOTIFICATION_DELIVERY_MODE', 'Real notification delivery is not implemented in this release.');
+  if (channel !== 'email') {
+    throw new AppError(400, 'NOTIFICATION_EMAIL_ONLY', 'Only email real delivery is supported in this release.');
+  }
+
+  return true;
 }
 
 module.exports = {

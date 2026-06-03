@@ -29,6 +29,10 @@ function assertNotificationSendControlAllowed({ draft, approval, providerReadine
     throw new AppError(400, 'UNSUPPORTED_NOTIFICATION_CHANNEL', 'Notification channel is not supported.');
   }
 
+  if (draft.channel !== 'email') {
+    throw new AppError(400, 'NOTIFICATION_EMAIL_ONLY', 'Only email real delivery is supported in this release.');
+  }
+
   const normalized = normalizeNotificationProviderConfig(config);
 
   if (!normalized.realDeliveryEnabled || providerReadiness?.realDeliveryEnabled === false) {
@@ -53,7 +57,7 @@ function assertNotificationSendControlAllowed({ draft, approval, providerReadine
     throw new AppError(403, 'NOTIFICATION_SEND_CONTROL_BLOCKED', 'Notification send control blocked provider delivery.');
   }
 
-  throw new AppError(400, 'INVALID_NOTIFICATION_DELIVERY_MODE', 'Real notification delivery is not implemented in this release.');
+  return true;
 }
 
 module.exports = {

@@ -233,6 +233,7 @@ async function getNotificationApprovalStatus(context, draftId, client = getPool(
 module.exports = {
   approveNotificationDraft,
   cancelNotificationApproval,
+  getLatestApprovalForDraft,
   getNotificationApprovalStatus,
   rejectNotificationDraft,
   requestNotificationApproval

@@ -109,7 +109,7 @@ function loadConfig() {
       globalKillSwitch: notificationGlobalKillSwitch,
       email: {
         enabled: toBoolean(process.env.NOTIFICATION_EMAIL_ENABLED, false),
-        provider: toEnum(process.env.NOTIFICATION_EMAIL_PROVIDER, ['none', 'smtp', 'sendgrid', 'ses', 'mailgun'], 'none'),
+        provider: toEnum(process.env.NOTIFICATION_EMAIL_PROVIDER, ['none', 'sandbox', 'smtp', 'sendgrid', 'ses', 'mailgun'], 'none'),
         from: optionalString(process.env.NOTIFICATION_EMAIL_FROM),
         replyTo: optionalString(process.env.NOTIFICATION_EMAIL_REPLY_TO)
       },
