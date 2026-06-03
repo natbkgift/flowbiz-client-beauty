@@ -5,6 +5,11 @@ const { loadConfig } = require('../../config');
 const { AppError } = require('../../common/errors');
 const { getAdminNotificationDraft } = require('./service');
 const { mapNotificationDeliveryAttemptRow } = require('./serializer');
+const {
+  assertNotificationDryRunAllowed,
+  assertNotificationRealDeliveryAllowed
+} = require('./provider-guards');
+const { normalizeNotificationProviderConfig } = require('./provider-config');
 
 const dryRunEmailAdapter = require('./delivery-adapters/dry-run-email');
 const dryRunLineAdapter = require('./delivery-adapters/dry-run-line');
@@ -45,6 +50,7 @@ function buildNotificationDeliveryIdempotencyKey(draft, provider) {
 
 function buildDryRunDeliveryPayload(draft, config = loadConfig()) {
   const { provider } = resolveDryRunAdapter(draft.channel);
+  const notificationConfig = normalizeNotificationProviderConfig(config);
   return {
     tenantId: draft.tenantId,
     draftId: draft.id,
@@ -70,23 +76,19 @@ function buildDryRunDeliveryPayload(draft, config = loadConfig()) {
     safety: {
       dryRunOnly: true,
       externalCallAllowed: false,
-      realDeliveryEnabled: Boolean(config.notificationRealDeliveryEnabled),
+      realDeliveryEnabled: Boolean(notificationConfig.realDeliveryEnabled),
+      globalKillSwitch: Boolean(notificationConfig.globalKillSwitch),
       providerConfigMissing: true
     }
   };
 }
 
 function assertNotificationDryRunEnabled(config = loadConfig()) {
-  if (!config.notificationDryRunEnabled) {
-    throw new AppError(403, 'NOTIFICATION_DRY_RUN_DISABLED', 'Notification dry-run delivery is disabled.');
-  }
+  assertNotificationDryRunAllowed(config);
 }
 
 function assertNotificationRealDeliveryDisabled(config = loadConfig()) {
-  if (config.notificationRealDeliveryEnabled) {
-    throw new AppError(400, 'INVALID_NOTIFICATION_DELIVERY_MODE', 'Real notification delivery is not implemented in this release.');
-  }
-  throw new AppError(403, 'NOTIFICATION_REAL_DELIVERY_DISABLED', 'Real notification delivery is disabled.');
+  assertNotificationRealDeliveryAllowed('email', config);
 }
 
 async function deliverNotificationDraft(context, draftId, options = {}) {

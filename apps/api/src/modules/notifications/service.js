@@ -545,6 +545,7 @@ async function getAdminNotificationDraft(context, draftId, client = getPool()) {
 
 module.exports = {
   SUPPORTED_EVENT_TYPES,
+  assertAdminNotificationPreviewContext,
   buildNotificationDraft,
   buildIdempotencyKey,
   createNotificationDraft,
