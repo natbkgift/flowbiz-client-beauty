@@ -471,31 +471,31 @@ async function listAdminNotificationDrafts(context, searchParams = new URLSearch
   assertAdminNotificationPreviewContext(context);
   const filters = normalizeAdminDraftFilters(searchParams);
   const values = [context.currentClinic.id];
-  const clauses = ['clinic_id = $1'];
+  const clauses = ['d.clinic_id = $1'];
 
   if (filters.eventType) {
     values.push(filters.eventType);
-    clauses.push(`event_type = $${values.length}`);
+    clauses.push(`d.event_type = $${values.length}`);
   }
 
   if (filters.channel) {
     values.push(filters.channel);
-    clauses.push(`channel = $${values.length}`);
+    clauses.push(`d.channel = $${values.length}`);
   }
 
   if (filters.status) {
     values.push(filters.status);
-    clauses.push(`status = $${values.length}`);
+    clauses.push(`d.status = $${values.length}`);
   }
 
   if (filters.sourceType) {
     values.push(filters.sourceType);
-    clauses.push(`source_type = $${values.length}`);
+    clauses.push(`d.source_type = $${values.length}`);
   }
 
   if (filters.sourceId) {
     values.push(filters.sourceId);
-    clauses.push(`source_id = $${values.length}`);
+    clauses.push(`d.source_id = $${values.length}`);
   }
 
   values.push(filters.limit);
@@ -506,8 +506,32 @@ async function listAdminNotificationDrafts(context, searchParams = new URLSearch
   const result = await client.query(
     `
       select *, count(*) over()::int as total_count
-      from notification_drafts
-      where ${clauses.join(' and ')}
+      from (
+        select
+          d.*,
+          ar.id as approval_request_id,
+          ar.clinic_id as approval_clinic_id,
+          ar.draft_id as approval_draft_id,
+          ar.status as approval_status,
+          ar.requested_by_user_id as approval_requested_by_user_id,
+          ar.decided_by_user_id as approval_decided_by_user_id,
+          ar.requested_note as approval_requested_note,
+          ar.decision_note as approval_decision_note,
+          ar.idempotency_key as approval_idempotency_key,
+          ar.requested_at as approval_requested_at,
+          ar.decided_at as approval_decided_at,
+          ar.created_at as approval_created_at,
+          ar.updated_at as approval_updated_at
+        from notification_drafts d
+        left join lateral (
+          select *
+          from notification_approval_requests
+          where clinic_id = d.clinic_id and draft_id = d.id
+          order by created_at desc, id desc
+          limit 1
+        ) ar on true
+        where ${clauses.join(' and ')}
+      ) drafts_with_approval
       order by created_at desc, id desc
       limit $${limitPosition}
       offset $${offsetPosition}
@@ -528,9 +552,30 @@ async function getAdminNotificationDraft(context, draftId, client = getPool()) {
   const normalizedId = asPositiveInteger(draftId, null, 'draftId');
   const result = await client.query(
     `
-      select *
-      from notification_drafts
-      where clinic_id = $1 and id = $2
+      select
+        d.*,
+        ar.id as approval_request_id,
+        ar.clinic_id as approval_clinic_id,
+        ar.draft_id as approval_draft_id,
+        ar.status as approval_status,
+        ar.requested_by_user_id as approval_requested_by_user_id,
+        ar.decided_by_user_id as approval_decided_by_user_id,
+        ar.requested_note as approval_requested_note,
+        ar.decision_note as approval_decision_note,
+        ar.idempotency_key as approval_idempotency_key,
+        ar.requested_at as approval_requested_at,
+        ar.decided_at as approval_decided_at,
+        ar.created_at as approval_created_at,
+        ar.updated_at as approval_updated_at
+      from notification_drafts d
+      left join lateral (
+        select *
+        from notification_approval_requests
+        where clinic_id = d.clinic_id and draft_id = d.id
+        order by created_at desc, id desc
+        limit 1
+      ) ar on true
+      where d.clinic_id = $1 and d.id = $2
       limit 1
     `,
     [context.currentClinic.id, normalizedId]
