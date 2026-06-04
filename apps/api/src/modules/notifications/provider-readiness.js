@@ -3,7 +3,8 @@
 const { CHANNELS, normalizeNotificationProviderConfig } = require('./provider-config');
 
 function isSupportedEmailProvider(provider) {
-  return ['sandbox'].includes(provider);
+  const normalized = String(provider || '').trim().toLowerCase();
+  return normalized === 'sandbox';
 }
 
 function hasRequiredProviderConfig(channel, channelConfig) {
