@@ -2,9 +2,9 @@
 
 const TEMPLATE_BY_EVENT = {
   'slot_offer.sent': {
-    title: 'Slot offer ready',
-    subject: 'New appointment slot offer',
-    message: 'A clinic appointment slot offer is ready for review.'
+    title: 'Appointment slot offer',
+    subject: 'Your appointment slot offer is ready',
+    message: 'The clinic has prepared an appointment slot offer for your booking request. Please review the proposed time and contact the clinic if you need assistance.'
   },
   'slot_offer.accepted': {
     title: 'Slot offer accepted',

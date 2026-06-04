@@ -365,7 +365,8 @@ test('Notification Email Delivery - safety-gated manual email send', async (t) =
       'NOTIFICATION_EMAIL_SEND_BLOCKED',
       'NOTIFICATION_EMAIL_SEND_FAILED',
       'NOTIFICATION_EMAIL_ALREADY_SENT',
-      'NOTIFICATION_EMAIL_RECIPIENT_MISSING'
+      'NOTIFICATION_EMAIL_RECIPIENT_MISSING',
+      'NOTIFICATION_EMAIL_RECIPIENT_INVALID'
     ]) {
       assert.equal(typeof THAI_ERROR_MESSAGES[code], 'string');
       assert.ok(THAI_ERROR_MESSAGES[code].length > 0);

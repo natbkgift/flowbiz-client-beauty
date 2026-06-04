@@ -247,7 +247,14 @@ function normalizeSlotOfferResponsePayload(body) {
 
 function formatDateOnly(value) {
   if (!value) return null;
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (value instanceof Date) {
+    return new Intl.DateTimeFormat('sv-SE', {
+      timeZone: 'Asia/Bangkok',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(value);
+  }
   return String(value).slice(0, 10);
 }
 
