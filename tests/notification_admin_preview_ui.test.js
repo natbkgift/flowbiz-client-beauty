@@ -127,6 +127,28 @@ function notificationRoutes(overrides = {}) {
       body: { items: [notificationDraft], total: 1, limit: 50, offset: 0 }
     },
     'GET /admin/notification-drafts/91': overrides.detail || { status: 200, body: notificationDraft },
+    'GET /admin/notification-provider-readiness': overrides.readiness || {
+      status: 200,
+      body: {
+        notificationProviders: {
+          realDeliveryEnabled: false,
+          dryRunEnabled: true,
+          globalKillSwitch: false,
+          realDeliveryBlocked: true,
+          channels: {
+            email: { enabled: true, provider: 'sandbox', ready: false, configured: true, blockedReason: 'NOTIFICATION_REAL_DELIVERY_DISABLED' }
+          }
+        }
+      }
+    },
+    'GET /admin/notification-drafts/91/approval-status': overrides.approval || {
+      status: 200,
+      body: { approvalStatus: 'pending', approval: { id: 701, status: 'pending' } }
+    },
+    'GET /admin/notification-drafts/91/delivery-attempts': overrides.attempts || {
+      status: 200,
+      body: { items: [], total: 0 }
+    },
     ...overrides.extra
   };
 }
@@ -181,7 +203,7 @@ test('Notification Drafts UI - draft rows render event channel status and messag
   assert.match(app.document.body.textContent, /The customer accepted/);
 });
 
-test('Notification Drafts UI - detail view shows subject message metadata and no delivery controls', async () => {
+test('Notification Drafts UI - detail view shows subject message metadata and guarded email control only', async () => {
   const app = await loadAdminApp({ routes: notificationRoutes() });
   click(app.window, await waitFor(() => app.document.querySelector('[data-testid="notification-draft-row-91"]')));
   await waitFor(() => app.document.querySelector('[data-testid="notification-draft-message"]'));
@@ -189,13 +211,16 @@ test('Notification Drafts UI - detail view shows subject message metadata and no
   assert.match(app.document.querySelector('[data-testid="notification-draft-subject"]').textContent, /Customer accepted/);
   assert.match(app.document.querySelector('[data-testid="notification-draft-message"]').textContent, /Please review/);
   assert.match(app.document.querySelector('[data-testid="notification-draft-metadata"]').textContent, /bookingRequestId/);
+  assert.ok(app.document.querySelector('[data-testid="email-send-eligibility-panel"]'));
+  assert.equal(app.document.querySelector('[data-testid="send-email-button"]').disabled, true);
 
   const buttonText = [...app.document.querySelectorAll('button')]
     .map((button) => button.textContent.trim().toLowerCase())
     .join(' ');
-  assert.doesNotMatch(buttonText, /\bsend\b/);
+  assert.match(buttonText, /\bsend email\b/);
   assert.doesNotMatch(buttonText, /\bapprove\b/);
   assert.doesNotMatch(buttonText, /\bretry\b/);
+  assert.doesNotMatch(app.document.body.textContent, new RegExp(`Send ${'LINE'}|Send ${'SMS'}|Bulk ${'send'}|Retry ${'send'}`));
 });
 
 test('Notification Drafts UI - ignores stale detail responses after rapid selection changes', async () => {
@@ -221,7 +246,15 @@ test('Notification Drafts UI - ignores stale detail responses after rapid select
         setTimeout(() => resolve({ status: 200, body: firstDraft }), 80);
       }),
       extra: {
-        'GET /admin/notification-drafts/92': { status: 200, body: secondDraft }
+        'GET /admin/notification-drafts/92': { status: 200, body: secondDraft },
+        'GET /admin/notification-drafts/92/approval-status': {
+          status: 200,
+          body: { approvalStatus: 'pending', approval: { id: 702, status: 'pending' } }
+        },
+        'GET /admin/notification-drafts/92/delivery-attempts': {
+          status: 200,
+          body: { items: [], total: 0 }
+        }
       }
     })
   });
