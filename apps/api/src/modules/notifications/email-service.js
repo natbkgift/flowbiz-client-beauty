@@ -172,10 +172,6 @@ async function sendApprovedNotificationEmail(context, draftId, options = {}) {
     assertNotificationRealDeliveryAllowed('email', config);
 
     const channelConfig = getNotificationChannelConfig('email', config);
-    if (!providerReadiness.channels.email.ready) {
-      throw new AppError(403, 'NOTIFICATION_EMAIL_PROVIDER_NOT_READY', 'Email provider is not ready for real delivery.');
-    }
-
     const resolved = resolveEmailAdapter(channelConfig.provider);
     provider = resolved.provider;
     const { adapter } = resolved;
