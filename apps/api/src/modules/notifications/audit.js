@@ -94,7 +94,7 @@ function buildSafeNotificationDeliveryAuditContext({
     draft_id: safeNumber(draft?.id),
     delivery_attempt_id: safeNumber(attempt?.id),
     approval_request_id: safeNumber(approval?.id),
-    actor_user_id: safeNumber(context.currentUser?.id),
+    actor_user_id: safeNumber(context?.currentUser?.id),
     channel: safeToken(channel || attempt?.channel || draft?.channel),
     provider: safeToken(provider || attempt?.provider),
     mode: safeToken(mode || attempt?.mode),
@@ -132,7 +132,7 @@ async function auditNotificationDeliveryEvent(client, {
     entityType: 'notification_delivery_attempt',
     entityId: attempt?.id || draft.id,
     actionType,
-    actorUserId: context.currentUser?.id || null,
+    actorUserId: context?.currentUser?.id || null,
     contextJson: buildSafeNotificationDeliveryAuditContext({
       draft,
       approval,

@@ -7,6 +7,7 @@ const { loadConfig } = require('../src/config');
 const { AppError } = require('../src/common/errors');
 const { sendApprovedNotificationEmail } = require('../src/modules/notifications/email-service');
 const { dryRunNotificationDraftDelivery } = require('../src/modules/notifications/delivery-service');
+const { buildSafeNotificationDeliveryAuditContext } = require('../src/modules/notifications/audit');
 const sandboxEmailAdapter = require('../src/modules/notifications/email-adapters/sandbox-email');
 
 async function createTenant(pool, uniqueId, suffix) {
@@ -189,6 +190,34 @@ function assertSafeAuditContext(context, rawNeedles) {
   assert.equal(serialized.includes('sms-token-secret'), false);
   assert.equal(serialized.includes('stack'), false);
 }
+
+test('Notification Delivery Audit Hardening - audit context handles null caller context', () => {
+  const context = buildSafeNotificationDeliveryAuditContext({
+    draft: {
+      tenantId: 101,
+      id: 202,
+      channel: 'email',
+      recipientType: 'member',
+      recipientId: 303,
+      recipientRef: 'member@example.test'
+    },
+    context: null,
+    channel: 'email',
+    provider: 'sandbox',
+    mode: 'real',
+    status: 'blocked'
+  });
+
+  assert.equal(context.clinic_id, 101);
+  assert.equal(context.draft_id, 202);
+  assert.equal(context.actor_user_id, null);
+  assert.equal(context.channel, 'email');
+  assert.equal(context.provider, 'sandbox');
+  assert.equal(context.mode, 'real');
+  assert.equal(context.status, 'blocked');
+  assert.equal(context.recipient_ref_present, true);
+  assertSafeAuditContext(context, ['member@example.test']);
+});
 
 test('Notification Delivery Audit Hardening - safe tenant-scoped evidence', async (t) => {
   const pool = new Pool({ connectionString: loadConfig().databaseUrl });
