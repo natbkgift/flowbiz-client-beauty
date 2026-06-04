@@ -3,7 +3,6 @@
 const { getPool } = require('../../db');
 const { loadConfig } = require('../../config');
 const { AppError } = require('../../common/errors');
-const { recordAuditLog } = require('../audit/service');
 const { getAdminNotificationDraft } = require('./service');
 const { getLatestApprovalForDraft } = require('./approval-service');
 const { mapNotificationDeliveryAttemptRow } = require('./serializer');
@@ -12,6 +11,7 @@ const { getNotificationChannelConfig } = require('./provider-config');
 const { assertNotificationRealDeliveryAllowed } = require('./provider-guards');
 const { assertNotificationSendControlAllowed } = require('./send-control');
 const { resolveEmailAdapter } = require('./email-adapter');
+const { auditNotificationDeliveryEvent } = require('./audit');
 
 function buildRealEmailDeliveryIdempotencyKey(draft, provider) {
   return [
@@ -52,33 +52,6 @@ function buildEmailPayload(draft, channelConfig) {
     eventType: draft.eventType,
     metadata: draft.metadata || {}
   };
-}
-
-function buildAuditContext(draft, approval, attempt, context, extra = {}) {
-  return {
-    clinic_id: draft.tenantId,
-    draft_id: draft.id,
-    delivery_attempt_id: attempt?.id || null,
-    approval_request_id: approval?.id || null,
-    actor_user_id: context.currentUser?.id || null,
-    provider: attempt?.provider || extra.provider || null,
-    channel: 'email',
-    status: attempt?.status || extra.status || null,
-    reason: extra.reason || null,
-    result: extra.result || null,
-    timestamp: new Date().toISOString()
-  };
-}
-
-async function auditEmailEvent(client, actionType, draft, approval, attempt, context, extra = {}) {
-  await recordAuditLog({
-    clinicId: draft.tenantId,
-    entityType: 'notification_delivery_attempt',
-    entityId: attempt?.id || draft.id,
-    actionType,
-    actorUserId: context.currentUser?.id || null,
-    contextJson: buildAuditContext(draft, approval, attempt, context, extra)
-  }, client);
 }
 
 async function loadExistingRealEmailAttempt(client, draft, provider) {
@@ -186,7 +159,17 @@ async function sendApprovedNotificationEmail(context, draftId, options = {}) {
     const payload = buildEmailPayload(draft, channelConfig);
     const idempotencyKey = buildRealEmailDeliveryIdempotencyKey(draft, provider);
     const attempt = await insertRealEmailAttempt(client, draft, payload, provider, idempotencyKey);
-    await auditEmailEvent(client, 'notification.email_send_requested', draft, approval, attempt, context);
+    await auditNotificationDeliveryEvent(client, {
+      actionType: 'notification.email_send_requested',
+      draft,
+      approval,
+      attempt,
+      context,
+      channel: 'email',
+      provider,
+      mode: 'real',
+      status: 'sending'
+    });
 
     let adapterResult;
     try {
@@ -199,7 +182,19 @@ async function sendApprovedNotificationEmail(context, draftId, options = {}) {
         reason: error.code || 'EMAIL_ADAPTER_FAILED'
       };
       const failedAttempt = await updateAttemptResult(client, attempt, 'failed', failedResult);
-      await auditEmailEvent(client, 'notification.email_send_failed', draft, approval, failedAttempt, context, { reason: failedResult.reason });
+      await auditNotificationDeliveryEvent(client, {
+        actionType: 'notification.email_send_failed',
+        draft,
+        approval,
+        attempt: failedAttempt,
+        context,
+        channel: 'email',
+        provider,
+        mode: 'real',
+        status: 'failed',
+        reason: failedResult.reason,
+        result: failedResult
+      });
       throw new AppError(502, 'NOTIFICATION_EMAIL_SEND_FAILED', 'Email send failed.');
     }
 
@@ -213,15 +208,18 @@ async function sendApprovedNotificationEmail(context, draftId, options = {}) {
     };
     const status = safeResult.safeResult && safeResult.accepted.length > 0 ? 'sent' : 'failed';
     const updatedAttempt = await updateAttemptResult(client, attempt, status, safeResult);
-    await auditEmailEvent(
-      client,
-      status === 'sent' ? 'notification.email_sent' : 'notification.email_send_failed',
+    await auditNotificationDeliveryEvent(client, {
+      actionType: status === 'sent' ? 'notification.email_sent' : 'notification.email_send_failed',
       draft,
       approval,
-      updatedAttempt,
+      attempt: updatedAttempt,
       context,
-      { result: safeResult }
-    );
+      channel: 'email',
+      provider,
+      mode: 'real',
+      status,
+      result: safeResult
+    });
 
     if (status !== 'sent') {
       throw new AppError(502, 'NOTIFICATION_EMAIL_SEND_FAILED', 'Email send failed.');
@@ -231,8 +229,15 @@ async function sendApprovedNotificationEmail(context, draftId, options = {}) {
   } catch (error) {
     if (error instanceof AppError) {
       if (draft && error.code !== 'NOTIFICATION_EMAIL_SEND_FAILED') {
-        await auditEmailEvent(client, 'notification.email_send_blocked', draft, approval, null, context, {
+        await auditNotificationDeliveryEvent(client, {
+          actionType: 'notification.email_send_blocked',
+          draft,
+          approval,
+          attempt: null,
+          context,
+          channel: 'email',
           provider,
+          mode: 'real',
           status: 'blocked',
           reason: error.code
         });

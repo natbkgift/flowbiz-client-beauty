@@ -25,6 +25,12 @@ PR 15F / #32: Approval Gate + Send Control           - merged
 PR 15G / #33: Safety-Gated Email Delivery Adapter    - merged
 ```
 
+Current branch work:
+
+```txt
+PR 16A: Notification Delivery Audit Hardening        - implemented in branch, not merged
+```
+
 Current notification flow:
 
 ```txt
@@ -107,7 +113,7 @@ Approval alone still does not send anything. A manual admin action is required f
 ## Recommended Next Roadmap
 
 1. PR 15H: Admin Email Send UI Hardening
-2. PR 16A: Notification Delivery Audit Hardening
+2. PR 16A: Notification Delivery Audit Hardening (implemented in branch, pending PR/merge)
 3. PR 16B: Customer Slot Offer Email Delivery
 4. PR 17A: Confirmed Appointment Foundation
 5. PR 17B: Appointment Conflict Guard

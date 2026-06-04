@@ -10,6 +10,7 @@ const {
   assertNotificationRealDeliveryAllowed
 } = require('./provider-guards');
 const { normalizeNotificationProviderConfig } = require('./provider-config');
+const { auditNotificationDeliveryEvent } = require('./audit');
 
 const dryRunEmailAdapter = require('./delivery-adapters/dry-run-email');
 const dryRunLineAdapter = require('./delivery-adapters/dry-run-line');
@@ -153,21 +154,66 @@ async function dryRunNotificationDraftDelivery(context, draftId, options = {}) {
   assertNotificationDryRunEnabled(config);
 
   const client = options.client || getPool();
-  const draft = await getAdminNotificationDraft(context, draftId, client);
-  const { provider, adapter } = resolveDryRunAdapter(draft.channel);
-  const payload = buildDryRunDeliveryPayload(draft, config);
-  const adapterResult = await adapter.dryRunDeliver(payload);
-  const result = {
-    dryRun: true,
-    externalCallMade: false,
-    blockedRealSend: true,
-    provider,
-    providerConfigMissing: true,
-    message: 'Dry run only. No notification was sent.',
-    adapterResult
-  };
+  let draft = null;
+  let provider = null;
 
-  return insertOrLoadDryRunAttempt(draft, payload, result, provider, client);
+  try {
+    draft = await getAdminNotificationDraft(context, draftId, client);
+    const resolved = resolveDryRunAdapter(draft.channel);
+    provider = resolved.provider;
+    const { adapter } = resolved;
+
+    await auditNotificationDeliveryEvent(client, {
+      actionType: 'notification.delivery_dry_run_requested',
+      draft,
+      context,
+      channel: draft.channel,
+      provider,
+      mode: 'dry_run',
+      status: 'requested'
+    });
+
+    const payload = buildDryRunDeliveryPayload(draft, config);
+    const adapterResult = await adapter.dryRunDeliver(payload);
+    const result = {
+      dryRun: true,
+      externalCallMade: false,
+      blockedRealSend: true,
+      provider,
+      providerConfigMissing: true,
+      message: 'Dry run only. No notification was sent.',
+      adapterResult
+    };
+
+    const attempt = await insertOrLoadDryRunAttempt(draft, payload, result, provider, client);
+    await auditNotificationDeliveryEvent(client, {
+      actionType: 'notification.delivery_dry_run_completed',
+      draft,
+      attempt,
+      context,
+      channel: draft.channel,
+      provider,
+      mode: 'dry_run',
+      status: attempt.status,
+      result
+    });
+
+    return attempt;
+  } catch (error) {
+    if (error instanceof AppError && draft) {
+      await auditNotificationDeliveryEvent(client, {
+        actionType: 'notification.delivery_dry_run_blocked',
+        draft,
+        context,
+        channel: draft.channel,
+        provider,
+        mode: 'dry_run',
+        status: 'blocked',
+        reason: error.code
+      });
+    }
+    throw error;
+  }
 }
 
 async function listNotificationDraftDeliveryAttempts(context, draftId, client = getPool()) {
