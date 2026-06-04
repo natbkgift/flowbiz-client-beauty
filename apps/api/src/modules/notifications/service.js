@@ -19,6 +19,12 @@ const CONTACT_METHOD_CHANNEL = {
 };
 
 const MAX_EMAIL_LENGTH = 254;
+const bangkokDateFormatter = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Asia/Bangkok',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+});
 
 const ADMIN_NOTIFICATION_DRAFT_ROLES = new Set([
   'owner',
@@ -95,12 +101,7 @@ function isValidNotificationEmail(value) {
 function formatDateOnly(value) {
   if (!value) return null;
   if (value instanceof Date) {
-    return new Intl.DateTimeFormat('sv-SE', {
-      timeZone: 'Asia/Bangkok',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).format(value);
+    return bangkokDateFormatter.format(value);
   }
   return String(value).slice(0, 10);
 }
