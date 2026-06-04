@@ -280,6 +280,36 @@ test('Notification Email Send UI - button is enabled only when all gates pass', 
   assert.match(app.document.querySelector('[data-testid="email-send-status"]').textContent, /Eligible/);
 });
 
+test('Notification Email Send UI - approval fetch failure stays conservative without false approval reason', async () => {
+  const app = await openDraft({
+    approval: {
+      status: 500,
+      body: { error: { code: 'APPROVAL_STATUS_FAILED', message: 'approval status unavailable' } }
+    }
+  });
+  const reasonsText = app.document.querySelector('[data-testid="email-send-blocking-reasons"]').textContent;
+
+  assert.equal(sendEmailButton(app).disabled, true);
+  assert.match(reasonsText, /Blocked: Eligibility cannot be confirmed yet/);
+  assert.doesNotMatch(reasonsText, /Blocked: approval is required/);
+});
+
+test('Notification Email Send UI - confirmation modal supports aria description, safe focus, and Escape cancel', async () => {
+  const app = await openDraft();
+
+  click(app.window, sendEmailButton(app));
+  const modal = await waitFor(() => app.document.querySelector('[data-testid="send-email-confirmation-modal"]'));
+  const dialog = modal.querySelector('[role="dialog"]');
+  const cancelButton = app.document.querySelector('[data-testid="cancel-send-email-button"]');
+
+  assert.equal(dialog.getAttribute('aria-describedby'), 'send-email-confirm-description send-email-confirm-scope');
+  await waitFor(() => app.document.activeElement === cancelButton);
+
+  app.window.dispatchEvent(new app.window.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  await waitFor(() => !app.document.querySelector('[data-testid="send-email-confirmation-modal"]'));
+  assert.equal(app.requests.filter((request) => request.method === 'POST').length, 0);
+});
+
 test('Notification Email Send UI - confirmation modal appears before send and calls only send-email endpoint', async () => {
   const app = await loadAdminApp({
     routes: notificationRoutes({
@@ -306,6 +336,59 @@ test('Notification Email Send UI - confirmation modal appears before send and ca
   click(app.window, app.document.querySelector('[data-testid="confirm-send-email-button"]'));
   await waitFor(() => /Email send recorded/.test(app.document.querySelector('[data-testid="email-send-result"]')?.textContent || ''));
 
+  const postRequests = app.requests.filter((request) => request.method === 'POST');
+  assert.equal(postRequests.length, 1);
+  assert.equal(postRequests[0].url.pathname, '/admin/notification-drafts/91/send-email');
+});
+
+test('Notification Email Send UI - stale send result does not leak after switching drafts', async () => {
+  const secondDraft = {
+    ...notificationDraft,
+    id: 92,
+    subject: 'Second selected draft',
+    message: 'Second selected draft content.',
+    sourceId: '72',
+    idempotencyKey: 'tenant:1001:event:slot_offer.accepted:source:slot_offer:72:recipient:admin:501:channel:email'
+  };
+  const approved = { status: 200, body: { approvalStatus: 'approved', approval: { id: 701, status: 'approved' } } };
+  const emptyAttempts = { status: 200, body: { items: [], total: 0 } };
+  const app = await loadAdminApp({
+    routes: {
+      'GET /auth/me': { status: 200, body: createSessionFixture() },
+      'GET /admin/notification-drafts': {
+        status: 200,
+        body: { items: [notificationDraft, secondDraft], total: 2, limit: 50, offset: 0 }
+      },
+      'GET /admin/notification-drafts/91': { status: 200, body: notificationDraft },
+      'GET /admin/notification-drafts/92': { status: 200, body: secondDraft },
+      'GET /admin/notification-provider-readiness': [
+        { status: 200, body: readiness() },
+        { status: 200, body: readiness() }
+      ],
+      'GET /admin/notification-drafts/91/approval-status': approved,
+      'GET /admin/notification-drafts/92/approval-status': approved,
+      'GET /admin/notification-drafts/91/delivery-attempts': emptyAttempts,
+      'GET /admin/notification-drafts/92/delivery-attempts': emptyAttempts,
+      'POST /admin/notification-drafts/91/send-email': async () => new Promise((resolve) => {
+        setTimeout(() => resolve({ status: 201, body: { id: 1009, draftId: 91, channel: 'email', mode: 'real', status: 'sent' } }), 80);
+      })
+    }
+  });
+
+  click(app.window, await waitFor(() => app.document.querySelector('[data-testid="notification-draft-row-91"]')));
+  await waitFor(() => {
+    const button = sendEmailButton(app);
+    return button && !button.disabled ? button : null;
+  });
+  click(app.window, sendEmailButton(app));
+  click(app.window, await waitFor(() => app.document.querySelector('[data-testid="confirm-send-email-button"]')));
+  click(app.window, app.document.querySelector('[data-testid="notification-draft-row-92"]'));
+
+  await waitFor(() => /Second selected draft content/.test(app.document.querySelector('[data-testid="notification-draft-message"]')?.textContent || ''));
+  await new Promise((resolve) => setTimeout(resolve, 120));
+
+  assert.equal(app.document.querySelector('[data-testid="email-send-result"]'), null);
+  assert.doesNotMatch(app.document.body.textContent, /Email send recorded/);
   const postRequests = app.requests.filter((request) => request.method === 'POST');
   assert.equal(postRequests.length, 1);
   assert.equal(postRequests[0].url.pathname, '/admin/notification-drafts/91/send-email');

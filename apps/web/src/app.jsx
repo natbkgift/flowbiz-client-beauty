@@ -6539,7 +6539,7 @@ function hasSuccessfulEmailDeliveryAttempt(attemptsData) {
 function buildEmailSendEligibility({ draft, providerData, approvalData, attemptsData, loading, errors }) {
   const providerReadiness = getNotificationProviderData(providerData);
   const emailReadiness = providerReadiness?.channels?.email || null;
-  const approvalStatus = getApprovalStatusValue(approvalData, draft);
+  const approvalStatus = approvalData ? getApprovalStatusValue(approvalData, draft) : null;
   const successfulEmailAttempt = hasSuccessfulEmailDeliveryAttempt(attemptsData);
   const reasons = [];
 
@@ -6551,9 +6551,9 @@ function buildEmailSendEligibility({ draft, providerData, approvalData, attempts
     reasons.push('Blocked: draft channel is not email');
   }
 
-  if (draft && !approvalStatus) {
+  if (draft && approvalData && !approvalStatus) {
     reasons.push('Blocked: approval is required');
-  } else if (approvalStatus && approvalStatus !== 'approved') {
+  } else if (approvalData && approvalStatus && approvalStatus !== 'approved') {
     reasons.push('Blocked: approval is not approved');
   }
 
@@ -6576,7 +6576,7 @@ function buildEmailSendEligibility({ draft, providerData, approvalData, attempts
   return {
     eligible: reasons.length === 0,
     reasons,
-    approvalStatus: approvalStatus || 'missing',
+    approvalStatus: approvalData ? (approvalStatus || 'missing') : 'unconfirmed',
     realDeliveryEnabled: providerReadiness?.realDeliveryEnabled === true,
     globalKillSwitch: providerReadiness?.globalKillSwitch === true,
     emailProviderReady: emailReadiness?.ready === true,
@@ -6607,6 +6607,7 @@ function NotificationDraftsPage() {
   const [sendState, setSendState] = useState({ status: 'idle', data: null, error: null });
   const [confirmSendOpen, setConfirmSendOpen] = useState(false);
   const latestSelectedIdRef = useRef(null);
+  const cancelSendButtonRef = useRef(null);
 
   const [listState] = usePageData(
     () => api.listNotificationDrafts(sessionOptions, { ...appliedFilters, limit: 50, offset: 0 }),
@@ -6653,65 +6654,85 @@ function NotificationDraftsPage() {
     setSendState({ status: 'idle', data: null, error: null });
     setConfirmSendOpen(false);
 
-    try {
-      const [detailResult, providerResult, approvalResult, attemptsResult] = await Promise.allSettled([
-        api.getNotificationDraft(sessionOptions, draftId),
-        api.getNotificationProviderReadiness(sessionOptions),
-        api.getNotificationDraftApprovalStatus(sessionOptions, draftId),
-        api.listNotificationDraftDeliveryAttempts(sessionOptions, draftId)
-      ]);
+    const [detailResult, providerResult, approvalResult, attemptsResult] = await Promise.allSettled([
+      api.getNotificationDraft(sessionOptions, draftId),
+      api.getNotificationProviderReadiness(sessionOptions),
+      api.getNotificationDraftApprovalStatus(sessionOptions, draftId),
+      api.listNotificationDraftDeliveryAttempts(sessionOptions, draftId)
+    ]);
 
-      if (latestSelectedIdRef.current === draftId) {
-        if (detailResult.status === 'fulfilled') {
-          setDetailState({ status: 'ready', data: detailResult.value, error: null });
-        } else {
-          setDetailState({ status: 'error', data: null, error: detailResult.reason });
-        }
+    if (latestSelectedIdRef.current === draftId) {
+      if (detailResult.status === 'fulfilled') {
+        setDetailState({ status: 'ready', data: detailResult.value, error: null });
+      } else {
+        setDetailState({ status: 'error', data: null, error: detailResult.reason });
+      }
 
-        setEmailSafetyState({
-          provider: providerResult.status === 'fulfilled'
-            ? { status: 'ready', data: providerResult.value, error: null }
-            : { status: 'error', data: null, error: providerResult.reason },
-          approval: approvalResult.status === 'fulfilled'
-            ? { status: 'ready', data: approvalResult.value, error: null }
-            : { status: 'error', data: null, error: approvalResult.reason },
-          attempts: attemptsResult.status === 'fulfilled'
-            ? { status: 'ready', data: attemptsResult.value, error: null }
-            : { status: 'error', data: null, error: attemptsResult.reason }
-        });
-      }
-    } catch (error) {
-      if (latestSelectedIdRef.current === draftId) {
-        setDetailState({ status: 'error', data: null, error });
-        setEmailSafetyState({
-          provider: { status: 'error', data: null, error },
-          approval: { status: 'error', data: null, error },
-          attempts: { status: 'error', data: null, error }
-        });
-      }
+      setEmailSafetyState({
+        provider: providerResult.status === 'fulfilled'
+          ? { status: 'ready', data: providerResult.value, error: null }
+          : { status: 'error', data: null, error: providerResult.reason },
+        approval: approvalResult.status === 'fulfilled'
+          ? { status: 'ready', data: approvalResult.value, error: null }
+          : { status: 'error', data: null, error: approvalResult.reason },
+        attempts: attemptsResult.status === 'fulfilled'
+          ? { status: 'ready', data: attemptsResult.value, error: null }
+          : { status: 'error', data: null, error: attemptsResult.reason }
+      });
     }
   }
 
   async function confirmSendEmail() {
     if (!detail) return;
 
+    const sendingId = detail.id;
     setSendState({ status: 'loading', data: null, error: null });
     setConfirmSendOpen(false);
 
     try {
-      const data = await api.sendNotificationDraftEmail(sessionOptions, detail.id);
+      const data = await api.sendNotificationDraftEmail(sessionOptions, sendingId);
+      if (String(latestSelectedIdRef.current) !== String(sendingId)) {
+        return;
+      }
+
       setSendState({ status: 'success', data, error: null });
-      const attemptsData = await api.listNotificationDraftDeliveryAttempts(sessionOptions, detail.id);
-      if (String(latestSelectedIdRef.current) === String(detail.id)) {
+      const attemptsData = await api.listNotificationDraftDeliveryAttempts(sessionOptions, sendingId);
+      if (String(latestSelectedIdRef.current) === String(sendingId)) {
         setEmailSafetyState((current) => ({
           ...current,
           attempts: { status: 'ready', data: attemptsData, error: null }
         }));
       }
     } catch (error) {
-      setSendState({ status: 'error', data: null, error });
+      if (String(latestSelectedIdRef.current) === String(sendingId)) {
+        setSendState({ status: 'error', data: null, error });
+      }
     }
   }
+
+  useEffect(() => {
+    if (!confirmSendOpen) {
+      return undefined;
+    }
+
+    const previousActiveElement = document.activeElement;
+    const focusTimer = window.setTimeout(() => cancelSendButtonRef.current?.focus(), 0);
+
+    function handleConfirmationKeyDown(event) {
+      if (event.key === 'Escape') {
+        setConfirmSendOpen(false);
+      }
+    }
+
+    window.addEventListener('keydown', handleConfirmationKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener('keydown', handleConfirmationKeyDown);
+      if (previousActiveElement && typeof previousActiveElement.focus === 'function') {
+        previousActiveElement.focus();
+      }
+    };
+  }, [confirmSendOpen]);
 
   if (listState.status === 'loading' || listState.status === 'idle') {
     return <LoadingCard label="กำลังโหลดร่างการแจ้งเตือน..." />;
@@ -7044,23 +7065,35 @@ function NotificationDraftsPage() {
                 </div>
                 {confirmSendOpen ? (
                   <div className="modal-backdrop" data-testid="send-email-confirmation-modal">
-                    <div className="confirmation-modal" role="dialog" aria-modal="true" aria-labelledby="send-email-confirm-title">
+                    <div
+                      className="confirmation-modal"
+                      role="dialog"
+                      aria-modal="true"
+                      aria-labelledby="send-email-confirm-title"
+                      aria-describedby="send-email-confirm-description send-email-confirm-scope"
+                    >
                       <h4 id="send-email-confirm-title">Send real email?</h4>
-                      <p>This will send a real email through the configured email provider path. This action is manual and audited.</p>
+                      <p id="send-email-confirm-description">This will send a real email through the configured email provider path. This action is manual and audited.</p>
                       <ul>
                         <li>Approval is approved</li>
                         <li>Email provider is ready</li>
                         <li>Real delivery is enabled</li>
                         <li>Kill switch is off</li>
                       </ul>
-                      <p>This does not send LINE or SMS. This does not start automatic sending or bulk email.</p>
+                      <p id="send-email-confirm-scope">This does not send LINE or SMS. This does not start automatic sending or bulk email.</p>
                       <div className="inline-actions">
                         <Button type="button" variant="primary" data-testid="confirm-send-email-button" onClick={confirmSendEmail}>
                           Confirm Send Email
                         </Button>
-                        <Button type="button" variant="secondary" data-testid="cancel-send-email-button" onClick={() => setConfirmSendOpen(false)}>
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          data-testid="cancel-send-email-button"
+                          ref={cancelSendButtonRef}
+                          onClick={() => setConfirmSendOpen(false)}
+                        >
                           Cancel
-                        </Button>
+                        </button>
                       </div>
                     </div>
                   </div>
