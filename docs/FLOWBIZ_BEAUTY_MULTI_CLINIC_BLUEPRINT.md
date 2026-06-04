@@ -121,7 +121,7 @@ PR 15H should remain UI-hardening only:
 
 - Add or harden an explicit Admin "Send Email" control.
 - Show the control only for email drafts.
-- Require approved approval status before enabling the control.
+- Require "approved" status before enabling the control.
 - Show provider readiness, real delivery flag, and kill switch status.
 - Use a confirmation modal that states a real email send will be attempted.
 - Show clear blocking reasons.
