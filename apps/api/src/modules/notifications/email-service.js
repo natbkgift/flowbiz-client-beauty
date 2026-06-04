@@ -133,7 +133,7 @@ async function insertRealEmailAttempt(client, draft, payload, provider, idempote
     return mapNotificationDeliveryAttemptRow(result.rows[0]);
   }
 
-  return loadExistingRealEmailAttempt(client, draft, provider);
+  throw new AppError(409, 'NOTIFICATION_EMAIL_SEND_BLOCKED', 'Existing real email attempt is already in progress or completed.');
 }
 
 async function updateAttemptResult(client, attempt, status, resultJson) {
