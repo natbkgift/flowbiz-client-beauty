@@ -2,9 +2,14 @@
 
 const { CHANNELS, normalizeNotificationProviderConfig } = require('./provider-config');
 
+function isSupportedEmailProvider(provider) {
+  const normalized = String(provider || '').trim().toLowerCase();
+  return normalized === 'sandbox';
+}
+
 function hasRequiredProviderConfig(channel, channelConfig) {
   if (channel === 'email') {
-    return Boolean(channelConfig.from);
+    return Boolean(isSupportedEmailProvider(channelConfig.provider) && channelConfig.from);
   }
 
   if (channel === 'line') {
@@ -27,6 +32,10 @@ function getChannelBlockedReason(channel, normalizedConfig, channelConfig) {
 
   if (!channelConfig.provider || channelConfig.provider === 'none') {
     return `${prefix}_PROVIDER_NOT_CONFIGURED`;
+  }
+
+  if (channel === 'email' && !isSupportedEmailProvider(channelConfig.provider)) {
+    return 'EMAIL_PROVIDER_NOT_READY';
   }
 
   if (!hasRequiredProviderConfig(channel, channelConfig)) {
@@ -79,5 +88,6 @@ function getNotificationProviderReadiness(config = {}) {
 
 module.exports = {
   getNotificationProviderReadiness,
-  hasRequiredProviderConfig
+  hasRequiredProviderConfig,
+  isSupportedEmailProvider
 };

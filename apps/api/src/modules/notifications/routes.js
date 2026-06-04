@@ -12,6 +12,7 @@ const {
   dryRunNotificationDraftDelivery,
   listNotificationDraftDeliveryAttempts
 } = require('./delivery-service');
+const { sendApprovedNotificationEmail } = require('./email-service');
 const {
   approveNotificationDraft,
   cancelNotificationApproval,
@@ -48,6 +49,13 @@ async function handleNotificationRoutes(request, response, url, tools) {
   if (dryRunParams && request.method === 'POST') {
     const context = await authenticateRequest(request);
     const result = await dryRunNotificationDraftDelivery(context, dryRunParams.id);
+    return json(response, 201, result);
+  }
+
+  const sendEmailParams = matchPath(url.pathname, '/admin/notification-drafts/:id/send-email');
+  if (sendEmailParams && request.method === 'POST') {
+    const context = await authenticateRequest(request);
+    const result = await sendApprovedNotificationEmail(context, sendEmailParams.id);
     return json(response, 201, result);
   }
 

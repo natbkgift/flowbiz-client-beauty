@@ -93,6 +93,7 @@ function assertNotificationRealDeliveryDisabled(config = loadConfig()) {
 
 async function deliverNotificationDraft(context, draftId, options = {}) {
   assertNotificationRealDeliveryDisabled(options.config || loadConfig());
+  throw new AppError(400, 'INVALID_NOTIFICATION_DELIVERY_MODE', 'Use the approved email delivery endpoint for manual real email sends.');
 }
 
 async function insertOrLoadDryRunAttempt(draft, payload, result, provider, client) {
