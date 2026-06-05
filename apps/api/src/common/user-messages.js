@@ -178,6 +178,7 @@ const THAI_ERROR_MESSAGES = {
   APPOINTMENT_START_TIME_REQUIRED: 'ต้องมีเวลาเริ่มต้นที่ชัดเจนก่อนยืนยันนัดหมาย',
   APPOINTMENT_DURATION_REQUIRED: 'ต้องมีระยะเวลานัดหมายที่ถูกต้องก่อนยืนยันนัดหมาย',
   APPOINTMENT_END_TIME_UNSUPPORTED: 'ยังไม่รองรับนัดหมายที่ข้ามวันในขั้นตอนนี้',
+  APPOINTMENT_TIME_CONFLICT: 'เวลานัดหมายนี้ชนกับนัดหมายอื่นที่ยืนยันแล้ว',
   INVALID_CONFIRMED_APPOINTMENT_STATUS: 'สถานะนัดหมายที่ยืนยันแล้วไม่ถูกต้อง',
   CONFIRMED_APPOINTMENT_PERMISSION_DENIED: 'คุณไม่มีสิทธิ์จัดการนัดหมายที่ยืนยันแล้วนี้',
   INVALID_NOTIFICATION_DRAFT: 'ข้อมูลร่างการแจ้งเตือนไม่ครบถ้วนหรือไม่ถูกต้อง',

@@ -12,7 +12,13 @@ PR #37 / PR 16B has been merged:
 - Merge commit: `c09eb0c557a060f645a10ccd800f7889ed3b334d`
 - Result: customer slot offer email delivery is now part of `main`
 
-PR 17A: Confirmed Appointment Foundation is implemented in the current branch, not merged.
+PR #39 / PR 17A has been merged:
+
+- PR: https://github.com/natbkgift/flowbiz-client-beauty/pull/39
+- Merge commit: `159bb95345b5c6da6977c0b673bf4fb5d4fcd62b`
+- Result: confirmed appointment foundation is now part of `main`
+
+PR 17B: Appointment Conflict Guard is implemented in the current branch, not merged.
 
 ## Notification Stack Status
 
@@ -86,17 +92,16 @@ Notification and delivery gaps:
 
 Appointment and booking gaps:
 
-- Appointment conflict guard.
 - Doctor/provider availability engine.
 - Calendar sync.
 - Appointment capacity rules.
 
 Current branch work:
 
-- PR 17A: Confirmed Appointment Foundation - implemented in branch, not merged.
-- Adds tenant-scoped confirmed appointments from accepted slot offers.
-- Adds admin list/detail/status endpoints for confirmed appointments.
-- Keeps conflict guard, availability, capacity rules, calendar sync, auto-confirm, and auto-send out of scope.
+- PR 17B: Appointment Conflict Guard - implemented in branch, not merged.
+- Adds clinic-scoped blocking for overlapping scheduled confirmed appointments.
+- Uses half-open interval behavior, so adjacent appointments remain allowed.
+- Keeps provider availability, doctor availability, capacity rules, calendar sync, rescheduling, public appointment endpoints, auto-confirm, and auto-send out of scope.
 
 Member and commerce gaps:
 
@@ -118,10 +123,9 @@ Approval alone still does not send anything. A manual admin action is required f
 
 ## Recommended Next Roadmap
 
-1. PR 17B: Appointment Conflict Guard
-2. PR 18A: Member Portal V1
-3. PR 18B: Member Consent Management
-4. PR 19A: Package Ownership / Payment Foundation
+1. PR 18A: Member Portal V1
+2. PR 18B: Member Consent Management
+3. PR 19A: Package Ownership / Payment Foundation
 
 ## Historical PR 15H Scope (Merged)
 
@@ -145,7 +149,7 @@ PR 15H did not add:
 
 ## Merge Readiness Baseline
 
-After PR #37, `main` should be treated as having:
+After PR #39, `main` should be treated as having:
 
 - Notification draft foundation complete.
 - Admin preview complete.
@@ -156,6 +160,9 @@ After PR #37, `main` should be treated as having:
 - Admin email send UI hardening complete.
 - Delivery audit hardening complete.
 - Customer slot offer email delivery complete.
+- Confirmed appointment foundation complete.
+
+PR17B branch work is not part of this merge readiness baseline until PR17B is merged.
 
 The next delivery work must preserve the same safety gates:
 
