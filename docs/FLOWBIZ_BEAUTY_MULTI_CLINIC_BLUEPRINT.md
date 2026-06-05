@@ -6,11 +6,11 @@ Last updated: 2026-06-04
 
 FlowBiz Beauty is a multi-clinic SaaS platform for clinic-facing CRM, booking request handling, member access, notification safety, and AI/HITL-assisted operations.
 
-PR #33 / PR 15G has been merged:
+PR #36 / PR 16A has been merged:
 
-- PR: https://github.com/natbkgift/flowbiz-client-beauty/pull/33
-- Merge commit: `cc6d53c1f0fbdb841c9e0ff26831d790b198ee17`
-- Result: safety-gated email delivery adapter is now part of `main`
+- PR: https://github.com/natbkgift/flowbiz-client-beauty/pull/36
+- Merge commit: `83187aef3699aebb6d5e8cd562d7ae9252fe8549`
+- Result: notification delivery audit hardening is now part of `main`
 
 ## Notification Stack Status
 
@@ -23,12 +23,14 @@ PR 15D / #30: Delivery Adapter Dry Run               - merged
 PR 15E / #31: Provider Config + Kill Switch          - merged
 PR 15F / #32: Approval Gate + Send Control           - merged
 PR 15G / #33: Safety-Gated Email Delivery Adapter    - merged
+PR 15H / #35: Admin Email Send UI Hardening          - merged
+PR 16A / #36: Notification Delivery Audit Hardening  - merged
 ```
 
 Current branch work:
 
 ```txt
-PR 16A: Notification Delivery Audit Hardening        - implemented in branch, not merged
+PR 16B: Customer Slot Offer Email Delivery           - implemented in branch, not merged
 ```
 
 Current notification flow:
@@ -42,11 +44,12 @@ Notification Draft
 -> Approval Gate
 -> Send Control
 -> Safety-Gated Email Delivery Adapter
+-> Delivery Audit Hardening
 ```
 
-## PR #33 Behavior Now In Main
+## Current Email Delivery Behavior In Main
 
-PR #33 added the first controlled real notification delivery path:
+The merged notification stack has the first controlled real notification delivery path:
 
 - Manual admin email send endpoint.
 - Email-only delivery path.
@@ -58,7 +61,7 @@ PR #33 added the first controlled real notification delivery path:
 - Tenant-scoped draft lookup.
 - Idempotent successful email send behavior.
 - Delivery attempt records.
-- Email audit events.
+- Safe email audit events.
 
 Safety boundaries preserved:
 
@@ -112,18 +115,16 @@ Approval alone still does not send anything. A manual admin action is required f
 
 ## Recommended Next Roadmap
 
-1. PR 15H: Admin Email Send UI Hardening
-2. PR 16A: Notification Delivery Audit Hardening (implemented in branch, pending PR/merge)
-3. PR 16B: Customer Slot Offer Email Delivery
-4. PR 17A: Confirmed Appointment Foundation
-5. PR 17B: Appointment Conflict Guard
-6. PR 18A: Member Portal V1
-7. PR 18B: Member Consent Management
-8. PR 19A: Package Ownership / Payment Foundation
+1. PR 16B: Customer Slot Offer Email Delivery (implemented in branch, not merged)
+2. PR 17A: Confirmed Appointment Foundation
+3. PR 17B: Appointment Conflict Guard
+4. PR 18A: Member Portal V1
+5. PR 18B: Member Consent Management
+6. PR 19A: Package Ownership / Payment Foundation
 
-## Recommended PR 15H Scope
+## Historical PR 15H Scope (Merged)
 
-PR 15H should remain UI-hardening only:
+PR 15H remained UI-hardening only:
 
 - Add or harden an explicit Admin "Send Email" control.
 - Show the control only for email drafts.
@@ -132,7 +133,7 @@ PR 15H should remain UI-hardening only:
 - Use a confirmation modal that states a real email send will be attempted.
 - Show clear blocking reasons.
 
-PR 15H should not add:
+PR 15H did not add:
 
 - SMTP or provider SDK integration.
 - LINE or SMS delivery.
@@ -143,7 +144,7 @@ PR 15H should not add:
 
 ## Merge Readiness Baseline
 
-After PR #33, `main` should be treated as having:
+After PR #36, `main` should be treated as having:
 
 - Notification draft foundation complete.
 - Admin preview complete.
@@ -151,6 +152,8 @@ After PR #33, `main` should be treated as having:
 - Provider readiness and kill switch complete.
 - Approval gate and send control complete.
 - Sandbox-only safety-gated email delivery complete.
+- Admin email send UI hardening complete.
+- Delivery audit hardening complete.
 
 The next delivery work must preserve the same safety gates:
 

@@ -3,7 +3,7 @@
 const { getPool } = require('../../db');
 const { loadConfig } = require('../../config');
 const { AppError } = require('../../common/errors');
-const { getAdminNotificationDraft } = require('./service');
+const { getAdminNotificationDraft, isValidNotificationEmail } = require('./service');
 const { getLatestApprovalForDraft } = require('./approval-service');
 const { mapNotificationDeliveryAttemptRow } = require('./serializer');
 const { getNotificationProviderReadiness } = require('./provider-readiness');
@@ -27,6 +27,9 @@ function buildEmailPayload(draft, channelConfig) {
   const to = String(draft.recipientRef || '').trim();
   if (!to) {
     throw new AppError(400, 'NOTIFICATION_EMAIL_RECIPIENT_MISSING', 'Notification email recipient is missing.');
+  }
+  if (!isValidNotificationEmail(to)) {
+    throw new AppError(400, 'NOTIFICATION_EMAIL_RECIPIENT_INVALID', 'Notification email recipient must be a valid email address.');
   }
 
   return {

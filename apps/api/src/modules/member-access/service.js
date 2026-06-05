@@ -14,6 +14,12 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PUBLIC_SLOT_OFFER_STATUSES = new Set(['ready_to_send', 'sent', 'accepted', 'declined']);
 const RESPONDABLE_SLOT_OFFER_STATUSES = new Set(['ready_to_send', 'sent']);
 const VALID_SLOT_OFFER_RESPONSES = new Set(['accepted', 'declined']);
+const bangkokDateFormatter = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Asia/Bangkok',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+});
 
 function trimString(value, maxLength, code = 'INVALID_MEMBER_ACCESS_PAYLOAD') {
   if (value === undefined || value === null) return null;
@@ -247,7 +253,9 @@ function normalizeSlotOfferResponsePayload(body) {
 
 function formatDateOnly(value) {
   if (!value) return null;
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (value instanceof Date) {
+    return bangkokDateFormatter.format(value);
+  }
   return String(value).slice(0, 10);
 }
 

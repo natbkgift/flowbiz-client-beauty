@@ -18,6 +18,14 @@ const CONTACT_METHOD_CHANNEL = {
   phone: 'sms'
 };
 
+const MAX_EMAIL_LENGTH = 254;
+const bangkokDateFormatter = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Asia/Bangkok',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit'
+});
+
 const ADMIN_NOTIFICATION_DRAFT_ROLES = new Set([
   'owner',
   'manager',
@@ -66,6 +74,36 @@ function normalizeSourceId(value) {
 
 function channelForContactMethod(method) {
   return CONTACT_METHOD_CHANNEL[method] || 'line';
+}
+
+function normalizeNotificationEmail(value) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > MAX_EMAIL_LENGTH || /\s/.test(trimmed)) {
+    return null;
+  }
+
+  const atIndex = trimmed.indexOf('@');
+  if (atIndex <= 0 || atIndex !== trimmed.lastIndexOf('@') || atIndex === trimmed.length - 1) {
+    return null;
+  }
+
+  return trimmed;
+}
+
+function isValidNotificationEmail(value) {
+  return Boolean(normalizeNotificationEmail(value));
+}
+
+function formatDateOnly(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return bangkokDateFormatter.format(value);
+  }
+  return String(value).slice(0, 10);
 }
 
 function isPlainObject(value) {
@@ -323,12 +361,25 @@ async function loadSlotOfferDraftContext(client, tenantId, sourceId) {
         o.customer_response,
         o.created_by_user_id,
         o.updated_by_user_id,
+        br.lead_id as booking_lead_id,
+        br.member_id as booking_member_id,
+        br.email as booking_request_email,
         br.preferred_contact_method,
-        br.status as booking_status
+        br.status as booking_status,
+        m.id as tenant_member_id,
+        m.email as member_email,
+        l.id as tenant_lead_id,
+        l.email as lead_email
       from clinic_booking_slot_offers o
       inner join clinic_booking_requests br
         on br.clinic_id = o.clinic_id
         and br.id = o.booking_request_id
+      left join clinic_members m
+        on m.clinic_id = o.clinic_id
+        and m.id = coalesce(o.member_id, br.member_id)
+      left join leads l
+        on l.clinic_id = o.clinic_id
+        and l.id = coalesce(o.lead_id, br.lead_id)
       where o.clinic_id = $1 and o.id = $2::bigint
       limit 1
     `,
@@ -387,6 +438,87 @@ function customerRecipientFromRow(row) {
   };
 }
 
+function safeFallbackChannelForSlotOffer(row) {
+  const channel = channelForContactMethod(row.preferred_contact_method);
+  return channel === 'email' ? 'line' : channel;
+}
+
+function customerLogicalRecipientFromSlotOfferRow(row) {
+  if (row.tenant_member_id) {
+    return {
+      recipientType: 'member',
+      recipientId: Number(row.tenant_member_id),
+      recipientRef: recipientRef('member', row.tenant_member_id),
+      channel: safeFallbackChannelForSlotOffer(row)
+    };
+  }
+
+  if (row.tenant_lead_id) {
+    return {
+      recipientType: 'lead',
+      recipientId: Number(row.tenant_lead_id),
+      recipientRef: recipientRef('lead', row.tenant_lead_id),
+      channel: safeFallbackChannelForSlotOffer(row)
+    };
+  }
+
+  return {
+    recipientType: 'booking_request',
+    recipientId: Number(row.booking_request_id),
+    recipientRef: recipientRef('booking_request', row.booking_request_id),
+    channel: safeFallbackChannelForSlotOffer(row)
+  };
+}
+
+function customerRecipientFromSlotOfferSent(row) {
+  const candidates = [
+    {
+      recipientSource: 'member',
+      recipientType: 'member',
+      recipientId: row.tenant_member_id,
+      email: row.member_email
+    },
+    {
+      recipientSource: 'lead',
+      recipientType: 'lead',
+      recipientId: row.tenant_lead_id,
+      email: row.lead_email
+    },
+    {
+      recipientSource: 'booking_request',
+      recipientType: 'booking_request',
+      recipientId: row.booking_request_id,
+      email: row.booking_request_email
+    }
+  ];
+
+  for (const candidate of candidates) {
+    const email = normalizeNotificationEmail(candidate.email);
+    if (!candidate.recipientId || !email) {
+      continue;
+    }
+
+    return {
+      recipientType: candidate.recipientType,
+      recipientId: Number(candidate.recipientId),
+      recipientRef: email,
+      channel: 'email',
+      metadataPatch: {
+        recipientEmailAvailable: true,
+        recipientSource: candidate.recipientSource
+      }
+    };
+  }
+
+  return {
+    ...customerLogicalRecipientFromSlotOfferRow(row),
+    metadataPatch: {
+      recipientEmailAvailable: false,
+      recipientSource: 'fallback'
+    }
+  };
+}
+
 function adminRecipientFromSlotOffer(row, tenantId) {
   const adminId = row.created_by_user_id || row.updated_by_user_id || null;
   return {
@@ -403,7 +535,7 @@ async function createNotificationDraftForEvent(input, client = getPool()) {
 
   if (input.eventType === 'slot_offer.sent') {
     const row = await loadSlotOfferDraftContext(client, tenantId, sourceId);
-    const recipient = customerRecipientFromRow(row);
+    const { metadataPatch, ...recipient } = customerRecipientFromSlotOfferSent(row);
     return createNotificationDraft({
       tenantId,
       eventType: input.eventType,
@@ -414,10 +546,11 @@ async function createNotificationDraftForEvent(input, client = getPool()) {
         bookingRequestId: Number(row.booking_request_id),
         offerId: Number(row.id),
         offerStatus: row.offer_status,
-        offeredDate: row.offered_date ? String(row.offered_date).slice(0, 10) : null,
+        offeredDate: formatDateOnly(row.offered_date),
         offeredTimeWindow: row.offered_time_window,
         offeredStartTimeProvided: Boolean(row.offered_start_time),
-        durationMinutes: row.duration_minutes === null ? null : Number(row.duration_minutes)
+        durationMinutes: row.duration_minutes === null ? null : Number(row.duration_minutes),
+        ...metadataPatch
       }
     }, client);
   }
@@ -598,5 +731,6 @@ module.exports = {
   listAdminNotificationDrafts,
   getAdminNotificationDraft,
   channelForContactMethod,
+  isValidNotificationEmail,
   sanitizeMetadata
 };

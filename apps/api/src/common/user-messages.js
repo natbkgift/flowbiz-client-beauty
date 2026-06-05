@@ -195,6 +195,7 @@ const THAI_ERROR_MESSAGES = {
   NOTIFICATION_EMAIL_SEND_FAILED: 'ส่งอีเมลไม่สำเร็จ กรุณาตรวจสอบการตั้งค่าและลองใหม่',
   NOTIFICATION_EMAIL_ALREADY_SENT: 'ร่างการแจ้งเตือนนี้ถูกส่งอีเมลแล้ว',
   NOTIFICATION_EMAIL_RECIPIENT_MISSING: 'ไม่พบผู้รับอีเมลสำหรับร่างการแจ้งเตือนนี้',
+  NOTIFICATION_EMAIL_RECIPIENT_INVALID: 'อีเมลผู้รับสำหรับร่างการแจ้งเตือนนี้ไม่ถูกต้อง',
   UNSUPPORTED_NOTIFICATION_EVENT: 'ประเภทเหตุการณ์การแจ้งเตือนนี้ยังไม่รองรับ',
   NOTIFICATION_TEMPLATE_NOT_FOUND: 'ไม่พบเทมเพลตร่างการแจ้งเตือนสำหรับเหตุการณ์นี้',
   PUBLIC_BOOKING_REQUEST_RATE_LIMITED: 'มีการส่งคำขอนัดหมายบ่อยเกินไป กรุณารอสักครู่แล้วลองใหม่',

@@ -201,7 +201,10 @@ test('Notification draft builder creates draft-only records safely', async (t) =
     assert.equal(first.draft.tenantId, tenant.clinicId);
     assert.equal(first.draft.eventType, 'slot_offer.sent');
     assert.equal(first.draft.recipientType, 'member');
-    assert.equal(first.draft.channel, 'line');
+    assert.equal(first.draft.recipientRef, `private-member-${uniqueId}@example.com`);
+    assert.equal(first.draft.channel, 'email');
+    assert.equal(first.draft.metadata.recipientEmailAvailable, true);
+    assert.equal(first.draft.metadata.recipientSource, 'member');
     assert.equal(first.draft.status, 'draft');
     assert.match(first.draft.idempotencyKey, /event:slot_offer\.sent/);
 
