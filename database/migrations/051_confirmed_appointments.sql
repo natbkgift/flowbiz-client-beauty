@@ -28,9 +28,6 @@ create table if not exists clinic_confirmed_appointments (
   updated_at            timestamptz not null default now()
 );
 
-create index if not exists idx_confirmed_appointments_clinic_id
-  on clinic_confirmed_appointments(clinic_id);
-
 create index if not exists idx_confirmed_appointments_clinic_date
   on clinic_confirmed_appointments(clinic_id, appointment_date);
 

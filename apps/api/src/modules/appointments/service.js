@@ -6,6 +6,7 @@ const { recordAuditLog } = require('../audit/service');
 
 const VALID_APPOINTMENT_STATUSES = new Set(['scheduled', 'cancelled', 'completed', 'no_show']);
 const START_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const bangkokDateFormatter = new Intl.DateTimeFormat('sv-SE', {
   timeZone: 'Asia/Bangkok',
   year: 'numeric',
@@ -102,6 +103,17 @@ function formatDateOnly(value) {
   if (!value) return null;
   if (value instanceof Date) return bangkokDateFormatter.format(value);
   return String(value).slice(0, 10);
+}
+
+function validateAppointmentDate(appointmentDate) {
+  if (!appointmentDate || !DATE_ONLY_PATTERN.test(appointmentDate)) {
+    throw new AppError(400, 'APPOINTMENT_DATE_REQUIRED', 'A valid appointment date is required.');
+  }
+  const parsed = new Date(`${appointmentDate}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== appointmentDate) {
+    throw new AppError(400, 'APPOINTMENT_DATE_REQUIRED', 'A valid appointment date is required.');
+  }
+  return appointmentDate;
 }
 
 function normalizeConcreteStartTime(value) {
@@ -222,7 +234,11 @@ async function confirmAppointmentFromAcceptedSlotOffer(context, bookingRequestId
     const startTime = normalizeConcreteStartTime(offer.offered_start_time);
     const durationMinutes = normalizeConcreteDuration(offer.duration_minutes);
     const appointmentDate = formatDateOnly(offer.offered_date);
+    validateAppointmentDate(appointmentDate);
     const endTime = calculateEndTime(startTime, durationMinutes);
+    if (!endTime) {
+      throw new AppError(400, 'APPOINTMENT_END_TIME_UNSUPPORTED', 'Appointments crossing midnight are not supported.');
+    }
 
     const existingAppointment = await getAppointmentBySlotOffer(client, clinicId, normalizedOfferId);
     if (existingAppointment) {
@@ -352,7 +368,7 @@ async function listConfirmedAppointments(context, searchParams = new URLSearchPa
 
   const result = await getPool().query(
     `
-      select *, count(*) over() as total_count
+      select *, (count(*) over())::int as total_count
       from clinic_confirmed_appointments
       where ${clauses.join(' and ')}
       order by appointment_date asc, start_time asc, id asc
@@ -364,7 +380,7 @@ async function listConfirmedAppointments(context, searchParams = new URLSearchPa
 
   return {
     items: result.rows.map(mapAppointmentRow),
-    total: result.rows[0]?.total_count || 0,
+    total: result.rows[0] ? Number(result.rows[0].total_count) : 0,
     limit: filters.limit,
     offset: filters.offset
   };
@@ -416,15 +432,15 @@ async function updateConfirmedAppointmentStatus(context, appointmentId, body) {
     }
 
     const existing = existingResult.rows[0];
-    if (existing.status === 'cancelled' && normalized.status === 'scheduled') {
-      throw new AppError(409, 'INVALID_CONFIRMED_APPOINTMENT_STATUS', 'Cancelled appointments cannot be rescheduled in this foundation flow.');
-    }
-
-    if (existing.status === normalized.status && normalized.status !== 'cancelled') {
+    if (existing.status === normalized.status) {
       appointment = mapAppointmentRow(existing);
       await client.query('commit');
       committed = true;
       return { success: true, changed: false, appointment };
+    }
+
+    if (existing.status === 'cancelled') {
+      throw new AppError(409, 'INVALID_CONFIRMED_APPOINTMENT_STATUS', 'Cancelled appointments cannot be changed to any other status.');
     }
 
     const updateResult = await client.query(
@@ -502,6 +518,7 @@ module.exports = {
   mapAppointmentRow,
   normalizeAppointmentStatus,
   normalizeCancellationReason,
+  validateAppointmentDate,
   asPositiveInteger,
   formatDateOnly
 };

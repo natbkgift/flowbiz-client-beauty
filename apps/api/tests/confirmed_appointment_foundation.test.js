@@ -7,6 +7,7 @@ const { loadConfig } = require('../src/config');
 const { AppError } = require('../src/common/errors');
 const { json } = require('../src/common/http');
 const { handleAppointmentRoutes } = require('../src/modules/appointments/routes');
+const { validateAppointmentDate } = require('../src/modules/appointments/service');
 
 function createMockResponse() {
   return {
@@ -358,7 +359,40 @@ test('PR17A Confirmed Appointment Foundation', async (t) => {
     assert.equal(res.body.error.code, 'APPOINTMENT_DURATION_REQUIRED');
   });
 
-  await t.test('6. Tenant isolation blocks cross-clinic confirmation', async () => {
+  await t.test('6. Appointment date validator rejects missing or invalid dates', () => {
+    for (const value of [null, '', 'not-a-date', '2099-02-31']) {
+      assert.throws(
+        () => validateAppointmentDate(value),
+        (error) => error instanceof AppError && error.statusCode === 400 && error.code === 'APPOINTMENT_DATE_REQUIRED'
+      );
+    }
+  });
+
+  await t.test('7. Reject appointments crossing midnight', async () => {
+    const bookingId = await createBooking(pool, tenantA, leadAId, memberAId, 'cross-midnight');
+    const offerId = await createOffer(pool, tenantA, bookingId, leadAId, memberAId, 'cross-midnight', {
+      offeredDate: '2099-06-25',
+      offeredStartTime: '23:30',
+      durationMinutes: 60
+    });
+
+    const res = await routeJson({
+      method: 'POST',
+      path: `/admin/booking-requests/${bookingId}/slot-offers/${offerId}/confirm-appointment`,
+      authenticateRequest: contextFor('owner')
+    });
+
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.body.error.code, 'APPOINTMENT_END_TIME_UNSUPPORTED');
+
+    const count = await pool.query(
+      'select count(*)::int as count from clinic_confirmed_appointments where clinic_id = $1 and slot_offer_id = $2',
+      [tenantA.clinicId, offerId]
+    );
+    assert.equal(count.rows[0].count, 0);
+  });
+
+  await t.test('8. Tenant isolation blocks cross-clinic confirmation', async () => {
     const res = await routeJson({
       method: 'POST',
       path: `/admin/booking-requests/${bookingBId}/slot-offers/${offerBId}/confirm-appointment`,
@@ -375,7 +409,7 @@ test('PR17A Confirmed Appointment Foundation', async (t) => {
     assert.equal(count.rows[0].count, 0);
   });
 
-  await t.test('7. List/detail endpoints are tenant scoped and read roles can list', async () => {
+  await t.test('9. List/detail endpoints are tenant scoped and read roles can list', async () => {
     const createdB = await routeJson({
       method: 'POST',
       path: `/admin/booking-requests/${bookingBId}/slot-offers/${offerBId}/confirm-appointment`,
@@ -389,6 +423,7 @@ test('PR17A Confirmed Appointment Foundation', async (t) => {
       authenticateRequest: contextFor('staff', tenantA)
     });
     assert.equal(list.statusCode, 200);
+    assert.equal(typeof list.body.total, 'number');
     assert.ok(list.body.items.some((item) => item.id === appointmentAId));
     assert.equal(list.body.items.some((item) => item.id === appointmentBId), false);
     assert.doesNotMatch(JSON.stringify(list.body.items), /customerName|phone|email|lineId|raw PR17A private booking message|raw PR17A offer note/);
@@ -409,7 +444,7 @@ test('PR17A Confirmed Appointment Foundation', async (t) => {
     assert.equal(crossDetail.body.error.code, 'CONFIRMED_APPOINTMENT_NOT_FOUND');
   });
 
-  await t.test('8. Status update cancel writes audit/activity without leaking reason', async () => {
+  await t.test('10. Status update cancel writes audit/activity without leaking reason', async () => {
     const res = await routeJson({
       method: 'PATCH',
       path: `/admin/confirmed-appointments/${appointmentAId}/status`,
@@ -440,7 +475,64 @@ test('PR17A Confirmed Appointment Foundation', async (t) => {
     assert.doesNotMatch(serialized, /raw private cancellation reason|0891799a|pr17a-booking-a@example.com|raw PR17A private booking message|raw PR17A offer note/);
   });
 
-  await t.test('9. Created audit/activity are summary-only', async () => {
+  await t.test('11. Repeated cancelled status update is a no-op without duplicate logs', async () => {
+    const beforeRow = await pool.query(
+      'select cancelled_at::text as cancelled_at, cancelled_by_user_id, cancellation_reason from clinic_confirmed_appointments where id = $1',
+      [appointmentAId]
+    );
+    const beforeActivity = await pool.query(
+      "select count(*)::int as count from lead_activity where clinic_id = $1 and lead_id = $2 and event_type = 'booking_request.appointment_cancelled'",
+      [tenantA.clinicId, leadAId]
+    );
+    const beforeAudit = await pool.query(
+      "select count(*)::int as count from audit_logs where clinic_id = $1 and entity_type = 'clinic_confirmed_appointment' and entity_id = $2 and action_type = 'clinic_confirmed_appointment.cancelled'",
+      [tenantA.clinicId, appointmentAId]
+    );
+
+    const res = await routeJson({
+      method: 'PATCH',
+      path: `/admin/confirmed-appointments/${appointmentAId}/status`,
+      authenticateRequest: contextFor('owner'),
+      body: { status: 'cancelled', cancellationReason: 'new cancellation reason that must not replace original' }
+    });
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.changed, false);
+    assert.equal(res.body.appointment.status, 'cancelled');
+
+    const afterRow = await pool.query(
+      'select cancelled_at::text as cancelled_at, cancelled_by_user_id, cancellation_reason from clinic_confirmed_appointments where id = $1',
+      [appointmentAId]
+    );
+    const afterActivity = await pool.query(
+      "select count(*)::int as count from lead_activity where clinic_id = $1 and lead_id = $2 and event_type = 'booking_request.appointment_cancelled'",
+      [tenantA.clinicId, leadAId]
+    );
+    const afterAudit = await pool.query(
+      "select count(*)::int as count from audit_logs where clinic_id = $1 and entity_type = 'clinic_confirmed_appointment' and entity_id = $2 and action_type = 'clinic_confirmed_appointment.cancelled'",
+      [tenantA.clinicId, appointmentAId]
+    );
+
+    assert.deepEqual(afterRow.rows[0], beforeRow.rows[0]);
+    assert.equal(afterActivity.rows[0].count, beforeActivity.rows[0].count);
+    assert.equal(afterAudit.rows[0].count, beforeAudit.rows[0].count);
+  });
+
+  await t.test('12. Cancelled appointments cannot transition to completed or no_show', async () => {
+    for (const status of ['completed', 'no_show']) {
+      const res = await routeJson({
+        method: 'PATCH',
+        path: `/admin/confirmed-appointments/${appointmentAId}/status`,
+        authenticateRequest: contextFor('owner'),
+        body: { status }
+      });
+
+      assert.equal(res.statusCode, 409);
+      assert.equal(res.body.error.code, 'INVALID_CONFIRMED_APPOINTMENT_STATUS');
+    }
+  });
+
+  await t.test('13. Created audit/activity are summary-only', async () => {
     const activity = await pool.query(
       "select event_data_json from lead_activity where clinic_id = $1 and lead_id = $2 and event_type = 'booking_request.appointment_confirmed' order by id desc limit 1",
       [tenantA.clinicId, leadAId]
@@ -457,7 +549,7 @@ test('PR17A Confirmed Appointment Foundation', async (t) => {
     assert.doesNotMatch(serialized, /PR17A Customer a|0891799a|pr17a-booking-a@example.com|@pr17a-booking-a|raw PR17A private booking message|raw PR17A offer note|raw PR17A internal note|raw PR17A metadata/);
   });
 
-  await t.test('10. Confirm appointment does not create notification drafts or delivery attempts', async () => {
+  await t.test('14. Confirm appointment does not create notification drafts or delivery attempts', async () => {
     const bookingId = await createBooking(pool, tenantA, leadAId, memberAId, 'no-notification');
     const offerId = await createOffer(pool, tenantA, bookingId, leadAId, memberAId, 'no-notification', {
       offeredDate: '2099-06-24'
