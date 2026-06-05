@@ -46,6 +46,21 @@ async function handleMemberAccessRoutes(request, response, url, tools) {
     return json(response, 200, result);
   }
 
+  const portalSessionParams = matchPath(url.pathname, '/public/clinics/:slug/member-portal/session');
+  if (portalSessionParams && request.method === 'GET') {
+    const limitCheck = checkRateLimit(request, 60, 60000);
+    if (!limitCheck.allowed) {
+      throw new AppError(429, 'RATE_LIMIT_EXCEEDED', limitCheck.message);
+    }
+
+    if (url.searchParams.has('clinicId') || url.searchParams.has('clinic_id')) {
+      throw new AppError(400, 'INVALID_MEMBER_ACCESS_PAYLOAD', 'clinicId cannot be supplied for public member access.');
+    }
+
+    const result = await verifyMemberMagicToken(portalSessionParams.slug, url.searchParams.get('token'), requestMeta(request));
+    return json(response, 200, result);
+  }
+
   const responseParams = matchPath(url.pathname, '/public/clinics/:slug/member-access/slot-offers/:offerId/respond');
   if (responseParams && request.method === 'POST') {
     const limitCheck = checkRateLimit(request, 60, 60000);

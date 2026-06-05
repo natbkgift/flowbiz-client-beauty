@@ -14,6 +14,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PUBLIC_SLOT_OFFER_STATUSES = new Set(['ready_to_send', 'sent', 'accepted', 'declined']);
 const RESPONDABLE_SLOT_OFFER_STATUSES = new Set(['ready_to_send', 'sent']);
 const VALID_SLOT_OFFER_RESPONSES = new Set(['accepted', 'declined']);
+const PUBLIC_CONFIRMED_APPOINTMENT_STATUSES = new Set(['scheduled', 'cancelled', 'completed', 'no_show']);
 const bangkokDateFormatter = new Intl.DateTimeFormat('sv-SE', {
   timeZone: 'Asia/Bangkok',
   year: 'numeric',
@@ -218,6 +219,65 @@ function mapPublicSlotOffer(row, options = {}) {
   }
 
   return base;
+}
+
+function mapPublicConfirmedAppointment(row) {
+  return {
+    id: Number(row.id),
+    bookingRequestId: row.booking_request_id ? Number(row.booking_request_id) : null,
+    slotOfferId: row.slot_offer_id ? Number(row.slot_offer_id) : null,
+    appointmentDate: formatDateOnly(row.appointment_date),
+    startTime: row.start_time,
+    endTime: row.end_time || null,
+    durationMinutes: Number(row.duration_minutes),
+    timezone: row.timezone,
+    visitType: row.visit_type || null,
+    status: row.status,
+    source: row.source,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
+function appointmentStartsAt(appointment) {
+  if (
+    !appointment ||
+    appointment.status !== 'scheduled' ||
+    !appointment.appointmentDate ||
+    !appointment.startTime
+  ) {
+    return null;
+  }
+
+  const timestamp = new Date(`${appointment.appointmentDate}T${appointment.startTime}:00+07:00`).getTime();
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function findNextScheduledAppointment(confirmedAppointments) {
+  const now = Date.now();
+  return confirmedAppointments
+    .map((appointment) => ({ appointment, startsAt: appointmentStartsAt(appointment) }))
+    .filter((item) => item.startsAt !== null && item.startsAt >= now)
+    .sort((a, b) => a.startsAt - b.startsAt || a.appointment.id - b.appointment.id)[0]?.appointment || null;
+}
+
+function buildMemberPortalSummary({ bookingRequests = [], slotOffers = [], confirmedAppointments = [] }) {
+  return {
+    bookingRequestCount: bookingRequests.length,
+    pendingSlotOfferCount: slotOffers.filter((offer) => (
+      !offer.customerResponse && (offer.offerStatus === 'ready_to_send' || offer.offerStatus === 'sent')
+    )).length,
+    acceptedSlotOfferCount: slotOffers.filter((offer) => (
+      offer.customerResponse === 'accepted' || offer.offerStatus === 'accepted'
+    )).length,
+    declinedSlotOfferCount: slotOffers.filter((offer) => (
+      offer.customerResponse === 'declined' || offer.offerStatus === 'declined'
+    )).length,
+    scheduledAppointmentCount: confirmedAppointments.filter((appointment) => appointment.status === 'scheduled').length,
+    completedAppointmentCount: confirmedAppointments.filter((appointment) => appointment.status === 'completed').length,
+    cancelledAppointmentCount: confirmedAppointments.filter((appointment) => appointment.status === 'cancelled').length,
+    nextScheduledAppointment: findNextScheduledAppointment(confirmedAppointments)
+  };
 }
 
 function normalizePositiveInteger(value, fieldName, code = 'INVALID_SLOT_OFFER_RESPONSE') {
@@ -582,19 +642,68 @@ async function listPublicSlotOffersForMember(client, clinicId, memberId) {
   return result.rows.map(mapPublicSlotOffer);
 }
 
+async function listPublicConfirmedAppointmentsForMember(client, clinicId, memberId) {
+  const result = await client.query(
+    `
+      select
+        id,
+        booking_request_id,
+        slot_offer_id,
+        appointment_date,
+        start_time,
+        end_time,
+        duration_minutes,
+        timezone,
+        visit_type,
+        status,
+        source,
+        created_at,
+        updated_at
+      from clinic_confirmed_appointments
+      where clinic_id = $1
+        and member_id = $2
+        and status = any($3::varchar[])
+      order by appointment_date desc, start_time desc, id desc
+      limit 20
+    `,
+    [clinicId, memberId, Array.from(PUBLIC_CONFIRMED_APPOINTMENT_STATUSES)]
+  );
+
+  return result.rows.map(mapPublicConfirmedAppointment);
+}
+
 async function verifyMemberMagicToken(slug, token, requestMeta = {}) {
   const client = await getPool().connect();
   try {
     await client.query('begin');
     const session = await resolveMemberSessionByToken(slug, token, requestMeta, { client });
     const slotOffers = await listPublicSlotOffersForMember(client, session.clinic.id, Number(session.memberRow.id));
+    const confirmedAppointments = await listPublicConfirmedAppointmentsForMember(
+      client,
+      session.clinic.id,
+      Number(session.memberRow.id)
+    );
+    const summary = buildMemberPortalSummary({
+      bookingRequests: session.bookingRequests,
+      slotOffers,
+      confirmedAppointments
+    });
+    const portal = {
+      profile: session.member,
+      summary,
+      bookingRequests: session.bookingRequests,
+      slotOffers,
+      confirmedAppointments
+    };
     await client.query('commit');
 
     return {
       success: true,
       member: session.member,
+      portal,
       bookingRequests: session.bookingRequests,
-      slotOffers
+      slotOffers,
+      confirmedAppointments
     };
   } catch (error) {
     await client.query('rollback').catch(() => {});
@@ -775,5 +884,8 @@ module.exports = {
   findMemberByContact,
   mapPublicBookingRequest,
   mapPublicSlotOffer,
+  mapPublicConfirmedAppointment,
+  listPublicConfirmedAppointmentsForMember,
+  buildMemberPortalSummary,
   resolveMemberSessionByToken
 };
