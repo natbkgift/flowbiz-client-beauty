@@ -1,6 +1,6 @@
 # FlowBiz Beauty Multi-Clinic SaaS Blueprint
 
-Last updated: 2026-06-05
+Last updated: 2026-06-06
 
 ## Current State
 
@@ -18,7 +18,17 @@ PR #39 / PR 17A has been merged:
 - Merge commit: `159bb95345b5c6da6977c0b673bf4fb5d4fcd62b`
 - Result: confirmed appointment foundation is now part of `main`
 
-PR 17B: Appointment Conflict Guard is implemented in the current branch, not merged.
+PR #40 / PR 17B has been merged:
+
+- PR: https://github.com/natbkgift/flowbiz-client-beauty/pull/40
+- Merge commit: `636f3e71b76a35fa7cf3d75ff5a1c2ca437557e0`
+- Result: appointment conflict guard is now part of `main`
+
+Current branch work:
+
+- PR 18A: Member Portal V1 - implemented in branch, not merged.
+- Extends the existing member-access magic-link session payload with a read-only portal profile, booking requests, slot offers, confirmed appointments, and portal summary counts.
+- Keeps new authentication, payment, package ownership, consent management, profile editing, rescheduling, public appointment creation, calendar sync, auto-send, and real messaging providers out of scope.
 
 ## Notification Stack Status
 
@@ -96,16 +106,8 @@ Appointment and booking gaps:
 - Calendar sync.
 - Appointment capacity rules.
 
-Current branch work:
-
-- PR 17B: Appointment Conflict Guard - implemented in branch, not merged.
-- Adds clinic-scoped blocking for overlapping scheduled confirmed appointments.
-- Uses half-open interval behavior, so adjacent appointments remain allowed.
-- Keeps provider availability, doctor availability, capacity rules, calendar sync, rescheduling, public appointment endpoints, auto-confirm, and auto-send out of scope.
-
 Member and commerce gaps:
 
-- Member Portal V1.
 - Member consent management.
 - Package ownership ledger.
 - Payment or checkout foundation.
@@ -123,9 +125,8 @@ Approval alone still does not send anything. A manual admin action is required f
 
 ## Recommended Next Roadmap
 
-1. PR 18A: Member Portal V1
-2. PR 18B: Member Consent Management
-3. PR 19A: Package Ownership / Payment Foundation
+1. PR 18B: Member Consent Management
+2. PR 19A: Package Ownership / Payment Foundation
 
 ## Historical PR 15H Scope (Merged)
 
@@ -149,7 +150,7 @@ PR 15H did not add:
 
 ## Merge Readiness Baseline
 
-After PR #39, `main` should be treated as having:
+After PR #40, `main` should be treated as having:
 
 - Notification draft foundation complete.
 - Admin preview complete.
@@ -161,8 +162,9 @@ After PR #39, `main` should be treated as having:
 - Delivery audit hardening complete.
 - Customer slot offer email delivery complete.
 - Confirmed appointment foundation complete.
+- Appointment conflict guard complete.
 
-PR17B branch work is not part of this merge readiness baseline until PR17B is merged.
+PR18A branch work is not part of this merge readiness baseline until PR18A is merged.
 
 The next delivery work must preserve the same safety gates:
 
