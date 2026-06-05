@@ -232,8 +232,11 @@ test('PR16B Customer Slot Offer Email Delivery', async (t) => {
 
   t.after(async () => {
     try {
-      if (tenantA?.clinicId && tenantB?.clinicId) {
-        await pool.query('delete from clinics where id = any($1::bigint[])', [[tenantA.clinicId, tenantB.clinicId]]);
+      const clinicIds = [];
+      if (tenantA?.clinicId) clinicIds.push(tenantA.clinicId);
+      if (tenantB?.clinicId) clinicIds.push(tenantB.clinicId);
+      if (clinicIds.length > 0) {
+        await pool.query('delete from clinics where id = any($1::bigint[])', [clinicIds]);
       }
       if (userIds.length) {
         await pool.query('delete from users where id = any($1::bigint[])', [userIds]);
