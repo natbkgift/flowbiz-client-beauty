@@ -68,7 +68,7 @@ Top-level `bookingRequests` and `slotOffers` are preserved for existing clients.
 - `cancelledAppointmentCount`
 - `nextScheduledAppointment`
 
-`nextScheduledAppointment` is selected from scheduled appointments with a future Bangkok-local appointment start timestamp. It is `null` when no future scheduled appointment is available.
+`nextScheduledAppointment` is selected with a separate ascending scheduled-appointment lookup using a future Bangkok-local appointment start timestamp. It is `null` when no future scheduled appointment is available.
 
 ## Confirmed Appointment Exposure
 

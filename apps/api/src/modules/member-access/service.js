@@ -21,6 +21,12 @@ const bangkokDateFormatter = new Intl.DateTimeFormat('sv-SE', {
   month: '2-digit',
   day: '2-digit'
 });
+const bangkokTimeFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Bangkok',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23'
+});
 
 function trimString(value, maxLength, code = 'INVALID_MEMBER_ACCESS_PAYLOAD') {
   if (value === undefined || value === null) return null;
@@ -239,6 +245,34 @@ function mapPublicConfirmedAppointment(row) {
   };
 }
 
+function normalizeAppointmentTime(value) {
+  if (typeof value !== 'string') return null;
+  const [hourPart, minutePart, secondPart = '00'] = value.split(':');
+  const hour = Number.parseInt(hourPart, 10);
+  const minute = Number.parseInt(minutePart, 10);
+  const second = Number.parseInt(secondPart, 10);
+
+  if (
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute) ||
+    !Number.isInteger(second) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59 ||
+    second < 0 ||
+    second > 59
+  ) {
+    return null;
+  }
+
+  return [
+    String(hour).padStart(2, '0'),
+    String(minute).padStart(2, '0'),
+    String(second).padStart(2, '0')
+  ].join(':');
+}
+
 function appointmentStartsAt(appointment) {
   if (
     !appointment ||
@@ -249,7 +283,10 @@ function appointmentStartsAt(appointment) {
     return null;
   }
 
-  const timestamp = new Date(`${appointment.appointmentDate}T${appointment.startTime}:00+07:00`).getTime();
+  const normalizedTime = normalizeAppointmentTime(appointment.startTime);
+  if (!normalizedTime) return null;
+
+  const timestamp = new Date(`${appointment.appointmentDate}T${normalizedTime}+07:00`).getTime();
   return Number.isNaN(timestamp) ? null : timestamp;
 }
 
@@ -261,7 +298,25 @@ function findNextScheduledAppointment(confirmedAppointments) {
     .sort((a, b) => a.startsAt - b.startsAt || a.appointment.id - b.appointment.id)[0]?.appointment || null;
 }
 
-function buildMemberPortalSummary({ bookingRequests = [], slotOffers = [], confirmedAppointments = [] }) {
+function getBangkokNowParts(now = new Date()) {
+  const timeParts = Object.fromEntries(
+    bangkokTimeFormatter.formatToParts(now)
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value])
+  );
+
+  return {
+    date: bangkokDateFormatter.format(now),
+    time: `${timeParts.hour || '00'}:${timeParts.minute || '00'}`
+  };
+}
+
+function buildMemberPortalSummary({
+  bookingRequests = [],
+  slotOffers = [],
+  confirmedAppointments = [],
+  nextScheduledAppointment = null
+}) {
   return {
     bookingRequestCount: bookingRequests.length,
     pendingSlotOfferCount: slotOffers.filter((offer) => (
@@ -276,7 +331,7 @@ function buildMemberPortalSummary({ bookingRequests = [], slotOffers = [], confi
     scheduledAppointmentCount: confirmedAppointments.filter((appointment) => appointment.status === 'scheduled').length,
     completedAppointmentCount: confirmedAppointments.filter((appointment) => appointment.status === 'completed').length,
     cancelledAppointmentCount: confirmedAppointments.filter((appointment) => appointment.status === 'cancelled').length,
-    nextScheduledAppointment: findNextScheduledAppointment(confirmedAppointments)
+    nextScheduledAppointment
   };
 }
 
@@ -672,6 +727,44 @@ async function listPublicConfirmedAppointmentsForMember(client, clinicId, member
   return result.rows.map(mapPublicConfirmedAppointment);
 }
 
+async function getNextScheduledAppointmentForMember(client, clinicId, memberId) {
+  const now = getBangkokNowParts();
+  const result = await client.query(
+    `
+      select
+        id,
+        booking_request_id,
+        slot_offer_id,
+        appointment_date,
+        start_time,
+        end_time,
+        duration_minutes,
+        timezone,
+        visit_type,
+        status,
+        source,
+        created_at,
+        updated_at
+      from clinic_confirmed_appointments
+      where clinic_id = $1
+        and member_id = $2
+        and status = 'scheduled'
+        and (
+          appointment_date > $3::date
+          or (
+            appointment_date = $3::date
+            and left(start_time, 5) >= $4
+          )
+        )
+      order by appointment_date asc, start_time asc, id asc
+      limit 20
+    `,
+    [clinicId, memberId, now.date, now.time]
+  );
+
+  return findNextScheduledAppointment(result.rows.map(mapPublicConfirmedAppointment));
+}
+
 async function verifyMemberMagicToken(slug, token, requestMeta = {}) {
   const client = await getPool().connect();
   try {
@@ -683,10 +776,16 @@ async function verifyMemberMagicToken(slug, token, requestMeta = {}) {
       session.clinic.id,
       Number(session.memberRow.id)
     );
+    const nextScheduledAppointment = await getNextScheduledAppointmentForMember(
+      client,
+      session.clinic.id,
+      Number(session.memberRow.id)
+    );
     const summary = buildMemberPortalSummary({
       bookingRequests: session.bookingRequests,
       slotOffers,
-      confirmedAppointments
+      confirmedAppointments,
+      nextScheduledAppointment
     });
     const portal = {
       profile: session.member,
@@ -886,6 +985,7 @@ module.exports = {
   mapPublicSlotOffer,
   mapPublicConfirmedAppointment,
   listPublicConfirmedAppointmentsForMember,
+  getNextScheduledAppointmentForMember,
   buildMemberPortalSummary,
   resolveMemberSessionByToken
 };

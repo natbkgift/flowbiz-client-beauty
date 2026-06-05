@@ -553,4 +553,31 @@ test('PR18A Member Portal V1', async (t) => {
     assert.equal(res.body.slotOffers.length, 3);
     assert.equal(res.body.confirmedAppointments.length, 3);
   });
+
+  await t.test('7. Next scheduled appointment uses robust time parsing and is not limited by recent appointment list', async () => {
+    await pool.query(
+      "update clinic_confirmed_appointments set start_time = '14:00:00', end_time = '15:00:00' where id = $1",
+      [scheduledAppointmentId]
+    );
+
+    for (let day = 1; day <= 25; day += 1) {
+      await createAppointment(pool, tenantA, null, null, leadAId, memberAId, `next-limit-${day}`, {
+        appointmentDate: `2099-09-${String(day).padStart(2, '0')}`,
+        startTime: '10:00',
+        endTime: '11:00',
+        status: 'scheduled'
+      });
+    }
+
+    const res = await routeJson({
+      path: `/public/clinics/${tenantA.clinicSlug}/member-access/session`,
+      searchParams: { token: tokenA }
+    });
+
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.body.portal.confirmedAppointments.length, 20);
+    assert.equal(res.body.portal.confirmedAppointments.some((item) => item.id === scheduledAppointmentId), false);
+    assert.equal(res.body.portal.summary.nextScheduledAppointment.id, scheduledAppointmentId);
+    assert.equal(res.body.portal.summary.nextScheduledAppointment.startTime, '14:00:00');
+  });
 });
