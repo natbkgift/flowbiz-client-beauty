@@ -12,6 +12,8 @@ PR #37 / PR 16B has been merged:
 - Merge commit: `c09eb0c557a060f645a10ccd800f7889ed3b334d`
 - Result: customer slot offer email delivery is now part of `main`
 
+PR 17A: Confirmed Appointment Foundation is implemented in the current branch, not merged.
+
 ## Notification Stack Status
 
 Completed notification stack:
@@ -84,11 +86,17 @@ Notification and delivery gaps:
 
 Appointment and booking gaps:
 
-- Confirmed appointment table.
 - Appointment conflict guard.
 - Doctor/provider availability engine.
 - Calendar sync.
 - Appointment capacity rules.
+
+Current branch work:
+
+- PR 17A: Confirmed Appointment Foundation - implemented in branch, not merged.
+- Adds tenant-scoped confirmed appointments from accepted slot offers.
+- Adds admin list/detail/status endpoints for confirmed appointments.
+- Keeps conflict guard, availability, capacity rules, calendar sync, auto-confirm, and auto-send out of scope.
 
 Member and commerce gaps:
 
@@ -110,11 +118,10 @@ Approval alone still does not send anything. A manual admin action is required f
 
 ## Recommended Next Roadmap
 
-1. PR 17A: Confirmed Appointment Foundation
-2. PR 17B: Appointment Conflict Guard
-3. PR 18A: Member Portal V1
-4. PR 18B: Member Consent Management
-5. PR 19A: Package Ownership / Payment Foundation
+1. PR 17B: Appointment Conflict Guard
+2. PR 18A: Member Portal V1
+3. PR 18B: Member Consent Management
+4. PR 19A: Package Ownership / Payment Foundation
 
 ## Historical PR 15H Scope (Merged)
 
