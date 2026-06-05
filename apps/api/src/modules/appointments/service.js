@@ -142,6 +142,30 @@ function calculateEndTime(startTime, durationMinutes) {
   return `${endHour}:${endMinute}`;
 }
 
+function timeToMinutes(value) {
+  if (typeof value !== 'string' || !START_TIME_PATTERN.test(value)) return null;
+  const [hour, minute] = value.split(':').map((part) => Number.parseInt(part, 10));
+  return hour * 60 + minute;
+}
+
+function rangesOverlap(startA, endA, startB, endB) {
+  const normalizedStartA = timeToMinutes(startA);
+  const normalizedEndA = timeToMinutes(endA);
+  const normalizedStartB = timeToMinutes(startB);
+  const normalizedEndB = timeToMinutes(endB);
+
+  if (
+    normalizedStartA === null ||
+    normalizedEndA === null ||
+    normalizedStartB === null ||
+    normalizedEndB === null
+  ) {
+    return false;
+  }
+
+  return normalizedStartA < normalizedEndB && normalizedEndA > normalizedStartB;
+}
+
 function mapAppointmentRow(row) {
   return {
     id: Number(row.id),
@@ -167,6 +191,16 @@ function mapAppointmentRow(row) {
   };
 }
 
+function mapAppointmentConflictRow(row) {
+  return {
+    appointmentId: Number(row.id),
+    appointmentDate: formatDateOnly(row.appointment_date),
+    startTime: row.start_time,
+    endTime: row.end_time || null,
+    status: row.status
+  };
+}
+
 async function getAppointmentBySlotOffer(client, clinicId, slotOfferId) {
   const result = await client.query(
     `
@@ -178,6 +212,53 @@ async function getAppointmentBySlotOffer(client, clinicId, slotOfferId) {
     [clinicId, slotOfferId]
   );
   return result.rows[0] ? mapAppointmentRow(result.rows[0]) : null;
+}
+
+async function findAppointmentConflict(client, {
+  clinicId,
+  appointmentDate,
+  startTime,
+  endTime,
+  excludeAppointmentId = null
+}) {
+  const result = await client.query(
+    `
+      select id, appointment_date, start_time, end_time, status
+      from clinic_confirmed_appointments
+      where clinic_id = $1
+        and appointment_date = $2::date
+        and status = 'scheduled'
+        and ($5::bigint is null or id <> $5::bigint)
+        and (
+          (end_time is not null and start_time < $4 and end_time > $3)
+          or (end_time is null and start_time = $3)
+        )
+      order by start_time asc, id asc
+      limit 1
+    `,
+    [clinicId, appointmentDate, startTime, endTime, excludeAppointmentId]
+  );
+
+  if (result.rowCount === 0) return null;
+
+  const row = result.rows[0];
+  if (row.end_time && !rangesOverlap(startTime, endTime, row.start_time, row.end_time)) {
+    return null;
+  }
+
+  return mapAppointmentConflictRow(row);
+}
+
+async function assertNoAppointmentConflict(client, payload) {
+  const conflict = await findAppointmentConflict(client, payload);
+  if (!conflict) return;
+
+  throw new AppError(
+    409,
+    'APPOINTMENT_TIME_CONFLICT',
+    'Appointment time conflicts with an existing confirmed appointment.',
+    { conflict }
+  );
 }
 
 async function recordAppointmentLeadActivity(client, clinicId, leadId, eventType, summary) {
@@ -248,6 +329,13 @@ async function confirmAppointmentFromAcceptedSlotOffer(context, bookingRequestId
       committed = true;
       return { success: true, idempotent, appointment };
     }
+
+    await assertNoAppointmentConflict(client, {
+      clinicId,
+      appointmentDate,
+      startTime,
+      endTime
+    });
 
     const insertResult = await client.query(
       `
@@ -520,5 +608,9 @@ module.exports = {
   normalizeCancellationReason,
   validateAppointmentDate,
   asPositiveInteger,
-  formatDateOnly
+  formatDateOnly,
+  timeToMinutes,
+  rangesOverlap,
+  findAppointmentConflict,
+  assertNoAppointmentConflict
 };
