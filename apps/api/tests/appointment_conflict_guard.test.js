@@ -204,6 +204,32 @@ async function createAcceptedOffer(pool, tenant, uniqueId, suffix, overrides) {
   return { leadId, memberId, bookingId, offerId };
 }
 
+async function insertLegacyNullEndAppointment(pool, tenant, appointmentDate, startTime, suffix) {
+  const result = await pool.query(
+    `
+      insert into clinic_confirmed_appointments (
+        clinic_id,
+        appointment_date,
+        start_time,
+        end_time,
+        duration_minutes,
+        status,
+        source,
+        metadata_json
+      )
+      values ($1, $2::date, $3, null, 60, 'scheduled', 'legacy_import', $4::jsonb)
+      returning id
+    `,
+    [
+      tenant.clinicId,
+      appointmentDate,
+      startTime,
+      JSON.stringify({ unsafe: `raw PR17B legacy metadata ${suffix}` })
+    ]
+  );
+  return Number(result.rows[0].id);
+}
+
 function piiNeedles(uniqueId, suffix) {
   return [
     `PR17B Private Customer ${suffix}`,
@@ -448,5 +474,67 @@ test('PR17B Appointment Conflict Guard', async (t) => {
       [tenantA.clinicId, offer.offerId]
     );
     assert.equal(count.rows[0].count, 1);
+  });
+
+  await t.test('9. Legacy null end_time rows block when their start is inside the proposed range', async () => {
+    const legacyAppointmentId = await insertLegacyNullEndAppointment(
+      pool,
+      tenantA,
+      '2099-07-19',
+      '14:30',
+      'legacy-null-overlap'
+    );
+    const proposed = await createAcceptedOffer(pool, tenantA, uniqueId, 'legacy-null-overlap', {
+      offeredDate: '2099-07-19',
+      offeredStartTime: '14:00'
+    });
+
+    const blocked = await confirmOffer(tenantA, proposed.bookingId, proposed.offerId);
+
+    assert.equal(blocked.statusCode, 409);
+    assert.equal(blocked.body.error.code, 'APPOINTMENT_TIME_CONFLICT');
+    assert.deepEqual(blocked.body.error.details, {
+      conflict: {
+        appointmentId: legacyAppointmentId,
+        appointmentDate: '2099-07-19',
+        startTime: '14:30',
+        endTime: null,
+        status: 'scheduled'
+      }
+    });
+
+    const count = await pool.query(
+      'select count(*)::int as count from clinic_confirmed_appointments where clinic_id = $1 and slot_offer_id = $2',
+      [tenantA.clinicId, proposed.offerId]
+    );
+    assert.equal(count.rows[0].count, 0);
+
+    const serialized = JSON.stringify(blocked.body);
+    for (const needle of [
+      ...piiNeedles(uniqueId, 'legacy-null-overlap'),
+      'raw PR17B legacy metadata legacy-null-overlap'
+    ]) {
+      assert.equal(serialized.includes(needle), false, `legacy null-end conflict response leaked ${needle}`);
+    }
+  });
+
+  await t.test('10. Legacy null end_time row at proposed end remains adjacent', async () => {
+    await insertLegacyNullEndAppointment(
+      pool,
+      tenantA,
+      '2099-07-20',
+      '15:00',
+      'legacy-null-adjacent'
+    );
+    const proposed = await createAcceptedOffer(pool, tenantA, uniqueId, 'legacy-null-adjacent', {
+      offeredDate: '2099-07-20',
+      offeredStartTime: '14:00'
+    });
+
+    const res = await confirmOffer(tenantA, proposed.bookingId, proposed.offerId);
+
+    assert.equal(res.statusCode, 201);
+    assert.equal(res.body.appointment.startTime, '14:00');
+    assert.equal(res.body.appointment.endTime, '15:00');
   });
 });

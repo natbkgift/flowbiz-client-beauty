@@ -231,7 +231,7 @@ async function findAppointmentConflict(client, {
         and ($5::bigint is null or id <> $5::bigint)
         and (
           (end_time is not null and start_time < $4 and end_time > $3)
-          or (end_time is null and start_time = $3)
+          or (end_time is null and start_time >= $3 and start_time < $4)
         )
       order by start_time asc, id asc
       limit 1
