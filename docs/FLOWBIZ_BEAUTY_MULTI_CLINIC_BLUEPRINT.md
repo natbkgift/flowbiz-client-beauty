@@ -1,16 +1,16 @@
 # FlowBiz Beauty Multi-Clinic SaaS Blueprint
 
-Last updated: 2026-06-04
+Last updated: 2026-06-05
 
 ## Current State
 
 FlowBiz Beauty is a multi-clinic SaaS platform for clinic-facing CRM, booking request handling, member access, notification safety, and AI/HITL-assisted operations.
 
-PR #36 / PR 16A has been merged:
+PR #37 / PR 16B has been merged:
 
-- PR: https://github.com/natbkgift/flowbiz-client-beauty/pull/36
-- Merge commit: `83187aef3699aebb6d5e8cd562d7ae9252fe8549`
-- Result: notification delivery audit hardening is now part of `main`
+- PR: https://github.com/natbkgift/flowbiz-client-beauty/pull/37
+- Merge commit: `c09eb0c557a060f645a10ccd800f7889ed3b334d`
+- Result: customer slot offer email delivery is now part of `main`
 
 ## Notification Stack Status
 
@@ -25,12 +25,7 @@ PR 15F / #32: Approval Gate + Send Control           - merged
 PR 15G / #33: Safety-Gated Email Delivery Adapter    - merged
 PR 15H / #35: Admin Email Send UI Hardening          - merged
 PR 16A / #36: Notification Delivery Audit Hardening  - merged
-```
-
-Current branch work:
-
-```txt
-PR 16B: Customer Slot Offer Email Delivery           - implemented in branch, not merged
+PR 16B / #37: Customer Slot Offer Email Delivery     - merged
 ```
 
 Current notification flow:
@@ -115,12 +110,11 @@ Approval alone still does not send anything. A manual admin action is required f
 
 ## Recommended Next Roadmap
 
-1. PR 16B: Customer Slot Offer Email Delivery (implemented in branch, not merged)
-2. PR 17A: Confirmed Appointment Foundation
-3. PR 17B: Appointment Conflict Guard
-4. PR 18A: Member Portal V1
-5. PR 18B: Member Consent Management
-6. PR 19A: Package Ownership / Payment Foundation
+1. PR 17A: Confirmed Appointment Foundation
+2. PR 17B: Appointment Conflict Guard
+3. PR 18A: Member Portal V1
+4. PR 18B: Member Consent Management
+5. PR 19A: Package Ownership / Payment Foundation
 
 ## Historical PR 15H Scope (Merged)
 
@@ -144,7 +138,7 @@ PR 15H did not add:
 
 ## Merge Readiness Baseline
 
-After PR #36, `main` should be treated as having:
+After PR #37, `main` should be treated as having:
 
 - Notification draft foundation complete.
 - Admin preview complete.
@@ -154,6 +148,7 @@ After PR #36, `main` should be treated as having:
 - Sandbox-only safety-gated email delivery complete.
 - Admin email send UI hardening complete.
 - Delivery audit hardening complete.
+- Customer slot offer email delivery complete.
 
 The next delivery work must preserve the same safety gates:
 
