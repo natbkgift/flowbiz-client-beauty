@@ -54,6 +54,7 @@ const { handleClinicOfferingsRoutes } = require('./modules/clinic-offerings/rout
 const { handlePublicContentRoutes } = require('./modules/public-content/routes');
 const { handlePublicLeadRoutes } = require('./modules/public-leads/routes');
 const { handleBookingRequestRoutes } = require('./modules/booking-requests/routes');
+const { handleAppointmentRoutes } = require('./modules/appointments/routes');
 const { handleMemberRoutes } = require('./modules/members/routes');
 const { handleMemberAccessRoutes } = require('./modules/member-access/routes');
 const { handleNotificationRoutes } = require('./modules/notifications/routes');
@@ -426,6 +427,10 @@ async function routeRequest(request, response) {
   }
 
   if (await handleBookingRequestRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
+    return;
+  }
+
+  if (await handleAppointmentRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
     return;
   }
 

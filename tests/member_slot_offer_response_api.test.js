@@ -518,15 +518,16 @@ test('Member Slot Offer Response API - magic-link customer response', async (t) 
     assert.doesNotMatch(JSON.stringify(res.body), /customerResponseNote|customer_response_note|not available/);
   });
 
-  await t.test('20. No confirmed appointment table created or used', async () => {
+  await t.test('20. Customer response does not auto-create confirmed appointments', async () => {
     const result = await pool.query(
       `
-        select table_name
-        from information_schema.tables
-        where table_schema = 'public'
-          and table_name in ('clinic_confirmed_appointments', 'confirmed_appointments')
-      `
+        select count(*)::int as count
+        from clinic_confirmed_appointments
+        where clinic_id = $1
+          and slot_offer_id in ($2, $3)
+      `,
+      [tenantA.clinicId, offerAId, declineOfferId]
     );
-    assert.equal(result.rowCount, 0);
+    assert.equal(result.rows[0].count, 0);
   });
 });
