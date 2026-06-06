@@ -33,14 +33,4 @@ create index if not exists idx_clinic_member_consents_clinic_member_status
 alter table clinic_member_events drop constraint if exists clinic_member_events_event_type_check;
 
 alter table clinic_member_events add constraint clinic_member_events_event_type_check
-  check (
-    event_type in (
-      'member.created',
-      'member.linked_to_lead',
-      'member.linked_to_booking_request',
-      'member.profile.updated',
-      'member_access.requested',
-      'member_access.verified',
-      'member_consent.updated'
-    )
-  );
+  check (length(trim(event_type)) > 0);

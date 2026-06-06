@@ -333,6 +333,17 @@ test('PR18B Member Consent Management', async (t) => {
     });
     assert.equal(invalidStatus.statusCode, 400);
     assert.equal(invalidStatus.body.error.code, 'INVALID_MEMBER_CONSENT_STATUS');
+
+    const invalidConsentsShape = await routeJson({
+      method: 'PATCH',
+      path: `/public/clinics/${tenantA.clinicSlug}/member-portal/consents`,
+      body: {
+        token: tokenA,
+        consents: { key: 'marketing', status: 'granted', version: 'v1' }
+      }
+    });
+    assert.equal(invalidConsentsShape.statusCode, 400);
+    assert.equal(invalidConsentsShape.body.error.code, 'INVALID_MEMBER_CONSENT');
   });
 
   await t.test('6. Tenant isolation and override rejection', async () => {

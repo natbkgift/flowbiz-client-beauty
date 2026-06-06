@@ -388,6 +388,9 @@ function normalizeSlotOfferResponsePayload(body) {
 function normalizeConsentUpdatePayload(body) {
   rejectMemberConsentOverride(body);
   const token = normalizeToken(body.token);
+  if (body.consents !== undefined && !Array.isArray(body.consents)) {
+    throw new AppError(400, 'INVALID_MEMBER_CONSENT', 'consents must be an array.');
+  }
   const rawConsents = Array.isArray(body.consents)
     ? body.consents
     : body.consent !== undefined
