@@ -198,7 +198,7 @@ test('PR18B Member Consent Management', async (t) => {
       searchParams: { token: tokenA }
     });
 
-    assert.equal(res.statusCode, 200);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.body));
     assert.ok(Array.isArray(res.body.portal.consents));
     assert.deepEqual(res.body.portal.consents.map((consent) => consent.key), [
       'communication',
@@ -233,7 +233,7 @@ test('PR18B Member Consent Management', async (t) => {
       userAgent: rawUserAgent
     });
 
-    assert.equal(res.statusCode, 200);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.body));
     assert.equal(res.body.success, true);
     assert.equal(consentByKey(res.body.consents, 'marketing').status, 'granted');
     assert.ok(consentByKey(res.body.consents, 'marketing').grantedAt);
@@ -268,7 +268,7 @@ test('PR18B Member Consent Management', async (t) => {
       }
     });
 
-    assert.equal(res.statusCode, 200);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.body));
     assert.equal(consentByKey(res.body.consents, 'appointment_reminder').status, 'revoked');
     assert.equal(consentByKey(res.body.consents, 'communication').status, 'granted');
 
@@ -276,7 +276,7 @@ test('PR18B Member Consent Management', async (t) => {
       path: `/public/clinics/${tenantA.clinicSlug}/member-portal/session`,
       searchParams: { token: tokenA }
     });
-    assert.equal(session.statusCode, 200);
+    assert.equal(session.statusCode, 200, JSON.stringify(session.body));
     assert.equal(consentByKey(session.body.portal.consents, 'marketing').status, 'granted');
     assert.equal(consentByKey(session.body.portal.consents, 'appointment_reminder').status, 'revoked');
     assert.equal(consentByKey(session.body.portal.consents, 'communication').status, 'granted');
@@ -298,7 +298,7 @@ test('PR18B Member Consent Management', async (t) => {
       }
     });
 
-    assert.equal(res.statusCode, 200);
+    assert.equal(res.statusCode, 200, JSON.stringify(res.body));
     assert.equal(consentByKey(res.body.consents, 'marketing').status, 'revoked');
     assert.ok(consentByKey(res.body.consents, 'marketing').revokedAt);
 
@@ -397,7 +397,7 @@ test('PR18B Member Consent Management', async (t) => {
         consent: { key: 'data_processing', status: 'granted', version: 'tenant-b-v1' }
       }
     });
-    assert.equal(tenantBUpdate.statusCode, 200);
+    assert.equal(tenantBUpdate.statusCode, 200, JSON.stringify(tenantBUpdate.body));
 
     const tenantASession = await routeJson({
       path: `/public/clinics/${tenantA.clinicSlug}/member-portal/session`,
@@ -472,6 +472,9 @@ test('PR18B Member Consent Management', async (t) => {
       "select metadata_json from clinic_member_consents where clinic_id = $1 and member_id = $2 and consent_key = 'marketing'",
       [tenantA.clinicId, memberAId]
     );
+    assert.equal(update.statusCode, 200, JSON.stringify(update.body));
+    assert.equal(session.statusCode, 200, JSON.stringify(session.body));
+    assert.equal(metadata.rowCount, 1);
 
     const forbiddenValues = [
       `pr18b-consent-member-a-${uniqueId}@example.com`,
