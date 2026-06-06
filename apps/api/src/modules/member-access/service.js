@@ -15,6 +15,9 @@ const PUBLIC_SLOT_OFFER_STATUSES = new Set(['ready_to_send', 'sent', 'accepted',
 const RESPONDABLE_SLOT_OFFER_STATUSES = new Set(['ready_to_send', 'sent']);
 const VALID_SLOT_OFFER_RESPONSES = new Set(['accepted', 'declined']);
 const PUBLIC_CONFIRMED_APPOINTMENT_STATUSES = new Set(['scheduled', 'cancelled', 'completed', 'no_show']);
+const CONSENT_KEYS = ['communication', 'marketing', 'appointment_reminder', 'data_processing'];
+const VALID_CONSENT_KEYS = new Set(CONSENT_KEYS);
+const VALID_CONSENT_STATUSES = new Set(['granted', 'revoked']);
 const bangkokDateFormatter = new Intl.DateTimeFormat('sv-SE', {
   timeZone: 'Asia/Bangkok',
   year: 'numeric',
@@ -71,6 +74,22 @@ function rejectSlotOfferClinicOverride(body) {
     body.lead_id !== undefined
   ) {
     throw new AppError(400, 'INVALID_SLOT_OFFER_RESPONSE', 'Tenant, member, and lead identifiers cannot be supplied for public slot offer response.');
+  }
+}
+
+function rejectMemberConsentOverride(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new AppError(400, 'INVALID_MEMBER_CONSENT', 'Request body must be a JSON object.');
+  }
+  if (
+    body.clinicId !== undefined ||
+    body.clinic_id !== undefined ||
+    body.memberId !== undefined ||
+    body.member_id !== undefined ||
+    body.leadId !== undefined ||
+    body.lead_id !== undefined
+  ) {
+    throw new AppError(400, 'INVALID_MEMBER_CONSENT', 'Tenant, member, and lead identifiers cannot be supplied for public member consent updates.');
   }
 }
 
@@ -366,12 +385,101 @@ function normalizeSlotOfferResponsePayload(body) {
   };
 }
 
+function normalizeConsentUpdatePayload(body) {
+  rejectMemberConsentOverride(body);
+  const token = normalizeToken(body.token);
+  const rawConsents = Array.isArray(body.consents)
+    ? body.consents
+    : body.consent !== undefined
+      ? [body.consent]
+      : null;
+
+  if (!rawConsents || rawConsents.length === 0) {
+    throw new AppError(400, 'INVALID_MEMBER_CONSENT', 'At least one consent update is required.');
+  }
+  if (rawConsents.length > CONSENT_KEYS.length) {
+    throw new AppError(400, 'INVALID_MEMBER_CONSENT', 'Too many consent updates.');
+  }
+
+  const seenKeys = new Set();
+  const updates = rawConsents.map((rawConsent) => {
+    if (!rawConsent || typeof rawConsent !== 'object' || Array.isArray(rawConsent)) {
+      throw new AppError(400, 'INVALID_MEMBER_CONSENT', 'Consent update must be a JSON object.');
+    }
+
+    const key = trimString(rawConsent.key, 80, 'INVALID_MEMBER_CONSENT');
+    if (!key || !VALID_CONSENT_KEYS.has(key)) {
+      throw new AppError(400, 'INVALID_MEMBER_CONSENT', 'Consent key is invalid.');
+    }
+    if (seenKeys.has(key)) {
+      throw new AppError(400, 'INVALID_MEMBER_CONSENT', 'Consent key cannot be duplicated in one request.');
+    }
+    seenKeys.add(key);
+
+    const status = trimString(rawConsent.status, 20, 'INVALID_MEMBER_CONSENT_STATUS');
+    if (!status || !VALID_CONSENT_STATUSES.has(status)) {
+      throw new AppError(400, 'INVALID_MEMBER_CONSENT_STATUS', 'Consent status must be granted or revoked.');
+    }
+
+    const versionProvided = rawConsent.version !== undefined && rawConsent.version !== null && String(rawConsent.version).trim() !== '';
+    const version = trimString(rawConsent.version, 80, 'INVALID_MEMBER_CONSENT') || 'v1';
+
+    return {
+      key,
+      status,
+      version,
+      versionProvided
+    };
+  });
+
+  return {
+    token,
+    updates,
+    versionProvided: updates.some((update) => update.versionProvided)
+  };
+}
+
 function formatDateOnly(value) {
   if (!value) return null;
   if (value instanceof Date) {
     return bangkokDateFormatter.format(value);
   }
   return String(value).slice(0, 10);
+}
+
+function formatTimestamp(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString();
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toISOString();
+}
+
+function defaultMemberConsent(key) {
+  return {
+    key,
+    status: 'unknown',
+    source: 'member_portal',
+    version: 'v1',
+    grantedAt: null,
+    revokedAt: null,
+    lastUpdatedAt: null,
+    updatedAt: null
+  };
+}
+
+function mapPublicMemberConsent(rowOrDefault) {
+  const key = rowOrDefault.consent_key || rowOrDefault.key;
+  return {
+    key,
+    status: rowOrDefault.consent_status || rowOrDefault.status || 'unknown',
+    source: rowOrDefault.consent_source || rowOrDefault.source || 'member_portal',
+    version: rowOrDefault.consent_version || rowOrDefault.version || 'v1',
+    grantedAt: formatTimestamp(rowOrDefault.granted_at || rowOrDefault.grantedAt),
+    revokedAt: formatTimestamp(rowOrDefault.revoked_at || rowOrDefault.revokedAt),
+    lastUpdatedAt: formatTimestamp(rowOrDefault.last_updated_at || rowOrDefault.lastUpdatedAt),
+    updatedAt: formatTimestamp(rowOrDefault.updated_at || rowOrDefault.updatedAt)
+  };
 }
 
 async function resolveActiveClinicForRequest(slug) {
@@ -765,6 +873,98 @@ async function getNextScheduledAppointmentForMember(client, clinicId, memberId) 
   return findNextScheduledAppointment(result.rows.map(mapPublicConfirmedAppointment));
 }
 
+async function listMemberConsentsForPortal(client, clinicId, memberId) {
+  const result = await client.query(
+    `
+      select
+        consent_key,
+        consent_status,
+        consent_source,
+        consent_version,
+        granted_at,
+        revoked_at,
+        last_updated_at,
+        updated_at
+      from clinic_member_consents
+      where clinic_id = $1
+        and member_id = $2
+        and consent_key = any($3::varchar[])
+    `,
+    [clinicId, memberId, CONSENT_KEYS]
+  );
+
+  const rowsByKey = new Map(result.rows.map((row) => [row.consent_key, row]));
+  return CONSENT_KEYS.map((key) => mapPublicMemberConsent(rowsByKey.get(key) || defaultMemberConsent(key)));
+}
+
+async function upsertMemberConsent(client, clinicId, memberId, update, metadata) {
+  const result = await client.query(
+    `
+      insert into clinic_member_consents (
+        clinic_id,
+        member_id,
+        consent_key,
+        consent_status,
+        consent_source,
+        consent_version,
+        granted_at,
+        revoked_at,
+        last_updated_at,
+        metadata_json,
+        updated_at
+      )
+      values (
+        $1,
+        $2,
+        $3,
+        $4,
+        'member_portal',
+        $5,
+        case when $4 = 'granted' then now() else null end,
+        case when $4 = 'revoked' then now() else null end,
+        now(),
+        $6::jsonb,
+        now()
+      )
+      on conflict (clinic_id, member_id, consent_key)
+      do update set
+        consent_status = excluded.consent_status,
+        consent_source = 'member_portal',
+        consent_version = excluded.consent_version,
+        granted_at = case
+          when excluded.consent_status = 'granted' then now()
+          else clinic_member_consents.granted_at
+        end,
+        revoked_at = case
+          when excluded.consent_status = 'revoked' then now()
+          else null
+        end,
+        last_updated_at = now(),
+        metadata_json = excluded.metadata_json,
+        updated_at = now()
+      returning
+        consent_key,
+        consent_status,
+        consent_source,
+        consent_version,
+        granted_at,
+        revoked_at,
+        last_updated_at,
+        updated_at
+    `,
+    [
+      clinicId,
+      memberId,
+      update.key,
+      update.status,
+      update.version,
+      JSON.stringify(metadata)
+    ]
+  );
+
+  return mapPublicMemberConsent(result.rows[0]);
+}
+
 async function verifyMemberMagicToken(slug, token, requestMeta = {}) {
   const client = await getPool().connect();
   try {
@@ -781,6 +981,7 @@ async function verifyMemberMagicToken(slug, token, requestMeta = {}) {
       session.clinic.id,
       Number(session.memberRow.id)
     );
+    const consents = await listMemberConsentsForPortal(client, session.clinic.id, Number(session.memberRow.id));
     const summary = buildMemberPortalSummary({
       bookingRequests: session.bookingRequests,
       slotOffers,
@@ -792,7 +993,8 @@ async function verifyMemberMagicToken(slug, token, requestMeta = {}) {
       summary,
       bookingRequests: session.bookingRequests,
       slotOffers,
-      confirmedAppointments
+      confirmedAppointments,
+      consents
     };
     await client.query('commit');
 
@@ -802,7 +1004,54 @@ async function verifyMemberMagicToken(slug, token, requestMeta = {}) {
       portal,
       bookingRequests: session.bookingRequests,
       slotOffers,
-      confirmedAppointments
+      confirmedAppointments,
+      consents
+    };
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function updateMemberConsents(slug, body, requestMeta = {}) {
+  const normalized = normalizeConsentUpdatePayload(body);
+  const client = await getPool().connect();
+
+  try {
+    await client.query('begin');
+    const session = await resolveMemberSessionByToken(slug, normalized.token, requestMeta, { client });
+    const clinicId = session.clinic.id;
+    const memberId = Number(session.memberRow.id);
+    const meta = getRequestMeta(requestMeta);
+    const metadata = {
+      requestIpHash: meta.requestIpHash,
+      userAgentHash: meta.userAgentHash,
+      updatedVia: 'member_portal'
+    };
+
+    for (const update of normalized.updates) {
+      await upsertMemberConsent(client, clinicId, memberId, update, metadata);
+    }
+
+    const summary = {
+      source: 'member_portal_consent',
+      memberId,
+      updatedKeys: normalized.updates.map((update) => update.key),
+      statuses: Object.fromEntries(normalized.updates.map((update) => [update.key, update.status])),
+      versionProvided: normalized.versionProvided
+    };
+
+    await recordMemberAccessEvent(client, clinicId, session.memberRow, 'member_consent.updated', summary);
+    await auditMemberAccess(client, clinicId, memberId, 'member_consent.updated', summary);
+
+    const consents = await listMemberConsentsForPortal(client, clinicId, memberId);
+    await client.query('commit');
+
+    return {
+      success: true,
+      consents
     };
   } catch (error) {
     await client.query('rollback').catch(() => {});
@@ -973,6 +1222,7 @@ async function respondToMemberSlotOffer(slug, offerId, body, requestMeta = {}) {
 module.exports = {
   requestMemberMagicLink,
   verifyMemberMagicToken,
+  updateMemberConsents,
   respondToMemberSlotOffer,
   mapMemberPublicProfile,
   maskEmail,
@@ -986,6 +1236,12 @@ module.exports = {
   mapPublicConfirmedAppointment,
   listPublicConfirmedAppointmentsForMember,
   getNextScheduledAppointmentForMember,
+  listMemberConsentsForPortal,
+  defaultMemberConsent,
+  mapPublicMemberConsent,
+  normalizeConsentUpdatePayload,
+  VALID_CONSENT_KEYS,
+  VALID_CONSENT_STATUSES,
   buildMemberPortalSummary,
   resolveMemberSessionByToken
 };

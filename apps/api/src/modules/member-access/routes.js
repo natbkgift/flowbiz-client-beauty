@@ -6,6 +6,7 @@ const { AppError } = require('../../common/errors');
 const {
   requestMemberMagicLink,
   verifyMemberMagicToken,
+  updateMemberConsents,
   respondToMemberSlotOffer
 } = require('./service');
 
@@ -58,6 +59,29 @@ async function handleMemberAccessRoutes(request, response, url, tools) {
     }
 
     const result = await verifyMemberMagicToken(portalSessionParams.slug, url.searchParams.get('token'), requestMeta(request));
+    return json(response, 200, result);
+  }
+
+  const consentParams = matchPath(url.pathname, '/public/clinics/:slug/member-portal/consents');
+  if (consentParams && request.method === 'PATCH') {
+    const limitCheck = checkRateLimit(request, 30, 60000);
+    if (!limitCheck.allowed) {
+      throw new AppError(429, 'RATE_LIMIT_EXCEEDED', limitCheck.message);
+    }
+
+    if (
+      url.searchParams.has('clinicId') ||
+      url.searchParams.has('clinic_id') ||
+      url.searchParams.has('memberId') ||
+      url.searchParams.has('member_id') ||
+      url.searchParams.has('leadId') ||
+      url.searchParams.has('lead_id')
+    ) {
+      throw new AppError(400, 'INVALID_MEMBER_CONSENT', 'Tenant, member, and lead identifiers cannot be supplied for public member consent updates.');
+    }
+
+    const body = await parseJsonBody(request);
+    const result = await updateMemberConsents(consentParams.slug, body, requestMeta(request));
     return json(response, 200, result);
   }
 
