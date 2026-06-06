@@ -225,6 +225,19 @@ const THAI_ERROR_MESSAGES = {
   MEMBER_ACCESS_FORBIDDEN: 'ไม่สามารถเข้าใช้งานข้อมูลสมาชิกนี้ได้',
   INVALID_MEMBER_CONSENT: 'ข้อมูลการยินยอมของสมาชิกไม่ถูกต้อง',
   INVALID_MEMBER_CONSENT_STATUS: 'สถานะการยินยอมของสมาชิกไม่ถูกต้อง',
+  INVALID_PACKAGE_PAYLOAD: 'ข้อมูลแพ็กเกจไม่ครบถ้วนหรือไม่ถูกต้อง',
+  INVALID_PACKAGE_TYPE: 'ประเภทแพ็กเกจไม่ถูกต้อง',
+  INVALID_PACKAGE_STATUS: 'สถานะแพ็กเกจไม่ถูกต้อง',
+  SERVICE_PACKAGE_NOT_FOUND: 'ไม่พบแพ็กเกจบริการที่ต้องการ',
+  SERVICE_PACKAGE_NOT_ACTIVE: 'แพ็กเกจบริการนี้ไม่พร้อมใช้งาน',
+  SERVICE_PACKAGE_CODE_CONFLICT: 'รหัสแพ็กเกจนี้ถูกใช้งานแล้วในคลินิกนี้',
+  INVALID_MEMBER_PACKAGE: 'ข้อมูลแพ็กเกจของสมาชิกไม่ครบถ้วนหรือไม่ถูกต้อง',
+  INVALID_MEMBER_PACKAGE_STATUS: 'สถานะแพ็กเกจของสมาชิกไม่ถูกต้อง',
+  MEMBER_PACKAGE_NOT_FOUND: 'ไม่พบแพ็กเกจของสมาชิกที่ต้องการ',
+  INVALID_PAYMENT_RECORD: 'ข้อมูลบันทึกการชำระเงินไม่ครบถ้วนหรือไม่ถูกต้อง',
+  INVALID_PAYMENT_STATUS: 'สถานะการชำระเงินไม่ถูกต้อง',
+  INVALID_PAYMENT_METHOD: 'วิธีบันทึกการชำระเงินไม่ถูกต้อง',
+  PACKAGE_PAYMENT_PERMISSION_DENIED: 'คุณไม่มีสิทธิ์จัดการข้อมูลแพ็กเกจหรือการชำระเงิน',
   INTERNAL_SERVER_ERROR: 'ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง'
 };
 

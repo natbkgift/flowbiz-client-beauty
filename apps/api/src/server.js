@@ -57,6 +57,7 @@ const { handleBookingRequestRoutes } = require('./modules/booking-requests/route
 const { handleAppointmentRoutes } = require('./modules/appointments/routes');
 const { handleMemberRoutes } = require('./modules/members/routes');
 const { handleMemberAccessRoutes } = require('./modules/member-access/routes');
+const { handlePackagePaymentRoutes } = require('./modules/package-payments/routes');
 const { handleNotificationRoutes } = require('./modules/notifications/routes');
 
 
@@ -431,6 +432,10 @@ async function routeRequest(request, response) {
   }
 
   if (await handleAppointmentRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
+    return;
+  }
+
+  if (await handlePackagePaymentRoutes(request, response, url, { authenticateRequest, parseJsonBody, json })) {
     return;
   }
 

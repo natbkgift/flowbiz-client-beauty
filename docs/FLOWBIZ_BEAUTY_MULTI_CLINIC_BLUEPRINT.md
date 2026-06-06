@@ -30,11 +30,17 @@ PR #41 / PR 18A has been merged:
 - Merge commit: `0a7cdadd9f9a44056a744f5bcfab6f7d0ce08a1a`
 - Result: member portal v1 is now part of `main`
 
+PR #42 / PR 18B has been merged:
+
+- PR: https://github.com/natbkgift/flowbiz-client-beauty/pull/42
+- Merge commit: `4f51293fdc73e5bb36b3c30f68260ef247982ff6`
+- Result: member consent management is now part of `main`
+
 Current branch work:
 
-- PR 18B: Member Consent Management - implemented in branch, not merged.
-- Extends the existing member portal magic-link session payload with `portal.consents` and adds a safe member consent update endpoint.
-- Keeps legal/PDPA advice, consent document versioning, payment, package ownership, profile editing, rescheduling, public appointment creation, calendar sync, auto-send, marketing automation, and real messaging providers out of scope.
+- PR 19A: Package Ownership / Payment Foundation - implemented in branch, not merged.
+- Adds clinic service package catalog, member package ownership records, manual/admin-created payment records, and read-only member portal visibility for packages/payments.
+- Keeps real payment gateways, checkout, webhooks, QR payment, bank reconciliation, invoice PDF, package usage deduction automation, auto-send, and real messaging providers out of scope.
 
 ## Notification Stack Status
 
@@ -114,9 +120,10 @@ Appointment and booking gaps:
 
 Member and commerce gaps:
 
-- Package ownership ledger.
-- Payment or checkout foundation.
 - Payment gateway integration.
+- Real payment provider integration.
+- Real checkout/payment automation.
+- Package usage deduction / visit consumption automation.
 
 ## Current Safety Position
 
@@ -130,7 +137,8 @@ Approval alone still does not send anything. A manual admin action is required f
 
 ## Recommended Next Roadmap
 
-1. PR 19A: Package Ownership / Payment Foundation
+1. PR 19B: Package Usage Deduction / Visit Consumption
+2. PR 20A: Payment Gateway Planning / Provider Abstraction
 
 ## Historical PR 15H Scope (Merged)
 
@@ -154,7 +162,7 @@ PR 15H did not add:
 
 ## Merge Readiness Baseline
 
-After PR #41, `main` should be treated as having:
+After PR #42, `main` should be treated as having:
 
 - Notification draft foundation complete.
 - Admin preview complete.
@@ -168,8 +176,9 @@ After PR #41, `main` should be treated as having:
 - Confirmed appointment foundation complete.
 - Appointment conflict guard complete.
 - Member Portal V1 complete.
+- Member Consent Management complete.
 
-PR18B branch work is not part of this merge readiness baseline until PR18B is merged.
+PR19A branch work is not part of this merge readiness baseline until PR19A is merged.
 
 The next delivery work must preserve the same safety gates:
 
