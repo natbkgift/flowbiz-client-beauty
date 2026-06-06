@@ -223,6 +223,8 @@ const THAI_ERROR_MESSAGES = {
   INVALID_MEMBER_ACCESS_TOKEN: 'ลิงก์เข้าใช้งานไม่ถูกต้องหรือไม่พร้อมใช้งาน',
   MEMBER_ACCESS_TOKEN_EXPIRED: 'ลิงก์เข้าใช้งานหมดอายุแล้ว กรุณาขอลิงก์ใหม่',
   MEMBER_ACCESS_FORBIDDEN: 'ไม่สามารถเข้าใช้งานข้อมูลสมาชิกนี้ได้',
+  INVALID_MEMBER_CONSENT: 'ข้อมูลการยินยอมของสมาชิกไม่ถูกต้อง',
+  INVALID_MEMBER_CONSENT_STATUS: 'สถานะการยินยอมของสมาชิกไม่ถูกต้อง',
   INTERNAL_SERVER_ERROR: 'ระบบขัดข้อง กรุณาลองใหม่อีกครั้ง'
 };
 

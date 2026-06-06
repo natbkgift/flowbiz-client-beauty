@@ -24,11 +24,17 @@ PR #40 / PR 17B has been merged:
 - Merge commit: `636f3e71b76a35fa7cf3d75ff5a1c2ca437557e0`
 - Result: appointment conflict guard is now part of `main`
 
+PR #41 / PR 18A has been merged:
+
+- PR: https://github.com/natbkgift/flowbiz-client-beauty/pull/41
+- Merge commit: `0a7cdadd9f9a44056a744f5bcfab6f7d0ce08a1a`
+- Result: member portal v1 is now part of `main`
+
 Current branch work:
 
-- PR 18A: Member Portal V1 - implemented in branch, not merged.
-- Extends the existing member-access magic-link session payload with a read-only portal profile, booking requests, slot offers, confirmed appointments, and portal summary counts.
-- Keeps new authentication, payment, package ownership, consent management, profile editing, rescheduling, public appointment creation, calendar sync, auto-send, and real messaging providers out of scope.
+- PR 18B: Member Consent Management - implemented in branch, not merged.
+- Extends the existing member portal magic-link session payload with `portal.consents` and adds a safe member consent update endpoint.
+- Keeps legal/PDPA advice, consent document versioning, payment, package ownership, profile editing, rescheduling, public appointment creation, calendar sync, auto-send, marketing automation, and real messaging providers out of scope.
 
 ## Notification Stack Status
 
@@ -108,7 +114,6 @@ Appointment and booking gaps:
 
 Member and commerce gaps:
 
-- Member consent management.
 - Package ownership ledger.
 - Payment or checkout foundation.
 - Payment gateway integration.
@@ -125,8 +130,7 @@ Approval alone still does not send anything. A manual admin action is required f
 
 ## Recommended Next Roadmap
 
-1. PR 18B: Member Consent Management
-2. PR 19A: Package Ownership / Payment Foundation
+1. PR 19A: Package Ownership / Payment Foundation
 
 ## Historical PR 15H Scope (Merged)
 
@@ -150,7 +154,7 @@ PR 15H did not add:
 
 ## Merge Readiness Baseline
 
-After PR #40, `main` should be treated as having:
+After PR #41, `main` should be treated as having:
 
 - Notification draft foundation complete.
 - Admin preview complete.
@@ -163,8 +167,9 @@ After PR #40, `main` should be treated as having:
 - Customer slot offer email delivery complete.
 - Confirmed appointment foundation complete.
 - Appointment conflict guard complete.
+- Member Portal V1 complete.
 
-PR18A branch work is not part of this merge readiness baseline until PR18A is merged.
+PR18B branch work is not part of this merge readiness baseline until PR18B is merged.
 
 The next delivery work must preserve the same safety gates:
 
