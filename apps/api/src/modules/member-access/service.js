@@ -7,6 +7,10 @@ const { AppError } = require('../../common/errors');
 const { recordAuditLog } = require('../audit/service');
 const { createNotificationDraftForEvent } = require('../notifications/service');
 const { resolvePublicClinicBySlug } = require('../public-content/clinic-resolver');
+const {
+  listPublicMemberPackagesForMember,
+  listPublicPaymentRecordsForMember
+} = require('../package-payments/service');
 
 const GENERIC_REQUEST_MESSAGE = 'หากพบข้อมูลสมาชิก ระบบจะส่งลิงก์เข้าใช้งานให้ตามช่องทางที่ระบุ';
 const VALID_CHANNELS = new Set(['email', 'phone', 'line']);
@@ -985,6 +989,8 @@ async function verifyMemberMagicToken(slug, token, requestMeta = {}) {
       Number(session.memberRow.id)
     );
     const consents = await listMemberConsentsForPortal(client, session.clinic.id, Number(session.memberRow.id));
+    const packages = await listPublicMemberPackagesForMember(client, session.clinic.id, Number(session.memberRow.id));
+    const payments = await listPublicPaymentRecordsForMember(client, session.clinic.id, Number(session.memberRow.id));
     const summary = buildMemberPortalSummary({
       bookingRequests: session.bookingRequests,
       slotOffers,
@@ -997,7 +1003,9 @@ async function verifyMemberMagicToken(slug, token, requestMeta = {}) {
       bookingRequests: session.bookingRequests,
       slotOffers,
       confirmedAppointments,
-      consents
+      consents,
+      packages,
+      payments
     };
     await client.query('commit');
 
@@ -1008,7 +1016,9 @@ async function verifyMemberMagicToken(slug, token, requestMeta = {}) {
       bookingRequests: session.bookingRequests,
       slotOffers,
       confirmedAppointments,
-      consents
+      consents,
+      packages,
+      payments
     };
   } catch (error) {
     await client.query('rollback').catch(() => {});
